@@ -61,38 +61,57 @@ Gehe dazu wie folgt vor:
 
 ### Schritt 2: Code auf Render hochladen
 1. Gehe auf [render.com](https://render.com/) und logge dich über deinen **GitHub Account** ein (dies ist die zwingend empfohlene Login-Methode, andere Methoden wie E-Mail oder Google können bei der Verknüpfung mit deinem Code Probleme verursachen).
-2. Klicke im Dashboard oben rechts auf **"New"** und wähle **"Web Service"**.
-3. Wähle **"Build and deploy from a Git repository"** aus.
-4. Verbinde dein GitHub-Konto und wähle das Repository deines Vokabeltrainers aus.
-5. Fülle die Einstellungen wie folgt aus:
-   - **Name:** Wie deine Webseite später heißen soll (z.B. `mein-vokabeltrainer`).
-   - **Region:** Frankfurt (oder die Region, die du bei Neon gewählt hast).
-   - **Branch:** `main` (Wichtig!).
-   - **Runtime:** `Docker` (Wichtig!).
-   - **Instance Type:** `Free` (Kostenlos).
+2. Klicke im Dashboard oben rechts auf **"New"** und wähle **"Blueprint"**.
+3. Verbinde dein GitHub-Konto und wähle das Repository deines Vokabeltrainers aus.
+4. Render erkennt automatisch die Datei `render.yaml` (den Blueprint) und lädt die Konfiguration. Du wirst nun aufgefordert, die fehlenden Umgebungsvariablen einzugeben.
 
-### Schritt 3: Umgebungsvariablen (Environment Variables) einrichten
-Bevor du ganz unten auf "Create Web Service" klickst, musst du Render noch sagen, wie es sich mit der Datenbank verbinden kann und dass es sich in der Cloud befindet.
-Scrolle runter zu **"Environment Variables"** und klicke auf **"Add Environment Variable"**. Füge folgende Einträge hinzu:
+### Schritt 3: Umgebungsvariablen (Environment Variables) eingeben
+Gib die folgenden Werte ein, wenn Render dich danach fragt:
 
 | Key (Schlüssel) | Value (Wert) |
 | :--- | :--- |
-| `RENDER` | `true` |
 | `DATABASE_URL` | *(Füge hier den kopierten Connection String von Neon aus Schritt 1 ein)* |
 | `GEMINI_API_KEY` | *(Dein Google Gemini API Key für die KI-Funktionen)* |
-| `SETTINGS_PASSWORD` | *(Optional: Passwortschutz für die Einstellungen)* |
-| `BASIC_AUTH_USER` | *(Optional: Globaler Zugriffsschutz (HTTP Basic Auth))* |
-| `BASIC_AUTH_PASSWORD` | *(Optional: Globaler Zugriffsschutz (HTTP Basic Auth))* |
+| `SETTINGS_PASSWORD` | *(Optional: Passwortschutz für die Einstellungen, kann leer bleiben)* |
+| `BASIC_AUTH_USER` | *(Optional: Globaler Zugriffsschutz, kann leer bleiben)* |
+| `BASIC_AUTH_PASSWORD` | *(Optional: Globaler Zugriffsschutz, kann leer bleiben)* |
 
 ### Schritt 4: Starten!
-1. Klicke ganz unten auf **"Create Web Service"**.
-2. Render beginnt nun automatisch, deine App herunterzuladen, vorzubereiten und zu starten (das sogenannte "Deployment"). Das kann beim ersten Mal 5-10 Minuten dauern.
-3. Wenn alles fertig ist, siehst du oben links einen grünen Status "Live" und darunter einen Link (z.B. `https://mein-vokabeltrainer.onrender.com`).
+1. Klicke ganz unten auf **"Apply"** oder **"Create Blueprint"**.
+2. Render beginnt nun automatisch, deine App herunterzuladen, vorzubereiten und zu starten (das sogenannte "Deployment"). Das kann beim ersten Mal etwas dauern.
+3. Wenn alles fertig ist, siehst du in deinem Dashboard einen grünen Status "Live" und einen Link (z.B. `https://vokabeltrainer.onrender.com`).
 4. Klicke auf den Link – **Fertig!** Dein Vokabeltrainer ist nun im Internet erreichbar.
 
 > **Hinweis zum Free-Tier bei Render:** Da du die kostenlose Version von Render nutzt, "schläft" deine App ein, wenn sie 15 Minuten lang nicht benutzt wird. Wenn du sie danach wieder aufrufst, dauert das Laden der Seite beim allerersten Mal ca. 30 Sekunden länger, weil Render die App erst wieder "aufwecken" muss. Danach reagiert sie wieder sofort.
 
 
+### Alternative: Manuelles Deployment (ohne Blueprint)
+
+Falls du bei der Nutzung von Docker (oder generell) aufgefordert wirst, eine Kreditkarte zu hinterlegen: **Dies ist eine Sicherheitsregel von Render, um Missbrauch (wie Krypto-Mining) zu verhindern.** Wenn du den Free Plan (0$) ausgewählt hast, brauchst du dir keine Sorgen vor Abbuchungen machen. Render wird im Free-Tier niemals Geld abbuchen.
+
+Möchtest du jedoch lieber komplett auf die Eingabe von Zahlungsdaten verzichten, kannst du den Web Service manuell mit der Node.js Umgebung konfigurieren:
+
+1. Klicke im Render-Dashboard auf **"New"** und wähle **"Web Service"**.
+2. Wähle **"Build and deploy from a Git repository"** aus.
+3. Verbinde dein GitHub-Konto und wähle das Repository deines Vokabeltrainers aus.
+4. Fülle die Einstellungen wie folgt aus:
+   - **Name:** Wie deine Webseite später heißen soll (z.B. `mein-vokabeltrainer`).
+   - **Region:** Frankfurt (oder die Region, die du bei Neon gewählt hast).
+   - **Branch:** `main`
+   - **Runtime:** `Node` (Wichtig! **Nicht** Docker auswählen, das umgeht die Kreditkartenabfrage)
+   - **Build Command:** `./scripts/render-build.sh`
+   - **Start Command:** `npm start`
+   - **Instance Type:** `Free` (Kostenlos)
+5. Klicke auf **"Advanced"** und füge unter **"Environment Variables"** die folgenden Variablen hinzu:
+
+| Key | Value |
+| :--- | :--- |
+| `RENDER` | `true` |
+| `DATABASE_URL` | *(Dein Neon Connection String)* |
+| `GEMINI_API_KEY` | *(Dein Google Gemini API Key)* |
+| `SETTINGS_PASSWORD` | *(Optional)* |
+
+6. Klicke ganz unten auf **"Create Web Service"**.
 
 ### Lokales Setup (Docker)
 

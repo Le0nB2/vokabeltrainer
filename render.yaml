@@ -1,0 +1,24 @@
+services:
+  - type: web
+    name: vokabeltrainer
+    env: node
+    plan: free
+    buildCommand: "./scripts/render-build.sh"
+    startCommand: "npm start"
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: NEXT_TELEMETRY_DISABLED
+        value: 1
+      - key: RENDER
+        value: true
+      - key: DATABASE_URL
+        sync: false
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: SETTINGS_PASSWORD
+        sync: false
+      - key: BASIC_AUTH_USER
+        sync: false
+      - key: BASIC_AUTH_PASSWORD
+        sync: false
