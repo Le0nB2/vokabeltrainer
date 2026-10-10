@@ -73,7 +73,7 @@ Gehe dazu wie folgt vor:
    - **Instance Type:** `Free` (Kostenlos).
 
 ### Schritt 3: Umgebungsvariablen (Environment Variables) einrichten
-Bevor du ganz unten auf "Create Web Service" klickst, musst du Render noch sagen, wie es sich mit der Datenbank verbinden kann und dass es sich in der Cloud befindet.
+Bevor du ganz unten auf "Deploy web service" klickst, musst du Render noch sagen, wie es sich mit der Datenbank verbinden kann und dass es sich in der Cloud befindet.
 Scrolle runter zu **"Environment Variables"** und klicke auf **"Add Environment Variable"**. Füge folgende Einträge hinzu:
 
 | Key (Schlüssel) | Value (Wert) |
@@ -85,15 +85,14 @@ Scrolle runter zu **"Environment Variables"** und klicke auf **"Add Environment 
 | `BASIC_AUTH_USER` | Benutzernamen *(Optional: Globaler Zugriffsschutz (HTTP Basic Auth))* |
 | `BASIC_AUTH_PASSWORD` | Kennwort *(Optional: Globaler Zugriffsschutz (HTTP Basic Auth))* |
 
+> **Hinweis zum Free-Tier bei Render:** Falls du bei beim Klick auf "Deploy web service" aufgefordert wirst, eine Kreditkarte zu hinterlegen: Dies ist eine Sicherheitsregel von Render, um Missbrauch (wie Krypto-Mining) zu verhindern. Wenn du den Free Plan (0$) ausgewählt hast, brauchst du dir keine Sorgen vor Abbuchungen machen. Render wird im Free-Tier kein Geld abbuchen.
+Da du jedoch die kostenlose Version von Render nutzt, "schläft" deine App ein, wenn sie 15 Minuten lang nicht benutzt wird. Wenn du sie danach wieder aufrufst, dauert das Laden der Seite beim allerersten Mal ca. 30 Sekunden länger, weil Render die App erst wieder "aufwecken" muss. Danach reagiert sie wieder sofort.
+
 ### Schritt 4: Starten!
 1. Klicke ganz unten auf **"Deploy web service"**.
 2. Render beginnt nun automatisch, deine App herunterzuladen, vorzubereiten und zu starten (das sogenannte "Deployment"). Das kann beim ersten Mal 5-10 Minuten dauern.
 3. Wenn alles fertig ist, siehst du oben links einen grünen Status "Live" und darunter einen Link (z.B. `https://mein-vokabeltrainer.onrender.com`).
 4. Klicke auf den Link – **Fertig!** Dein Vokabeltrainer ist nun im Internet erreichbar.
-
-> **Hinweis zum Free-Tier bei Render:** Da du die kostenlose Version von Render nutzt, "schläft" deine App ein, wenn sie 15 Minuten lang nicht benutzt wird. Wenn du sie danach wieder aufrufst, dauert das Laden der Seite beim allerersten Mal ca. 30 Sekunden länger, weil Render die App erst wieder "aufwecken" muss. Danach reagiert sie wieder sofort.
-
-
 
 ### Lokales Setup (Docker)
 
