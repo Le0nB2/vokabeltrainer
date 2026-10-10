@@ -1,0 +1,1 @@
+ALTER TABLE "Settings" ADD COLUMN "worksheetCount" INTEGER NOT NULL DEFAULT 0;

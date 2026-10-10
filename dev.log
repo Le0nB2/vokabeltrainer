@@ -1,0 +1,16 @@
+
+> vokabeltrainer@0.1.0 dev
+> next dev
+
+▲ Next.js 16.3.8 (Turbopack)
+- Local:         http://localhost:3000
+- Network:       http://192.168.0.2:3000
+✓ Ready in 806ms
+✓ Running next.config.ts took 89ms
+⚠ The Edge Runtime is deprecated. You can use the "nodejs" runtime instead. Learn more: https://nextjs.org/docs/messages/edge-runtime-deprecated
+
+○ Compiling / ...
+ GET / 200 in 6.7s (next.js: 5.9s, application-code: 807ms)
+ GET /decks/ae825ced-ecf2-4575-b9c2-cee870380ee6/study 200 in 2.3s
+ GET / 200 in 185ms (next.js: 21ms, application-code: 164ms)
+ GET /decks/ae825ced-ecf2-4575-b9c2-cee870380ee6/study 200 in 77ms (next.js: 28ms, application-code: 49ms)

@@ -1,0 +1,17 @@
+▲ Next.js 16.3.8
+- Local:         http://localhost:3005
+- Network:       http://0.0.0.0:3005
+✓ Ready in 0ms
+✓ Running next.config took 4ms
+⨯ Error [PrismaClientKnownRequestError]:
+Invalid `prisma.deck.findMany()` invocation:
+
+
+The table `main.Deck` does not exist in the current database.
+    at async e (.next/server/chunks/ssr/[root-of-the-server]__0w4ta1k._.js:1:2729)
+    at async ab (.next/server/chunks/ssr/src_1h3m91h._.js:1:19936) {
+  code: 'P2021',
+  clientVersion: '5.22.0',
+  meta: { modelName: 'Deck', table: 'main.Deck' },
+  digest: '3932103350'
+}

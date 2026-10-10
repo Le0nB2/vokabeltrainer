@@ -1,0 +1,72 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = "file:./dev.db"
+}
+
+model Deck {
+  id                  String      @id @default(uuid())
+  title               String
+  description         String?
+  createdAt           DateTime    @default(now())
+  updatedAt           DateTime    @updatedAt
+  cards               Card[]
+  reviewLogs          ReviewLog[]
+  lastResultCorrect   Int?
+  lastResultIncorrect Int?
+}
+
+model Card {
+  id                 String      @id @default(uuid())
+  deckId             String
+  deck               Deck        @relation(fields: [deckId], references: [id], onDelete: Cascade)
+  front              String
+  back               String
+  notes              String?
+  mnemonic           String?
+  contextSentence    String?
+  easeFactor         Float       @default(2.5)
+  lapses             Int         @default(0)
+  box                Int         @default(1)
+  consecutiveCorrect Int         @default(0)
+  dueDate            DateTime    @default(now())
+  lastReviewed       DateTime?
+  createdAt          DateTime    @default(now())
+  updatedAt          DateTime    @updatedAt
+  gapText            String?
+  reviewLogs         ReviewLog[]
+}
+
+model ReviewLog {
+  id        String   @id @default(uuid())
+  cardId    String
+  card      Card     @relation(fields: [cardId], references: [id], onDelete: Cascade)
+  deckId    String
+  deck      Deck     @relation(fields: [deckId], references: [id], onDelete: Cascade)
+  isCorrect Boolean  @default(true)
+  createdAt DateTime @default(now())
+}
+
+model Settings {
+  id                    String  @id @default("default")
+  minigamesEnabled      Boolean @default(true)
+  minigameIntervalMin   Int     @default(50)
+  minigameIntervalMax   Int     @default(75)
+  speedMatchEnabled     Boolean @default(true)
+  balloonPopEnabled     Boolean @default(true)
+  reactionTesterEnabled Boolean @default(true)
+  wordDropEnabled       Boolean @default(true)
+  worksheetCount        Int     @default(0)
+  notificationsEnabled  Boolean @default(false)
+}
+
+model ApiUsageLog {
+  id          String   @id @default(uuid())
+  apiKeyIndex Int
+  isSuccess   Boolean
+  endpoint    String
+  createdAt   DateTime @default(now())
+}

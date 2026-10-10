@@ -1,0 +1,229 @@
+# Vokabeltrainer mit adaptivem Spaced Repetition (SRS) & Gemini AI
+
+Eine moderne, lokal lauffähige Vokabeltrainer-Webanwendung, gebaut mit Next.js (App Router), TypeScript, Tailwind CSS, und Prisma (SQLite).
+
+## Features
+- **Smarteres Spaced Repetition System (SRS):** Adaptives Lernsystem ähnlich zu SuperMemo. Dynamische Berechnung der Intervalle basierend auf dem 'Ease-Factor' der Karte und deiner Bewertung.
+  - **Feine SRS-Abstufung**: Anstelle von nur "Gewusst" oder "Nicht gewusst" ermöglicht das System (wie bei FSRS) eine granularere Rückmeldung ("Erneut", "Schwer", "Gut", "Einfach"). So können Intervalle noch besser auf den individuellen Lernfortschritt abgestimmt werden. Das "Leech-Management" erkennt Problemkarten und zeigt gezielt hinterlegte Eselsbrücken an.
+- **Globales Mischen (Interleaving)**: Ein spezieller "Tägliches Training" Modus (auf dem Dashboard verfügbar) erlaubt es, fällige Karten aus allen Decks gemischt abzufragen. Dies erfordert ein tieferes Abrufen der Vokabeln, da der Kontext (z.B. das Thema des Decks) nicht vorab bekannt ist.
+- **Aktives Erinnern (Typing-Mode)**: In höheren Lernstufen (ab Stufe 3) wird nicht nur die Selbsteinschätzung abgefragt, sondern das Wort muss aktiv eingetippt werden. Ein integrierter Fuzzy-Matching-Algorithmus (Damerau-Levenshtein-Distanz) erkennt dabei leichte Tippfehler und gibt gezieltes Feedback (z.B. "Tippfehler beachtet").
+- **Study Mode:** Ablenkungsfreier Lernmodus mit 3D-Karten-Flip und Tastatursteuerung.
+- **Foto-Scan Import:** Lade ein Foto einer Vokabelliste hoch. Die Gemini Vision KI extrahiert die Vokabeln automatisch.
+- **Manuelle Eingabe:** Direkt in der Web-Oberfläche.
+- **CSV Import:** Schneller Massen-Import von Vokabeln via CSV-Datei.
+  - **Pflichtfelder:** Die Spalten `front` (Vorderseite) und `back` (Rückseite) müssen zwingend ausgefüllt sein.
+  - **Optionale Felder:** `notes`, `gapText` (oder `lückentext`), `mnemonic` (oder `eselsbrücke`) und `contextSentence` (oder `beispielsatz`).
+  - **KI-Generierung:** Falls die Felder Lückentext (`gapText`), Eselsbrücke (`mnemonic`) und Beispielsatz (`contextSentence`) in der CSV nicht ausgefüllt sind, werden diese automatisch über die integrierte Google Gemini KI generiert!
+  - [Hier findest du eine Beispiel-CSV](./public/assets/example.csv) zum Herunterladen oder Ansehen.
+  - Beispiel Struktur:
+    ```csv
+    front,back,notes,gapText,mnemonic,contextSentence
+    apple,Apfel,ein Obst,The ___ is red.,A for Apple,I ate an apple today.
+    house,Haus,,,,
+    car,Auto,,,,
+    ```
+- **Contextual Learning**: Beim Scannen oder Hinzufügen neuer Vokabeln generiert die integrierte KI-Anbindung nun vollautomatisch in einem Schritt sinnvolle Beispielsätze und einprägsame Eselsbrücken, um das Lernen im Kontext zu erleichtern.
+- **Minigame-Pausensystem**: Im Lernmodus (Study-Mode) ist nun ein konfigurierbares Pausensystem integriert, das die Motivation aufrechterhält und Ermüdung entgegenwirkt. Nach einer bestimmten Anzahl gelernter Karten (Standard: 50-75) wird automatisch eines von vier Minispielen zur Auflockerung eingeblendet.
+
+  Die Minispiele können in den **Einstellungen** konfiguriert werden:
+  - **Speed-Match (Paare verbinden)**: Finde die passenden englischen und deutschen Vokabelpaare auf Zeit.
+  - **Balloon Pop (Motorischer Reset)**: Zerplatze aufsteigende Ballons für eine kurze kognitive Pause.
+  - **Reaktions-Tester (Reflex-Check)**: Klicke blitzschnell, sobald der Bildschirm grün wird.
+  - **Wort-Regen (Word Drop)**: Fange die richtige fallende englische Vokabel passend zum deutschen Wort.
+
+  Alle Minispiele sind responsiv und lassen sich nach Belieben in den Einstellungen aktivieren oder deaktivieren. Auch das Intervall (wie viele Karten zwischen Pausen gelernt werden sollen) ist dort frei wählbar. Ein "Überspringen"-Button erlaubt es zudem, Minispiele im Lernfluss jederzeit zu überspringen.
+
+## Hosting in der Cloud (Render & Neon)
+
+Du möchtest deinen Vokabeltrainer nicht lokal auf deinem eigenen PC laufen lassen, sondern ihn rund um die Uhr aus dem Internet erreichbar machen? Kein Problem! Dank dieser Anleitung kannst du die App völlig **kostenlos** in der Cloud hosten.
+
+Wir nutzen dafür zwei Dienste:
+1. **Neon:** Eine kostenlose Datenbank in der Cloud (PostgreSQL), in der deine Vokabeln gespeichert werden.
+2. **Render:** Ein Cloud-Anbieter, der deinen Programmcode ausführt und deine App im Internet als Website sichtbar macht.
+
+### Vorbereitung
+
+Den **kostenlosen** API Key erhältst du im [Google AI Studio](https://aistudio.google.com/).
+Gehe dazu wie folgt vor:
+1. Besuche das [Google AI Studio](https://aistudio.google.com/) und melde dich mit deinem Google-Konto an.
+2. Klicke im Menü links auf **"Get API key"**.
+3. Klicke auf den Button **"Create API key"**.
+4. Wähle ein bestehendes Google Cloud Projekt aus oder klicke auf **"Create API key in new project"**.
+5. Kopiere den generierten Schlüssel und füge ihn in deine `.env` Datei bei `GEMINI_API_KEY` ein.
+
+*Hinweis: Die Nutzung der Gemini API im Free Tier ist kostenlos und für den Vokabeltrainer völlig ausreichend.*
+
+### Schritt 1: Datenbank bei Neon erstellen
+1. Gehe auf [neon.tech](https://neon.tech/) und registriere dich kostenlos (mit deinem GitHub-Konto).
+2. Klicke im Dashboard auf **"New Project"**.
+3. Gib dem Projekt einen Namen (z.B. `vokabeltrainer-db`). Wähle bei Region am besten "Frankfurt" aus, damit die Datenbank schnell erreichbar ist. Klicke auf **"Create Project"**.
+4. Wichtig: Auf der nächsten Seite siehst du direkt deinen sogenannten **Connection String** (fängt meist mit `postgres://...` an). Kopiere diesen Text und speichere ihn dir kurz in einem Texteditor zwischen! Du brauchst ihn gleich.
+
+### Schritt 2: Code auf Render hochladen
+1. Gehe auf [render.com](https://render.com/) und logge dich über deinen **GitHub Account** ein (dies ist die zwingend empfohlene Login-Methode, andere Methoden wie E-Mail oder Google können bei der Verknüpfung mit deinem Code Probleme verursachen).
+2. Klicke im Dashboard oben rechts auf **"New"** und wähle **"Web Service"**.
+3. Wähle **"Build and deploy from a Git repository"** aus.
+4. Verbinde dein GitHub-Konto und wähle das Repository deines Vokabeltrainers aus.
+5. Fülle die Einstellungen wie folgt aus:
+   - **Name:** Wie deine Webseite später heißen soll (z.B. `mein-vokabeltrainer`).
+   - **Region:** Frankfurt (oder die Region, die du bei Neon gewählt hast).
+   - **Branch:** `main` (Wichtig!).
+   - **Runtime:** `Docker` (Wichtig!).
+   - **Instance Type:** `Free` (Kostenlos).
+
+### Schritt 3: Umgebungsvariablen (Environment Variables) einrichten
+Bevor du ganz unten auf "Create Web Service" klickst, musst du Render noch sagen, wie es sich mit der Datenbank verbinden kann und dass es sich in der Cloud befindet.
+Scrolle runter zu **"Environment Variables"** und klicke auf **"Add Environment Variable"**. Füge folgende Einträge hinzu:
+
+| Key (Schlüssel) | Value (Wert) |
+| :--- | :--- |
+| `RENDER` | `true` |
+| `DATABASE_URL` | *(Füge hier den kopierten Connection String von Neon aus Schritt 1 ein)* |
+| `GEMINI_API_KEY` | *(Dein Google Gemini API Key für die KI-Funktionen)* |
+| `SETTINGS_PASSWORD` | *(Optional: Passwortschutz für die Einstellungen)* |
+| `BASIC_AUTH_USER` | *(Optional: Globaler Zugriffsschutz (HTTP Basic Auth))* |
+| `BASIC_AUTH_PASSWORD` | *(Optional: Globaler Zugriffsschutz (HTTP Basic Auth))* |
+
+### Schritt 4: Starten!
+1. Klicke ganz unten auf **"Create Web Service"**.
+2. Render beginnt nun automatisch, deine App herunterzuladen, vorzubereiten und zu starten (das sogenannte "Deployment"). Das kann beim ersten Mal 5-10 Minuten dauern.
+3. Wenn alles fertig ist, siehst du oben links einen grünen Status "Live" und darunter einen Link (z.B. `https://mein-vokabeltrainer.onrender.com`).
+4. Klicke auf den Link – **Fertig!** Dein Vokabeltrainer ist nun im Internet erreichbar.
+
+> **Hinweis zum Free-Tier bei Render:** Da du die kostenlose Version von Render nutzt, "schläft" deine App ein, wenn sie 15 Minuten lang nicht benutzt wird. Wenn du sie danach wieder aufrufst, dauert das Laden der Seite beim allerersten Mal ca. 30 Sekunden länger, weil Render die App erst wieder "aufwecken" muss. Danach reagiert sie wieder sofort.
+
+
+
+### Lokales Setup (Docker)
+
+Die App ist vollständig containerisiert und kann ohne lokale Node.js Installation ausgeführt werden.
+
+### 1. Umgebungsvariablen konfigurieren
+Erstelle eine `.env` Datei im Hauptverzeichnis (falls nicht vorhanden) und füge deinen Gemini API Key und den Passwortschutz (falls benötigt) ein:
+
+```env
+# Optional: Mehrere Schlüssel kommasepariert, falls das Limit oft erreicht wird
+GEMINI_API_KEY="DEIN_GEMINI_API_KEY_HIER"
+# Optional: Passwortschutz für die Einstellungen
+SETTINGS_PASSWORD="DEIN_PASSWORT_HIER"
+# Optional: Globaler Zugriffsschutz (HTTP Basic Auth)
+BASIC_AUTH_USER="benutzername"
+BASIC_AUTH_PASSWORD="dein_sicheres_passwort"
+```
+
+Den **kostenlosen** API Key erhältst du im [Google AI Studio](https://aistudio.google.com/).
+Gehe dazu wie folgt vor:
+1. Besuche das [Google AI Studio](https://aistudio.google.com/) und melde dich mit deinem Google-Konto an.
+2. Klicke im Menü links auf **"Get API key"**.
+3. Klicke auf den Button **"Create API key"**.
+4. Wähle ein bestehendes Google Cloud Projekt aus oder klicke auf **"Create API key in new project"**.
+5. Kopiere den generierten Schlüssel und füge ihn in deine `.env` Datei bei `GEMINI_API_KEY` ein.
+
+*Hinweis: Die Nutzung der Gemini API im Free Tier ist kostenlos und für den Vokabeltrainer völlig ausreichend.*
+
+### 2. Starten
+Starte die Container mit Docker Compose:
+```bash
+docker-compose up --build
+```
+
+Beim Start:
+1. Baut das Next.js Standalone-Image.
+2. Führt automatisch `prisma migrate deploy` aus, um das SQLite-Schema sicher zu migrieren.
+3. Startet den Webserver auf Port 3000 (intern).
+
+Die App ist nun unter [http://localhost:3001](http://localhost:3001) erreichbar.
+
+## Tech-Stack
+- Frontend & Backend: Next.js 15 (App Router, Server Actions)
+- Styling: Tailwind CSS, Lucide Icons
+- Datenbank: SQLite via Prisma ORM
+- KI-Analyse: `@google/genai` (Gemini 3.5 Flash Lite Structured Output)
+
+## Dienste und Versionen
+
+Hier sind die zentralen Dienste, Container-Eigenschaften und Abhängigkeiten des Vokabeltrainer-Projekts aufgeführt.
+
+## Docker Container
+
+| Dienst | Image / Basis | Port (Host:Container) | Letzte Stable-Version | Update-Hinweise |
+| :--- | :--- | :--- | :--- | :--- |
+| **app** | `node:22-alpine` | `3001:3000` | `node:24-alpine` (Active LTS) / `node:22-alpine` (Maintenance) | Update auf Node 24 LTS empfohlen, vorab Build- und Modul-Kompatibilität testen. |
+
+## Kerntechnologien & Frameworks
+
+| Technologie | Aktuelle Version | Letzte Stable-Version | Quelle | Update-Hinweise |
+| :--- | :--- | :--- | :--- | :--- |
+| **Node.js** | 22-alpine (v22.x) | 24.x LTS | `Dockerfile` | Testlauf für native Module empfohlen; v22 wird weiterhin gewartet. |
+| **Next.js** | 16.3.8 | 16.3.8 | `package.json` | Bereits aktuell (kein Update erforderlich). |
+| **React** | 19.2.8 | 19.3.0 | `package.json` | Minor-Update, ohne Breaking Changes direkt möglich. |
+| **React DOM** | 19.2.8 | 19.3.0 | `package.json` | Minor-Update, zusammen mit React aktualisieren. |
+
+## Datenbank & ORM
+
+| Technologie | Aktuelle Version | Letzte Stable-Version | Beschreibung | Update-Hinweise |
+| :--- | :--- | :--- | :--- | :--- |
+| **Prisma (CLI & Client)** | ^5.22.0 | 7.10.0 | ORM für die Datenbankanbindung | Vorsicht: Breaking Changes zwischen v5 und v7. Offizielle Migration Guides beachten. |
+| **SQLite** | - | - | Lokale, dateibasierte Datenbank (via Prisma `dev.db`) | Wird über Prisma bzw. Systemtreiber verwaltet, kein manuelles Update nötig. |
+
+## Weitere wichtige Abhängigkeiten
+
+| Paket | Aktuelle Version | Letzte Stable-Version | Funktion / Bereich | Update-Hinweise |
+| :--- | :--- | :--- | :--- | :--- |
+| **@google/genai** | ^2.25.0 | 2.27.0 | KI-Services (z. B. Bildanalyse) | Reibungslos möglich (abwärtskompatible Minor-Releases). |
+| **Tailwind CSS** | ^4.x | 4.x | Styling | Minor-/Patch-Updates innerhalb v4 unkritisch. |
+| **Lucide React** | ^1.49.0 | 1.49.0+ | UI-Icons | Reibungslos möglich. |
+| **Chart.js** | ^4.5.1 | 4.5.x | Diagramme und Visualisierungen | Reibungslos möglich innerhalb der Major-Version. |
+| **react-chartjs-2** | ^5.3.1 | 5.3.x | React-Wrapper für Chart.js | Reibungslos möglich. |
+| **Zod** | ^4.6.5 | 4.6.5 | Schema-Validierung | Bereits auf aktuellem Stand. |
+| **Framer Motion** | ^14.0.0 | 14.0.0 | Animationen | Bereits auf aktuellem Stand. |
+| **@react-pdf/renderer** | ^4.9.0 | 4.9.0 | PDF-Generierung für Arbeitsblätter | Reibungslos möglich. |
+
+## Home Assistant Integration (Benachrichtigungen)
+
+Die App verfügt über einen API-Endpunkt, um die Anzahl der aktuell fälligen Vokabeln abzufragen. Dies ermöglicht es, externe Systeme wie Home Assistant zu nutzen, um z.B. täglich um 16:00 Uhr eine Push-Benachrichtigung an dein Smartphone zu senden, falls Vokabeln fällig sind.
+
+Damit der Endpunkt echte Daten liefert, muss in der Web-App unter **Einstellungen -> Benachrichtigungen** der Schalter **Tägliche Erinnerung aktivieren** eingeschaltet sein. Ist er aus, liefert die API immer `0` zurück.
+
+### 1. REST Sensor (in `configuration.yaml`)
+Erstellt einen Sensor, der die fälligen Vokabeln von der App abfragt. (Ersetze die IP mit der deines Docker-Hosts).
+
+```yaml
+sensor:
+  - platform: rest
+    name: "Vokabeln faellig"
+    resource: "http://192.168.1.xxx:3001/api/notifications/due-count"
+    method: GET
+    value_template: "{{ value_json.dueCount }}"
+    unit_of_measurement: "Vokabeln"
+```
+
+### 2. Automatisierung (in `automations.yaml` oder via UI)
+Sendet täglich um 16:00 Uhr eine Benachrichtigung, wenn mehr als 0 Vokabeln fällig sind.
+
+```yaml
+alias: Vokabeln Erinnerung 16 Uhr
+triggers:
+  - trigger: time
+    at: '16:00:00'
+conditions:
+  - condition: not
+    conditions:
+      - condition: state
+        entity_id: sensor.vokabeln_faellig
+        state:
+          - unavailable
+          - unknown
+  - condition: numeric_state
+    entity_id: sensor.vokabeln_faellig
+    above: 0
+actions:
+  - action: notify.mobile_app_dein_smartphone # Handynamen anpassen
+    data:
+      title: Vokabeltrainer
+      message: >-
+        Denk an Deine Vokabeln! Heute sind noch {{
+        states('sensor.vokabeln_faellig') }} Vokabeln zu üben.
+      data:
+        url: http://192.168.1.xxx:3001/
+  ```
