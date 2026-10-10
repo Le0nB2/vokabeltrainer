@@ -55,20 +55,21 @@ Gehe dazu wie folgt vor:
 
 ### Schritt 1: Datenbank bei Neon erstellen
 1. Gehe auf [neon.tech](https://neon.tech/) und registriere dich kostenlos (mit deinem GitHub-Konto).
-2. Klicke im Dashboard auf **"New Project"**.
+2. Klicke im Dashboard auf **"New Project"** falls du nicht direkt aufgefordert wirst ein Projekt zu erstellen.
 3. Gib dem Projekt einen Namen (z.B. `vokabeltrainer-db`). Wähle bei Region am besten "Frankfurt" aus, damit die Datenbank schnell erreichbar ist. Klicke auf **"Create Project"**.
-4. Wichtig: Auf der nächsten Seite siehst du direkt deinen sogenannten **Connection String** (fängt meist mit `postgres://...` an). Kopiere diesen Text und speichere ihn dir kurz in einem Texteditor zwischen! Du brauchst ihn gleich.
+4. Achte darauf, dass Postgres database aktiviert ist.
+5. Wichtig: Nach create Projekt gelangst du ins Dashboard. Klicke auf Connect. Auf der nächsten Seite siehst du direkt deinen sogenannten **Connection String** (fängt meist mit `postgres://...` an). Kopiere diesen Text und speichere ihn dir kurz in einem Texteditor zwischen! Du brauchst ihn gleich.
 
 ### Schritt 2: Code auf Render hochladen
-1. Gehe auf [render.com](https://render.com/) und logge dich über deinen **GitHub Account** ein (dies ist die zwingend empfohlene Login-Methode, andere Methoden wie E-Mail oder Google können bei der Verknüpfung mit deinem Code Probleme verursachen).
+1. Gehe auf [render.com](https://render.com/), erstelle ein Konto bzw. logge dich über deinen **Google Account** ein.
 2. Klicke im Dashboard oben rechts auf **"New"** und wähle **"Web Service"**.
-3. Wähle **"Build and deploy from a Git repository"** aus.
-4. Verbinde dein GitHub-Konto und wähle das Repository deines Vokabeltrainers aus.
+3. Wähle **"Public Git Repository"** aus.
+4. Wähle das Repository `https://github.com/Le0nB2/vokabeltrainer` deines Vokabeltrainers aus.
 5. Fülle die Einstellungen wie folgt aus:
    - **Name:** Wie deine Webseite später heißen soll (z.B. `mein-vokabeltrainer`).
-   - **Region:** Frankfurt (oder die Region, die du bei Neon gewählt hast).
+   - **Language/Runtime:** `Docker` (Wichtig!).
    - **Branch:** `main` (Wichtig!).
-   - **Runtime:** `Docker` (Wichtig!).
+   - **Region:** Frankfurt (oder die Region, die du bei Neon gewählt hast).
    - **Instance Type:** `Free` (Kostenlos).
 
 ### Schritt 3: Umgebungsvariablen (Environment Variables) einrichten
@@ -81,11 +82,11 @@ Scrolle runter zu **"Environment Variables"** und klicke auf **"Add Environment 
 | `DATABASE_URL` | *(Füge hier den kopierten Connection String von Neon aus Schritt 1 ein)* |
 | `GEMINI_API_KEY` | *(Dein Google Gemini API Key für die KI-Funktionen)* |
 | `SETTINGS_PASSWORD` | *(Optional: Passwortschutz für die Einstellungen)* |
-| `BASIC_AUTH_USER` | *(Optional: Globaler Zugriffsschutz (HTTP Basic Auth))* |
-| `BASIC_AUTH_PASSWORD` | *(Optional: Globaler Zugriffsschutz (HTTP Basic Auth))* |
+| `BASIC_AUTH_USER` | Benutzernamen *(Optional: Globaler Zugriffsschutz (HTTP Basic Auth))* |
+| `BASIC_AUTH_PASSWORD` | Kennwort *(Optional: Globaler Zugriffsschutz (HTTP Basic Auth))* |
 
 ### Schritt 4: Starten!
-1. Klicke ganz unten auf **"Create Web Service"**.
+1. Klicke ganz unten auf **"Deploy web service"**.
 2. Render beginnt nun automatisch, deine App herunterzuladen, vorzubereiten und zu starten (das sogenannte "Deployment"). Das kann beim ersten Mal 5-10 Minuten dauern.
 3. Wenn alles fertig ist, siehst du oben links einen grünen Status "Live" und darunter einen Link (z.B. `https://mein-vokabeltrainer.onrender.com`).
 4. Klicke auf den Link – **Fertig!** Dein Vokabeltrainer ist nun im Internet erreichbar.
