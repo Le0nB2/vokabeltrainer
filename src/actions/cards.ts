@@ -8,10 +8,10 @@ export async function addCard(
   deckId: string,
   front: string,
   back: string,
-  notes?: string,
-  gapText?: string,
-  mnemonic?: string,
-  contextSentence?: string
+  notes?: string | null,
+  gapText?: string | null,
+  mnemonic?: string | null,
+  contextSentence?: string | null
 ) {
   const card = await prisma.card.create({
     data: {
@@ -36,7 +36,7 @@ export async function addCardsBulk(
     notes?: string;
     gapText?: string;
     mnemonic?: string;
-    contextSentence?: string;
+    contextSentence?: string | null;
   }[]
 ) {
   const created = await prisma.card.createMany({
@@ -136,10 +136,10 @@ export async function updateCardDetails(
   deckId: string,
   front: string,
   back: string,
-  notes?: string,
-  gapText?: string,
-  mnemonic?: string,
-  contextSentence?: string
+  notes?: string | null,
+  gapText?: string | null,
+  mnemonic?: string | null,
+  contextSentence?: string | null
 ) {
   const updated = await prisma.card.update({
     where: { id: cardId },
