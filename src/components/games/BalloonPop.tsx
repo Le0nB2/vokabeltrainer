@@ -82,20 +82,20 @@ export function BalloonPop({ onComplete }: { onComplete: () => void }) {
           {balloons.map(b => (
             <motion.div
               key={b.id}
-              initial={{ y: 500, x: `${b.x}%`, scale: 0, opacity: 0 }}
-              animate={{ y: -100, x: `${b.x}%`, scale: 1, opacity: 1 }}
+              initial={{ bottom: "-20%", scale: 0, opacity: 0 }}
+              animate={{ bottom: "120%", scale: 1, opacity: 1 }}
               exit={{ scale: 1.5, opacity: 0, transition: { duration: 0.2 } }}
-              transition={{ y: { duration: b.speed, ease: "linear" }, scale: { duration: 0.2 }, opacity: { duration: 0.2 } }}
+              transition={{ bottom: { duration: b.speed, ease: "linear" }, scale: { duration: 0.2 }, opacity: { duration: 0.2 } }}
               // eslint-disable-next-line @typescript-eslint/no-explicit-any
               onAnimationComplete={(def: any) => {
                  // Remove balloon if it reached top without being popped
-                 if (def && typeof def === 'object' && 'y' in def && def.y === -100) {
+                 if (def && typeof def === 'object' && 'bottom' in def && def.bottom === "120%") {
                     setBalloons(prev => prev.filter(bl => bl.id !== b.id))
                  }
               }}
               onClick={() => popBalloon(b.id)}
-              className={`absolute bottom-0 w-16 h-20 sm:w-20 sm:h-24 ${b.color} rounded-[50%] shadow-lg cursor-pointer transform -translate-x-1/2 flex items-center justify-center`}
-              style={{ left: `${b.x}%` }}
+              className={`absolute w-16 h-20 sm:w-20 sm:h-24 ${b.color} rounded-[50%] shadow-lg cursor-pointer flex items-center justify-center`}
+              style={{ left: `calc(${b.x}% - 2rem)` }}
               whileHover={{ scale: 1.1 }}
               whileTap={{ scale: 0.9 }}
             >
