@@ -88,9 +88,9 @@ export function SpeedMatch({
   }
 
   return (
-    <div className="flex flex-col h-full items-center justify-center p-4 sm:p-6 w-full max-w-2xl mx-auto">
+    <div className="flex flex-col h-full items-center justify-start sm:justify-center p-4 sm:p-6 w-full max-w-2xl mx-auto overflow-y-auto">
       <h2 className="text-xl sm:text-2xl font-bold text-zinc-800 dark:text-zinc-100 mb-6 text-center">Speed-Match</h2>
-      <div className="grid grid-cols-2 gap-4 sm:gap-8 w-full">
+      <div className="grid grid-cols-2 gap-2 sm:gap-8 w-full pb-8">
         {/* Left Column */}
         <div className="flex flex-col gap-3">
           <AnimatePresence>
@@ -98,7 +98,8 @@ export function SpeedMatch({
               <motion.button
                 key={`left-${item.id}`}
                 layout
-                initial={{ opacity: 1, scale: 1 }}
+                initial={{ opacity: 0, scale: 0.8 }}
+                animate={{ opacity: 1, scale: 1 }}
                 exit={{ opacity: 0, scale: 0.8 }}
                 onClick={() => !selectedLeft && setSelectedLeft(item.id)}
                 className={`p-3 sm:p-4 rounded-xl shadow-sm text-center border-2 transition-all
@@ -109,7 +110,7 @@ export function SpeedMatch({
                     : 'border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 hover:border-blue-300'}
                 `}
               >
-                <span className="text-sm sm:text-base font-medium break-words hyphens-auto">{item.text}</span>
+                <span className="text-sm sm:text-base font-medium break-words hyphens-auto line-clamp-3 sm:line-clamp-none">{item.text}</span>
               </motion.button>
             ))}
           </AnimatePresence>
@@ -122,7 +123,8 @@ export function SpeedMatch({
               <motion.button
                 key={`right-${item.id}`}
                 layout
-                initial={{ opacity: 1, scale: 1 }}
+                initial={{ opacity: 0, scale: 0.8 }}
+                animate={{ opacity: 1, scale: 1 }}
                 exit={{ opacity: 0, scale: 0.8 }}
                 onClick={() => !selectedRight && setSelectedRight(item.id)}
                 className={`p-3 sm:p-4 rounded-xl shadow-sm text-center border-2 transition-all
@@ -133,7 +135,7 @@ export function SpeedMatch({
                     : 'border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 hover:border-blue-300'}
                 `}
               >
-                 <span className="text-sm sm:text-base font-medium break-words hyphens-auto">{item.text}</span>
+                 <span className="text-sm sm:text-base font-medium break-words hyphens-auto line-clamp-3 sm:line-clamp-none">{item.text}</span>
               </motion.button>
             ))}
           </AnimatePresence>
