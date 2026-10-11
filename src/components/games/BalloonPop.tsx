@@ -77,7 +77,7 @@ export function BalloonPop({ onComplete }: { onComplete: () => void }) {
         <div className="text-lg font-bold text-red-500">{timeLeft}s</div>
       </div>
 
-      <div className="flex-1 relative border-2 border-dashed border-zinc-200 dark:border-zinc-800 rounded-xl overflow-hidden bg-zinc-50/50 dark:bg-zinc-900/50 cursor-crosshair">
+      <div className="flex-1 relative border-2 border-dashed border-zinc-200 dark:border-zinc-800 rounded-xl overflow-hidden bg-zinc-50/50 dark:bg-zinc-900/50 cursor-crosshair transform-gpu">
         <AnimatePresence>
           {balloons.map(b => (
             <motion.div

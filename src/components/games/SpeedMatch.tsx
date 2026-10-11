@@ -98,7 +98,8 @@ export function SpeedMatch({
               <motion.button
                 key={`left-${item.id}`}
                 layout
-                initial={{ opacity: 1, scale: 1 }}
+                initial={{ opacity: 0, scale: 0.8 }}
+                animate={{ opacity: 1, scale: 1 }}
                 exit={{ opacity: 0, scale: 0.8 }}
                 onClick={() => !selectedLeft && setSelectedLeft(item.id)}
                 className={`p-3 sm:p-4 rounded-xl shadow-sm text-center border-2 transition-all
@@ -122,7 +123,8 @@ export function SpeedMatch({
               <motion.button
                 key={`right-${item.id}`}
                 layout
-                initial={{ opacity: 1, scale: 1 }}
+                initial={{ opacity: 0, scale: 0.8 }}
+                animate={{ opacity: 1, scale: 1 }}
                 exit={{ opacity: 0, scale: 0.8 }}
                 onClick={() => !selectedRight && setSelectedRight(item.id)}
                 className={`p-3 sm:p-4 rounded-xl shadow-sm text-center border-2 transition-all
