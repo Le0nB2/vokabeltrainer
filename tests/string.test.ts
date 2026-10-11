@@ -38,4 +38,10 @@ describe('evaluateAnswer', () => {
     const result = evaluateAnswer('hello!', 'hello')
     expect(result.status).toBe('CORRECT')
   })
+  it('should ignore text in brackets', () => {
+    const result = evaluateAnswer('like', '(to) like')
+    expect(result.status).toBe('CORRECT')
+    const result2 = evaluateAnswer('hello', 'hello [sth]')
+    expect(result2.status).toBe('CORRECT')
+  })
 })
