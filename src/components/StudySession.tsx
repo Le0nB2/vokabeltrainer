@@ -20,7 +20,7 @@ export function StudySession({ deck, dueCards, settings }: { deck: { id: string,
   const [sessionCardCount, setSessionCardCount] = useState(0)
   const [studyMode, setStudyMode] = useState<'smart' | 'classic'>('smart')
   const [typingInput, setTypingInput] = useState('')
-  const [typingFeedback, setTypingFeedback] = useState<{ status: string, message: string, rating: 'again' | 'hard' | 'good' | 'easy' } | null>(null)
+  const [typingFeedback, setTypingFeedback] = useState<{ status: string, message: string, input?: string, rating: 'again' | 'hard' | 'good' | 'easy' } | null>(null)
   const isGlobal = deck.id === 'global';
 
 
@@ -105,9 +105,9 @@ export function StudySession({ deck, dueCards, settings }: { deck: { id: string,
     if (sessionCompleted) return
 
     if (e.key === ' ' || e.key === 'Enter') {
-      // Allow input field to handle its own enter
-      if (e.key === 'Enter' && !isFlipped && isTypingMode && document.activeElement?.tagName === 'INPUT') {
-        return; // Form onSubmit handles this
+      // Allow input field to handle its own enter/space
+      if (!isFlipped && isTypingMode && document.activeElement?.tagName === 'INPUT') {
+        return; // Let input handle typing
       }
 
       e.preventDefault()
@@ -253,7 +253,7 @@ export function StudySession({ deck, dueCards, settings }: { deck: { id: string,
     else if (result.status === 'TYPO') rating = 'hard';
     else rating = 'again';
 
-    setTypingFeedback({ ...result, rating });
+    setTypingFeedback({ ...result, rating, input: typingInput });
     setIsFlipped(true);
   };
 
@@ -336,16 +336,26 @@ export function StudySession({ deck, dueCards, settings }: { deck: { id: string,
             <span className="text-3xl md:text-5xl font-bold text-zinc-900 dark:text-zinc-100 [overflow-wrap:anywhere] w-full">{questionText}</span>
             <span className="mt-4 text-sm text-blue-500 font-medium">{subtitleText}</span>
             {isTypingMode ? (
-              <form onSubmit={handleTypingSubmit} className="w-full mt-8" onClick={e => e.stopPropagation()}>
+              <form onSubmit={handleTypingSubmit} className="w-full mt-8 relative" onClick={e => e.stopPropagation()}>
                 <input
                   type="text"
                   value={typingInput}
                   onChange={e => setTypingInput(e.target.value)}
                   placeholder="Antwort eintippen..."
-                  className="w-full px-6 py-4 rounded-xl border-2 border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-950 text-xl text-center focus:outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-500/20 transition-all"
+                  className="w-full px-6 py-4 pr-16 rounded-xl border-2 border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-950 text-xl text-center focus:outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-500/20 transition-all"
                   autoFocus
+                  autoCorrect="off"
+                  spellCheck={false}
+                  autoCapitalize="off"
+                  autoComplete="off"
                 />
-                <button type="submit" className="hidden">Prüfen</button>
+                <button
+                  type="submit"
+                  className="absolute right-3 top-1/2 -translate-y-1/2 p-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors flex items-center justify-center"
+                  title="Absenden"
+                >
+                  <ArrowLeft className="w-5 h-5 rotate-180" />
+                </button>
               </form>
             ) : (
               <div className="absolute bottom-8 text-sm text-zinc-400 flex items-center gap-2">
@@ -382,7 +392,12 @@ export function StudySession({ deck, dueCards, settings }: { deck: { id: string,
                 typingFeedback.status === 'TYPO' ? 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400' :
                 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400'
               }`}>
-                {typingFeedback.message}
+                <div>{typingFeedback.message}</div>
+                {typingFeedback.status !== 'CORRECT' && typingFeedback.input && (
+                  <div className="mt-2 text-sm opacity-80 font-normal">
+                    Deine Eingabe: "{typingFeedback.input}"
+                  </div>
+                )}
               </div>
             )}
 
