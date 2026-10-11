@@ -30,6 +30,7 @@ export function MinigameOverlay({
   const [showInstructions, setShowInstructions] = useState(false)
 
   useEffect(() => {
+    if (activeGame) return;
     const available = []
     if (settings.speedMatchEnabled && pool.length >= 5) available.push('speed')
     if (settings.balloonPopEnabled) available.push('balloon')
@@ -44,7 +45,7 @@ export function MinigameOverlay({
     const randomGame = available[Math.floor(Math.random() * available.length)]
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setActiveGame(randomGame)
-  }, [settings, pool, onClose])
+  }, [settings, pool, onClose, activeGame])
 
   if (!activeGame) return null
 
