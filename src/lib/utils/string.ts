@@ -44,8 +44,8 @@ export function evaluateAnswer(input: string, correct: string) {
   // Zuerst Text in Klammern entfernen (z.B. "(to)", "[sth]"), dann Sonderzeichen
   const removeBrackets = (str: string) => str.replace(/\([^()]*\)/g, '').replace(/\[[^\[\]]*\]/g, '');
 
-  const normalizedInput = removeBrackets(input.toLowerCase()).replace(/[.,/#!$%^&*;:{}=\-_\`~()]/g, "").replace(/\s{2,}/g, ' ').trim();
-  const normalizedCorrect = removeBrackets(correct.toLowerCase()).replace(/[.,/#!$%^&*;:{}=\-_\`~()]/g, "").replace(/\s{2,}/g, ' ').trim();
+  const normalizedInput = removeBrackets(input.toLowerCase()).replace(/[.,/#!$%^&*;:{}=\-_\`~()?"']/g, "").replace(/\s{2,}/g, ' ').trim();
+  const normalizedCorrect = removeBrackets(correct.toLowerCase()).replace(/[.,/#!$%^&*;:{}=\-_\`~()?"']/g, "").replace(/\s{2,}/g, ' ').trim();
 
   const dist = damerauLevenshtein(normalizedInput, normalizedCorrect);
   const targetLength = normalizedCorrect.length;

@@ -45,3 +45,9 @@ describe('evaluateAnswer', () => {
     expect(result2.status).toBe('CORRECT')
   })
 })
+  it('should ignore question marks and quotes', () => {
+    const result = evaluateAnswer('How are you', 'How are you?')
+    expect(result.status).toBe('CORRECT')
+    const result2 = evaluateAnswer('its', "it's")
+    expect(result2.status).toBe('CORRECT')
+  })
