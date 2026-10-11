@@ -20,7 +20,7 @@ export function StudySession({ deck, dueCards, settings }: { deck: { id: string,
   const [sessionCardCount, setSessionCardCount] = useState(0)
   const [studyMode, setStudyMode] = useState<'smart' | 'classic'>('smart')
   const [typingInput, setTypingInput] = useState('')
-  const [typingFeedback, setTypingFeedback] = useState<{ status: string, message: string, rating: 'again' | 'hard' | 'good' | 'easy' } | null>(null)
+  const [typingFeedback, setTypingFeedback] = useState<{ status: string, message: string, input?: string, rating: 'again' | 'hard' | 'good' | 'easy' } | null>(null)
   const isGlobal = deck.id === 'global';
 
 
@@ -253,7 +253,7 @@ export function StudySession({ deck, dueCards, settings }: { deck: { id: string,
     else if (result.status === 'TYPO') rating = 'hard';
     else rating = 'again';
 
-    setTypingFeedback({ ...result, rating });
+    setTypingFeedback({ ...result, rating, input: typingInput });
     setIsFlipped(true);
   };
 
@@ -392,7 +392,12 @@ export function StudySession({ deck, dueCards, settings }: { deck: { id: string,
                 typingFeedback.status === 'TYPO' ? 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400' :
                 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400'
               }`}>
-                {typingFeedback.message}
+                <div>{typingFeedback.message}</div>
+                {typingFeedback.status !== 'CORRECT' && typingFeedback.input && (
+                  <div className="mt-2 text-sm opacity-80 font-normal">
+                    Deine Eingabe: "{typingFeedback.input}"
+                  </div>
+                )}
               </div>
             )}
 
