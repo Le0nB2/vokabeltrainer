@@ -120,7 +120,8 @@ export default async function Dashboard() {
               <div key={deck.id} className="bg-white dark:bg-zinc-900 rounded-xl p-6 shadow-sm border border-zinc-200 dark:border-zinc-800 hover:border-blue-500 dark:hover:border-blue-500 transition-colors group relative">
                 <DeckMenu deckId={deck.id} cardCount={deck.cards.length} />
 
-                <Link href={`/decks/${deck.id}/study`} className="block">
+                {/* If there are no cards, go to the detail page to add some. Otherwise, go to study. */}
+                <Link href={deck.cards.length === 0 ? `/decks/${deck.id}` : `/decks/${deck.id}/study`} className="block">
                   <h2 className="text-xl font-semibold mb-2">{deck.title}</h2>
                   <div className="flex gap-4 text-sm text-zinc-500 mb-6">
                     <span>{deck._count.cards} Karten</span>
