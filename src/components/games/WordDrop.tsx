@@ -42,7 +42,7 @@ export function WordDrop({
       id: i,
       text: opt.text,
       isCorrect: opt.isCorrect,
-      x: 10 + (i * 20) + (Math.random() * 10) // Spread them out horizontally
+      x: 15 + (i * 20) + (Math.random() * 5) // Spread them out horizontally, but keep within bounds
     }))
 
     setCurrentWord({ de: target.back, en: target.front, options })
@@ -111,14 +111,14 @@ export function WordDrop({
             {currentWord.options.map((opt) => (
               <motion.button
                 key={opt.id}
-                initial={{ y: -50, x: `${opt.x}%`, opacity: 0 }}
-                animate={{ y: 800, x: `${opt.x}%`, opacity: 1 }}
+                initial={{ top: "-10%", opacity: 0 }}
+                animate={{ top: "110%", opacity: 1 }}
                 exit={{ scale: 0, opacity: 0 }}
                 // eslint-disable-next-line react-hooks/purity
-                transition={{ y: { duration: 6 + Math.random() * 2, ease: "linear" } }}
+                transition={{ top: { duration: 6 + Math.random() * 2, ease: "linear" } }}
                 // eslint-disable-next-line @typescript-eslint/no-explicit-any
                 onAnimationComplete={(def: any) => {
-                  if (def && typeof def === 'object' && 'y' in def && def.y === 800) {
+                  if (def && typeof def === 'object' && 'top' in def && def.top === "110%") {
                      // Missed it
                      if (opt.isCorrect && !isTransitioning) {
                         setIsTransitioning(true)
@@ -127,8 +127,8 @@ export function WordDrop({
                   }
                 }}
                 onClick={() => handleCatch(opt.isCorrect, opt.id)}
-                className="absolute top-0 px-4 py-3 bg-white dark:bg-zinc-800 border-2 border-zinc-200 dark:border-zinc-700 rounded-xl shadow-lg cursor-pointer transform -translate-x-1/2 hover:border-blue-500 text-sm sm:text-base font-semibold"
-                style={{ left: `${opt.x}%` }}
+                className="absolute px-4 py-3 bg-white dark:bg-zinc-800 border-2 border-zinc-200 dark:border-zinc-700 rounded-xl shadow-lg cursor-pointer hover:border-blue-500 text-sm sm:text-base font-semibold"
+                style={{ left: `calc(${opt.x}% - 2rem)` }}
                 whileHover={{ scale: 1.1 }}
                 whileTap={{ scale: 0.9 }}
               >
