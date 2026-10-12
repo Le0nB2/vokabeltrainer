@@ -1,10 +1,8 @@
 services:
   - type: web
     name: vokabeltrainer
-    env: node
+    env: docker
     plan: free
-    buildCommand: "./scripts/render-build.sh"
-    startCommand: "npm start"
     envVars:
       - key: NODE_ENV
         value: production
