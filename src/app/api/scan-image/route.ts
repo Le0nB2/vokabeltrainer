@@ -3,8 +3,6 @@ import { GoogleGenAI, Type } from "@google/genai";
 import prisma from "@/lib/prisma";
 
 
-let currentKeyIndex = 0;
-
 export async function POST(req: NextRequest) {
   try {
     const formData = await req.formData();
@@ -38,8 +36,8 @@ export async function POST(req: NextRequest) {
     const models = ["gemini-3.5-flash-lite", "gemini-3.1-flash-lite"];
 
     // Try keys starting from the currentKeyIndex
-    for (let i = 0; i < apiKeys.length; i++) {
-      const attemptIndex = (currentKeyIndex + i) % apiKeys.length;
+    for (let attemptIndex = 0; attemptIndex < apiKeys.length; attemptIndex++) {
+
       const apiKey = apiKeys[attemptIndex];
       const ai = new GoogleGenAI({ apiKey });
 
@@ -50,7 +48,7 @@ export async function POST(req: NextRequest) {
           const response = await ai.models.generateContent({
             model: modelToUse,
             contents: [
-              "Extrahiere alle Vokabelpaare aus diesem Foto (Buchseite, Liste, Notizbuch). Trenne Ausgangswort und Übersetzung/Bedeutung exakt. Korrigiere offensichtliche Lesefehler. Generiere zudem für jede Vokabel zwingend eine witzige/bildhafte, jugendfreie und für 11- bis 13-Jährige geeignete Eselsbrücke auf Deutsch ('mnemonic') sowie einen einfachen englischen Beispielsatz ('contextSentence'). Generiere zudem zwingend einen Lückentext ('gapText', englischer Beispielsatz, in dem das englische Wort fehlt). Behalte 'notes' für grammatikalische Hinweise bei. Ignoriere Seitenzahlen und Überschriften.",
+              "Du bist ein didaktischer Englischlehrer für Schüler im Alter von 11 bis 13 Jahren (5.–7. Klasse). Extrahiere alle Vokabelpaare aus diesem Foto (Buchseite, Liste, Notizbuch). Trenne das englische Ausgangswort ('front') und die deutsche Übersetzung/Bedeutung ('back') exakt. Korrigiere offensichtliche Lesefehler. Generiere zudem für jede Vokabel zwingend eine Eselsbrücke auf Deutsch ('mnemonic') nach der Schlüsselwortmethode: 1. Finde ein deutsches Wort, das lautmalerisch an das englische Wort erinnert (z. B. 'mice' -> 'Mais'). 2. Verknüpfe dieses Klangwort in einer kurzen, bildhaften Szene mit der deutschen Übersetzung. Keine reinen Reime ohne Klangbezug, keine Beleidigungen, strikt jugendfrei. Erstelle auch einen einfachen englischen Beispielsatz ('contextSentence'). Erstelle zwingend einen Lückentext ('gapText'), der EXAKT derselbe Satz wie 'contextSentence' ist, bei dem jedoch das Zielwort aus 'front' durch '___' ersetzt wurde. Übernimm in 'notes' nur grammatikalische Besonderheiten, Aussprachehinweise oder unregelmäßige Formen, falls im Quellmaterial vorhanden; andernfalls belasse es als leeren String. Ignoriere Seitenzahlen und Überschriften.",
               { inlineData: { data: base64Image, mimeType: mimeType } }
             ],
             config: {
@@ -62,27 +60,27 @@ export async function POST(req: NextRequest) {
                   properties: {
                     front: {
                       type: Type.STRING,
-                      description: "Das Ausgangswort oder die Frage",
+                      description: "Das englische Ausgangswort",
                     },
                     back: {
                       type: Type.STRING,
-                      description: "Die Übersetzung oder die Antwort",
+                      description: "Die deutsche Übersetzung oder Bedeutung",
                     },
                     notes: {
                       type: Type.STRING,
-                      description: "Optionale Beispielsätze oder grammatikalische Notizen",
+                      description: "Nur grammatikalische Besonderheiten, Aussprachehinweise oder unregelmäßige Formen aus dem Quellmaterial. Sonst leer.",
                     },
                     gapText: {
                       type: Type.STRING,
-                      description: "Ein englischer Beispielsatz in dem das Ausgangswort durch ___ ersetzt ist.",
+                      description: "Exakt identisch mit contextSentence, wobei das Wort aus 'front' durch '___' ersetzt wurde.",
                     },
                     mnemonic: {
                       type: Type.STRING,
-                      description: "Eine witzige/bildhafte, jugendfreie und für 11- bis 13-Jährige geeignete Eselsbrücke auf Deutsch",
+                      description: "Bildhafte Eselsbrücke nach der Schlüsselwortmethode (lautmalerisches deutsches Wort verknüpft mit der Übersetzung), jugendfrei.",
                     },
                     contextSentence: {
                       type: Type.STRING,
-                      description: "Ein einfacher englischer Beispielsatz",
+                      description: "Ein einfacher, für 11-13-Jährige verständlicher englischer Beispielsatz.",
                     },
                   },
                   required: ["front", "back", "mnemonic", "contextSentence", "gapText"],
@@ -106,11 +104,9 @@ export async function POST(req: NextRequest) {
               isSuccess: true,
               endpoint: "scan-image"
             }
-          });
+          }).catch(err => console.error("DB Log Error:", err));
 
 
-          // Update the global index to the key that just succeeded
-          currentKeyIndex = attemptIndex;
           break; // Success, exit inner model loop
         } catch (error: unknown) {
           // Log error
@@ -120,7 +116,7 @@ export async function POST(req: NextRequest) {
               isSuccess: false,
               endpoint: "scan-image"
             }
-          });
+          }).catch(err => console.error("DB Log Error:", err));
 
           lastError = error;
           const errorMessage = (error as Error).message || String(error);
@@ -135,7 +131,7 @@ export async function POST(req: NextRequest) {
           if (errorMessage.includes("429") || errorMessage.includes("Quota exceeded") || errorMessage.includes("RESOURCE_EXHAUSTED")) {
             console.warn(`API key at index ${attemptIndex} exhausted quota. Trying next key if available.`);
 
-            if (i === apiKeys.length - 1 && modelIndex === models.length - 1) {
+            if (attemptIndex === apiKeys.length - 1 && modelIndex === models.length - 1) {
               return NextResponse.json(
                 { error: "Dein kostenloses Google API-Kontingente ist aufgebraucht. Versuche es in ein paar Stunden noch einmal" },
                 { status: 429 }

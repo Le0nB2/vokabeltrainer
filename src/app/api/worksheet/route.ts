@@ -3,8 +3,6 @@ import { NextRequest, NextResponse } from "next/server";
 import { GoogleGenAI, Type, Schema } from "@google/genai";
 import prisma from "@/lib/prisma";
 
-let currentKeyIndex = 0;
-
 export async function POST(req: NextRequest) {
   try {
     const { deckId } = await req.json();
@@ -151,8 +149,8 @@ ${JSON.stringify(selectedCards.map(c => ({ englisch: c.front, deutsch: c.back })
       required: ["exercises", "solutions"]
     };
 
-    for (let i = 0; i < apiKeys.length; i++) {
-      const attemptIndex = (currentKeyIndex + i) % apiKeys.length;
+    for (let attemptIndex = 0; attemptIndex < apiKeys.length; attemptIndex++) {
+
       const apiKey = apiKeys[attemptIndex];
       const ai = new GoogleGenAI({ apiKey });
 
@@ -205,11 +203,9 @@ ${JSON.stringify(selectedCards.map(c => ({ englisch: c.front, deutsch: c.back })
               isSuccess: true,
               endpoint: "worksheet"
             }
-          });
+          }).catch(err => console.error("DB Log Error:", err));
 
 
-          // Update the global index to the key that just succeeded
-          currentKeyIndex = attemptIndex;
           break; // Success, exit inner model loop
         } catch (error: unknown) {
           // Log error
@@ -219,7 +215,7 @@ ${JSON.stringify(selectedCards.map(c => ({ englisch: c.front, deutsch: c.back })
               isSuccess: false,
               endpoint: "worksheet"
             }
-          });
+          }).catch(err => console.error("DB Log Error:", err));
 
           lastError = error;
           const errorMessage = (error as Error).message || String(error);
@@ -234,7 +230,7 @@ ${JSON.stringify(selectedCards.map(c => ({ englisch: c.front, deutsch: c.back })
           if (errorMessage.includes("429") || errorMessage.includes("Quota exceeded") || errorMessage.includes("RESOURCE_EXHAUSTED")) {
             console.warn(`API key at index ${attemptIndex} exhausted quota. Trying next key if available.`);
 
-            if (i === apiKeys.length - 1 && modelIndex === models.length - 1) {
+            if (attemptIndex === apiKeys.length - 1 && modelIndex === models.length - 1) {
               return NextResponse.json(
                 { error: "Dein kostenloses Google API-Kontingente ist aufgebraucht. Versuche es in ein paar Stunden noch einmal" },
                 { status: 429 }

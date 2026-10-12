@@ -1,8 +1,6 @@
 import { GoogleGenAI, Type } from "@google/genai";
 import prisma from "@/lib/prisma";
 
-let currentKeyIndex = 0;
-
 export class QuotaExceededError extends Error {
   constructor(message: string) {
     super(message);
@@ -18,14 +16,14 @@ export async function enrichCards(cards: any[], apiKeys: string[]) {
   const models = ["gemini-3.5-flash-lite", "gemini-3.1-flash-lite"];
 
   const promptText = `
-Generiere für die folgenden Vokabelpaare zwingend eine witzige/bildhafte, jugendfreie und für 11- bis 13-Jährige geeignete Eselsbrücke auf Deutsch ('mnemonic') sowie einen einfachen englischen Beispielsatz ('contextSentence'). Generiere zudem zwingend einen Lückentext ('gapText', englischer Beispielsatz, in dem das englische Wort fehlt - ersetze es durch ___).
+Du bist ein didaktischer Englischlehrer für Schüler im Alter von 11 bis 13 Jahren (5.–7. Klasse). Generiere für die folgenden Vokabelpaare zwingend eine Eselsbrücke auf Deutsch ('mnemonic') nach der Schlüsselwortmethode: 1. Finde ein deutsches Wort, das lautmalerisch an das englische Wort erinnert. 2. Verknüpfe dieses Klangwort in einer kurzen, bildhaften Szene mit der deutschen Übersetzung. Keine reinen Reime ohne Klangbezug, keine Beleidigungen, strikt jugendfrei. Erstelle auch einen einfachen, verständlichen englischen Beispielsatz ('contextSentence'). Erstelle zwingend einen Lückentext ('gapText'), der EXAKT derselbe Satz wie 'contextSentence' ist, bei dem jedoch das englische Zielwort durch '___' ersetzt wurde.
 
 Hier sind die Vokabeln:
 ${JSON.stringify(cards, null, 2)}
 `;
 
-  for (let i = 0; i < apiKeys.length; i++) {
-    const attemptIndex = (currentKeyIndex + i) % apiKeys.length;
+  for (let attemptIndex = 0; attemptIndex < apiKeys.length; attemptIndex++) {
+
     const apiKey = apiKeys[attemptIndex];
     const ai = new GoogleGenAI({ apiKey });
 
@@ -49,15 +47,15 @@ ${JSON.stringify(cards, null, 2)}
                   },
                   gapText: {
                     type: Type.STRING,
-                    description: "Ein englischer Beispielsatz in dem das Ausgangswort durch ___ ersetzt ist.",
+                    description: "Exakt identisch mit contextSentence, wobei das englische Zielwort durch '___' ersetzt wurde.",
                   },
                   mnemonic: {
                     type: Type.STRING,
-                    description: "Eine witzige/bildhafte, jugendfreie und für 11- bis 13-Jährige geeignete Eselsbrücke auf Deutsch",
+                    description: "Bildhafte Eselsbrücke nach der Schlüsselwortmethode (lautmalerisches deutsches Wort verknüpft mit der Übersetzung), jugendfrei.",
                   },
                   contextSentence: {
                     type: Type.STRING,
-                    description: "Ein einfacher englischer Beispielsatz",
+                    description: "Ein einfacher, für 11-13-Jährige verständlicher englischer Beispielsatz.",
                   },
                 },
                 required: ["id", "mnemonic", "contextSentence", "gapText"],
@@ -81,10 +79,8 @@ ${JSON.stringify(cards, null, 2)}
             isSuccess: true,
             endpoint: "enrich-csv"
           }
-        });
+        }).catch(err => console.error("DB Log Error:", err));
 
-        // Update the global index to the key that just succeeded
-        currentKeyIndex = attemptIndex;
         break; // Success, exit inner model loop
       } catch (error: unknown) {
         // Log error
@@ -94,7 +90,7 @@ ${JSON.stringify(cards, null, 2)}
             isSuccess: false,
             endpoint: "enrich-csv"
           }
-        });
+        }).catch(err => console.error("DB Log Error:", err));
 
         lastError = error;
         const errorMessage = (error as Error).message || String(error);
@@ -109,7 +105,7 @@ ${JSON.stringify(cards, null, 2)}
         if (errorMessage.includes("429") || errorMessage.includes("Quota exceeded") || errorMessage.includes("RESOURCE_EXHAUSTED")) {
           console.warn(`API key at index ${attemptIndex} exhausted quota. Trying next key if available.`);
 
-          if (i === apiKeys.length - 1 && modelIndex === models.length - 1) {
+          if (attemptIndex === apiKeys.length - 1 && modelIndex === models.length - 1) {
             throw new QuotaExceededError("Dein kostenloses Google API-Kontingente ist aufgebraucht. Versuche es in ein paar Stunden noch einmal");
           }
           break; // Break inner model loop, let outer key loop continue
