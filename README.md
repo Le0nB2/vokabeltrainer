@@ -49,7 +49,7 @@ Gehe dazu wie folgt vor:
 2. Klicke im Menü links auf **"Get API key"**.
 3. Klicke auf den Button **"Create API key"**.
 4. Wähle ein bestehendes Google Cloud Projekt aus oder klicke auf **"Create API key in new project"**.
-5. Kopiere den generierten Schlüssel und füge ihn in deine `.env` Datei bei `GEMINI_API_KEY` ein.
+5. Notiere den generierten Schlüssel vorübergehend.
 
 *Hinweis: Die Nutzung der Gemini API im Free Tier ist kostenlos und für den Vokabeltrainer völlig ausreichend.*
 
