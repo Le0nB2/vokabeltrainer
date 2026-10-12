@@ -52,6 +52,7 @@ export async function POST(req: NextRequest) {
 
 WICHTIGE REGELN:
 1. Trenne das englische Ausgangswort ('front') und die deutsche Übersetzung/Bedeutung ('back') exakt. Korrigiere offensichtliche Lesefehler.
+   - WICHTIG: Keine Klammern in Sätzen oder Wörtern (z. B. "It's your turn" statt "(It's) your turn", "to find" statt "(to) find").
 2. Exakte Buch-Bedeutung priorisieren: Wenn das Buch für ein Wort eine spezifische Bedeutung angibt (z.B. "year" = "der Jahrgang / die Jahrgangsstufe"), muss genau diese Bedeutung für 'back' und für den Beispielsatz 'contextSentence' verwendet werden.
 3. Saubere Übernahme von Alternativen: Trennungen mit Schrägstrich aus dem Buch (z.B. "Du bist dran / an der Reihe" oder "das Sandwich, (zusammengeklapptes) belegtes Brot") sollen im Feld 'back' vollständig erhalten bleiben und nicht abgeschnitten werden.
 4. Lautschrift: Falls auf dem Bild Lautschrift vorhanden ist, extrahiere sie in eckigen Klammern (z.B. [bɔːl]) in das Feld 'phonetic', sonst leer.
@@ -59,10 +60,11 @@ WICHTIGE REGELN:
 6. Eselsbrücken ('mnemonic') nach der Schlüsselwortmethode:
    - Finde ein DEUTSCHES Wort, das lautmalerisch an das englische Wort erinnert (Klangwort).
    - KEINE Fantasiewörter! Das deutsche Klangwort MUSS ein echtes, existierendes deutsches Wort aus dem Duden sein.
+   - ACHTUNG KOGNATE: Falls das englische Wort bereits ein deutsches Lehnwort/Kognat ist (wie "ball", "orange", "sandwich", "banana"), erfinde KEIN künstliches Klangwort (keine Binsenweisheiten wie "Ball klingt wie Ball"). Baue stattdessen eine kurze, merkfähige Szene oder weise auf Besonderheiten (z. B. die englische Aussprache) hin.
    - Falls kein direktes deutsches Klangwort existiert, wähle ein Teilwort oder eine treffende lautmalerische Assoziation (z.B. "please" -> "Prise", "wrong" -> "Gong").
    - Verknüpfe dieses Klangwort in einer kurzen, bildhaften Szene mit der deutschen Übersetzung. Keine reinen Reime ohne Klangbezug, keine Beleidigungen, strikt jugendfrei.
-7. Erstelle einen einfachen englischen Beispielsatz ('contextSentence').
-8. Erstelle zwingend einen Lückentext ('gapText'), der EXAKT derselbe Satz wie 'contextSentence' ist, bei dem jedoch das Zielwort aus 'front' durch '___' ersetzt wurde.
+7. Erstelle einen einfachen englischen Beispielsatz ('contextSentence'). Dieser darf keine optionalen Klammern enthalten.
+8. Erstelle zwingend einen Lückentext ('gapText'), der EXAKT derselbe Satz wie 'contextSentence' ist, bei dem jedoch AUSSCHLIESSLICH das Zielwort oder die Kernphrase aus 'front' durch '___' ersetzt wurde.
 9. Ignoriere Seitenzahlen und Überschriften.`,
               { inlineData: { data: base64Image, mimeType: mimeType } }
             ],
