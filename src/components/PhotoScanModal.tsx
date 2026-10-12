@@ -17,6 +17,7 @@ interface ExtractedCard {
   gapText?: string
   mnemonic?: string
   contextSentence?: string
+  phonetic?: string
 }
 
 export function PhotoScanModal({ deckId, isOpen, onClose }: PhotoScanModalProps) {
@@ -126,7 +127,7 @@ export function PhotoScanModal({ deckId, isOpen, onClose }: PhotoScanModalProps)
   }
 
   const addEmptyCard = () => {
-    setExtractedCards([...extractedCards, { front: "", back: "", notes: "", gapText: "", mnemonic: "", contextSentence: "" }])
+    setExtractedCards([...extractedCards, { front: "", back: "", notes: "", gapText: "", mnemonic: "", contextSentence: "", phonetic: "" }])
   }
 
   return (
@@ -184,6 +185,7 @@ export function PhotoScanModal({ deckId, isOpen, onClose }: PhotoScanModalProps)
                   <tr>
                     <th className="p-3">Vorderseite</th>
                     <th className="p-3">Rückseite</th>
+                    <th className="p-3">Lautschrift</th>
                     <th className="p-3">Lückentext</th>
                     <th className="p-3">Eselsbrücke</th>
                     <th className="p-3">Beispielsatz</th>
@@ -208,6 +210,13 @@ export function PhotoScanModal({ deckId, isOpen, onClose }: PhotoScanModalProps)
                         <input
                           value={card.back}
                           onChange={e => updateCard(i, "back", e.target.value)}
+                          className="w-full bg-transparent border-b border-transparent hover:border-zinc-300 focus:border-blue-500 outline-none px-1 py-1"
+                        />
+                      </td>
+                      <td className="p-2">
+                        <input
+                          value={card.phonetic || ""}
+                          onChange={e => updateCard(i, "phonetic", e.target.value)}
                           className="w-full bg-transparent border-b border-transparent hover:border-zinc-300 focus:border-blue-500 outline-none px-1 py-1"
                         />
                       </td>

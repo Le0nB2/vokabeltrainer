@@ -37,6 +37,7 @@ export async function addCardsBulk(
     gapText?: string;
     mnemonic?: string;
     contextSentence?: string | null;
+    phonetic?: string | null;
   }[]
 ) {
   const created = await prisma.card.createMany({
@@ -44,7 +45,7 @@ export async function addCardsBulk(
       deckId,
       front: c.front,
       back: c.back,
-      notes: c.notes,
+      notes: c.phonetic ? (c.notes ? `${c.phonetic}\n${c.notes}` : c.phonetic) : c.notes,
       gapText: c.gapText,
       mnemonic: c.mnemonic,
       contextSentence: c.contextSentence,
