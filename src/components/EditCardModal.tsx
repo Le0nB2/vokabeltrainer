@@ -51,10 +51,10 @@ export function EditCardModal({ deckId, card, isOpen, onClose }: EditCardModalPr
         deckId,
         front,
         back,
-        notes || undefined,
-        gapText || undefined,
-        mnemonic || undefined,
-        contextSentence || undefined
+        notes || null,
+        gapText || null,
+        mnemonic || null,
+        contextSentence || null
       )
       onClose()
     } catch (err) {

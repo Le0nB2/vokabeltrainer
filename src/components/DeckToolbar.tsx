@@ -120,7 +120,7 @@ export function DeckToolbar({ deck }: { deck: { id: string, cards: CardType[] } 
                       <Pencil className="w-4 h-4" />
                     </button>
                     <button
-                      onClick={async () => await deleteCard(card.id, deck.id)}
+                      onClick={async () => { if (window.confirm("Möchtest du diese Vokabel wirklich löschen?")) { await deleteCard(card.id, deck.id); } }}
                       className="text-zinc-400 hover:text-red-500 transition-colors"
                     >
                       <Trash2 className="w-4 h-4" />

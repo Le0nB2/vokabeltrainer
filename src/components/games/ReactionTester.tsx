@@ -6,10 +6,12 @@ import { motion } from "framer-motion"
 export function ReactionTester({ onComplete }: { onComplete: () => void }) {
   const [state, setState] = useState<'waiting' | 'ready' | 'go' | 'result' | 'early'>('waiting')
   const [reactionTime, setReactionTime] = useState<number | null>(null)
+  const [playCount, setPlayCount] = useState<number>(0)
   const timerRef = useRef<NodeJS.Timeout | null>(null)
   const startTimeRef = useRef<number>(0)
 
   const startGame = () => {
+    setPlayCount(prev => prev + 1)
     setState('ready')
     setReactionTime(null)
     const delay = 1500 + Math.random() * 2500 // 1.5 to 4 seconds
@@ -57,12 +59,14 @@ export function ReactionTester({ onComplete }: { onComplete: () => void }) {
            </div>
 
            <div className="flex gap-4 justify-center mt-8">
-             <button
-               onClick={startGame}
-               className="px-6 py-3 bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700 rounded-xl font-medium transition-colors"
-             >
-               Nochmal
-             </button>
+             {playCount < 3 && (
+               <button
+                 onClick={startGame}
+                 className="px-6 py-3 bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700 rounded-xl font-medium transition-colors"
+               >
+                 Nochmal
+               </button>
+             )}
              <button
                onClick={onComplete}
                className="px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-medium transition-colors shadow-sm"
