@@ -76,6 +76,9 @@ export function EditCardModal({ deckId, card, isOpen, onClose }: EditCardModalPr
               value={front}
               onChange={e => setFront(e.target.value)}
               className="w-full border rounded-lg p-2 dark:bg-zinc-800 dark:border-zinc-700"
+              autoComplete="off"
+              autoCorrect="off"
+              spellCheck={false}
             />
           </div>
           <div>
@@ -94,6 +97,9 @@ export function EditCardModal({ deckId, card, isOpen, onClose }: EditCardModalPr
               onChange={e => setGapText(e.target.value)}
               placeholder="z.B. I go to ___"
               className="w-full border rounded-lg p-2 dark:bg-zinc-800 dark:border-zinc-700"
+              autoComplete="off"
+              autoCorrect="off"
+              spellCheck={false}
             />
           </div>
           <div>
@@ -103,6 +109,9 @@ export function EditCardModal({ deckId, card, isOpen, onClose }: EditCardModalPr
               onChange={e => setMnemonic(e.target.value)}
               placeholder="Merkhilfe / Bildhafte Assoziation"
               className="w-full border rounded-lg p-2 dark:bg-zinc-800 dark:border-zinc-700"
+              autoComplete="off"
+              autoCorrect="off"
+              spellCheck={false}
             />
           </div>
           <div>
@@ -112,6 +121,9 @@ export function EditCardModal({ deckId, card, isOpen, onClose }: EditCardModalPr
               onChange={e => setContextSentence(e.target.value)}
               placeholder="Beispielsatz zur Erläuterung"
               className="w-full border rounded-lg p-2 dark:bg-zinc-800 dark:border-zinc-700"
+              autoComplete="off"
+              autoCorrect="off"
+              spellCheck={false}
             />
           </div>
           <div>
