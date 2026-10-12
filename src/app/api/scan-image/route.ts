@@ -48,7 +48,22 @@ export async function POST(req: NextRequest) {
           const response = await ai.models.generateContent({
             model: modelToUse,
             contents: [
-              "Du bist ein didaktischer Englischlehrer für Schüler im Alter von 11 bis 13 Jahren (5.–7. Klasse). Extrahiere alle Vokabelpaare aus diesem Foto (Buchseite, Liste, Notizbuch). Trenne das englische Ausgangswort ('front') und die deutsche Übersetzung/Bedeutung ('back') exakt. Korrigiere offensichtliche Lesefehler. Generiere zudem für jede Vokabel zwingend eine Eselsbrücke auf Deutsch ('mnemonic') nach der Schlüsselwortmethode: 1. Finde ein deutsches Wort, das lautmalerisch an das englische Wort erinnert (z. B. 'mice' -> 'Mais'). 2. Verknüpfe dieses Klangwort in einer kurzen, bildhaften Szene mit der deutschen Übersetzung. Keine reinen Reime ohne Klangbezug, keine Beleidigungen, strikt jugendfrei. Erstelle auch einen einfachen englischen Beispielsatz ('contextSentence'). Erstelle zwingend einen Lückentext ('gapText'), der EXAKT derselbe Satz wie 'contextSentence' ist, bei dem jedoch das Zielwort aus 'front' durch '___' ersetzt wurde. Übernimm in 'notes' nur grammatikalische Besonderheiten, Aussprachehinweise oder unregelmäßige Formen, falls im Quellmaterial vorhanden; andernfalls belasse es als leeren String. Ignoriere Seitenzahlen und Überschriften.",
+              `Du bist ein didaktischer Englischlehrer für Schüler im Alter von 11 bis 13 Jahren (5.–7. Klasse). Extrahiere alle Vokabelpaare aus diesem Foto (Buchseite, Liste, Notizbuch).
+
+WICHTIGE REGELN:
+1. Trenne das englische Ausgangswort ('front') und die deutsche Übersetzung/Bedeutung ('back') exakt. Korrigiere offensichtliche Lesefehler.
+2. Exakte Buch-Bedeutung priorisieren: Wenn das Buch für ein Wort eine spezifische Bedeutung angibt (z.B. "year" = "der Jahrgang / die Jahrgangsstufe"), muss genau diese Bedeutung für 'back' und für den Beispielsatz 'contextSentence' verwendet werden.
+3. Saubere Übernahme von Alternativen: Trennungen mit Schrägstrich aus dem Buch (z.B. "Du bist dran / an der Reihe" oder "das Sandwich, (zusammengeklapptes) belegtes Brot") sollen im Feld 'back' vollständig erhalten bleiben und nicht abgeschnitten werden.
+4. Lautschrift: Falls auf dem Bild Lautschrift vorhanden ist, extrahiere sie in eckigen Klammern (z.B. [bɔːl]) in das Feld 'phonetic', sonst leer.
+5. Hinweise & Grammatik: Lese die Zusatzspalte rechts konsequent aus und schreibe sie in das Feld 'notes' (z.B. Gegenteile "new ◄► old", Fragen "How old are you, please?", Aussprache-Tipps, Signalwörter, grammatikalische Besonderheiten).
+6. Eselsbrücken ('mnemonic') nach der Schlüsselwortmethode:
+   - Finde ein DEUTSCHES Wort, das lautmalerisch an das englische Wort erinnert (Klangwort).
+   - KEINE Fantasiewörter! Das deutsche Klangwort MUSS ein echtes, existierendes deutsches Wort aus dem Duden sein.
+   - Falls kein direktes deutsches Klangwort existiert, wähle ein Teilwort oder eine treffende lautmalerische Assoziation (z.B. "please" -> "Prise", "wrong" -> "Gong").
+   - Verknüpfe dieses Klangwort in einer kurzen, bildhaften Szene mit der deutschen Übersetzung. Keine reinen Reime ohne Klangbezug, keine Beleidigungen, strikt jugendfrei.
+7. Erstelle einen einfachen englischen Beispielsatz ('contextSentence').
+8. Erstelle zwingend einen Lückentext ('gapText'), der EXAKT derselbe Satz wie 'contextSentence' ist, bei dem jedoch das Zielwort aus 'front' durch '___' ersetzt wurde.
+9. Ignoriere Seitenzahlen und Überschriften.`,
               { inlineData: { data: base64Image, mimeType: mimeType } }
             ],
             config: {
@@ -58,17 +73,21 @@ export async function POST(req: NextRequest) {
                 items: {
                   type: Type.OBJECT,
                   properties: {
+                    phonetic: {
+                      type: Type.STRING,
+                      description: "Die Lautschrift in eckigen Klammern, wie auf dem Bild angegeben, z. B. [bɔːl]. Sonst leer.",
+                    },
                     front: {
                       type: Type.STRING,
                       description: "Das englische Ausgangswort",
                     },
                     back: {
                       type: Type.STRING,
-                      description: "Die deutsche Übersetzung oder Bedeutung",
+                      description: "Die deutsche Übersetzung oder Bedeutung. Spezifische Bedeutungen aus dem Buch priorisieren. Alternativen mit Schrägstrich oder Klammern vollständig erhalten.",
                     },
                     notes: {
                       type: Type.STRING,
-                      description: "Nur grammatikalische Besonderheiten, Aussprachehinweise oder unregelmäßige Formen aus dem Quellmaterial. Sonst leer.",
+                      description: "Zusatzinfos aus der dritten Spalte rechts, z.B. Gegenteile ('new ◄► old'), typische Beispielsätze/Fragen ('How old are you, please?'), Aussprache-Tipps, Signalwörter oder grammatikalische Besonderheiten. Lese diese Spalte konsequent aus. Sonst leer.",
                     },
                     gapText: {
                       type: Type.STRING,
@@ -76,7 +95,7 @@ export async function POST(req: NextRequest) {
                     },
                     mnemonic: {
                       type: Type.STRING,
-                      description: "Bildhafte Eselsbrücke nach der Schlüsselwortmethode (lautmalerisches deutsches Wort verknüpft mit der Übersetzung), jugendfrei.",
+                      description: "Bildhafte Eselsbrücke nach der Schlüsselwortmethode. Das deutsche Klangwort muss ein echtes, existierendes deutsches Wort aus dem Duden sein (oder eine treffende lautmalerische Assoziation/Teilwort, falls nicht vorhanden). Z.B. 'please' -> 'Prise', 'wrong' -> 'Gong'. Verknüpft mit der Übersetzung, jugendfrei.",
                     },
                     contextSentence: {
                       type: Type.STRING,
