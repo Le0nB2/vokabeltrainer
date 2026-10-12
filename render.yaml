@@ -1,6 +1,7 @@
 services:
   - type: web
     name: vokabeltrainer
+    region: frankfurt
     env: docker
     plan: free
     envVars:
