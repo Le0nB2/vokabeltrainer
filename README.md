@@ -82,8 +82,8 @@ Scrolle runter zu **"Environment Variables"** und klicke auf **"Add Environment 
 | `DATABASE_URL` | *(Füge hier den kopierten Connection String von Neon aus Schritt 1 ein)* |
 | `GEMINI_API_KEY` | *(Dein Google Gemini API Key für die KI-Funktionen)* |
 | `SETTINGS_PASSWORD` | *(Optional: Passwortschutz für die Einstellungen)* |
-| `BASIC_AUTH_USER` | Benutzernamen *(Optional: Globaler Zugriffsschutz (HTTP Basic Auth))* |
-| `BASIC_AUTH_PASSWORD` | Kennwort *(Optional: Globaler Zugriffsschutz (HTTP Basic Auth))* |
+| `BASIC_AUTH_USER` | Benutzernamen *(Optional: Globaler Zugriffsschutz falls die url öffentlich zugänglich ist (HTTP Basic Auth))* |
+| `BASIC_AUTH_PASSWORD` | Kennwort *(Optional: Globaler Zugriffsschutz falls die url öffentlich zugänglich ist (HTTP Basic Auth))* |
 
 > **Hinweis zum Free-Tier bei Render:** Falls du bei beim Klick auf "Deploy web service" aufgefordert wirst, eine Kreditkarte zu hinterlegen: Dies ist eine Sicherheitsregel von Render, um Missbrauch (wie Krypto-Mining) zu verhindern. Wenn du den Free Plan (0$) ausgewählt hast, brauchst du dir keine Sorgen vor Abbuchungen machen. Render wird im Free-Tier kein Geld abbuchen.
 Da du jedoch die kostenlose Version von Render nutzt, "schläft" deine App ein, wenn sie 15 Minuten lang nicht benutzt wird. Wenn du sie danach wieder aufrufst, dauert das Laden der Seite beim allerersten Mal ca. 30 Sekunden länger, weil Render die App erst wieder "aufwecken" muss. Danach reagiert sie wieder sofort.
