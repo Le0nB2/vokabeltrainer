@@ -1,4 +1,5 @@
 import { cookies } from "next/headers"
+import { verifySessionCookie } from "@/lib/auth-utils"
 import { PasswordPrompt } from "@/components/PasswordPrompt"
 
 export default async function SettingsLayout({
@@ -8,7 +9,10 @@ export default async function SettingsLayout({
 }) {
   const envPassword = process.env.SETTINGS_PASSWORD
   const cookieStore = await cookies()
-  const isAuthenticated = cookieStore.get("settings_auth")?.value === "true"
+  const isAuthenticated = verifySessionCookie(
+    cookieStore.get("settings_auth")?.value,
+    envPassword
+  )
 
   if (envPassword && !isAuthenticated) {
     return <PasswordPrompt />

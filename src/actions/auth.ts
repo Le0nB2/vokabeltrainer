@@ -1,4 +1,5 @@
 "use server"
+import { getSessionCookieValue } from "@/lib/auth-utils"
 
 import { cookies, headers } from "next/headers"
 import { revalidatePath } from "next/cache"
@@ -18,7 +19,7 @@ export async function checkPassword(password: string) {
     const headersList = await headers()
     const isHttps = headersList.get("x-forwarded-proto") === "https"
     const cookieStore = await cookies()
-    cookieStore.set("settings_auth", "true", {
+    cookieStore.set("settings_auth", getSessionCookieValue(envPassword), {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production" && isHttps,
       path: "/",
