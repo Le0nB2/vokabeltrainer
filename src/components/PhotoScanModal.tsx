@@ -199,6 +199,9 @@ export function PhotoScanModal({ deckId, isOpen, onClose }: PhotoScanModalProps)
                           value={card.front}
                           onChange={e => updateCard(i, "front", e.target.value)}
                           className="w-full bg-transparent border-b border-transparent hover:border-zinc-300 focus:border-blue-500 outline-none px-1 py-1"
+                          autoComplete="off"
+                          autoCorrect="off"
+                          spellCheck={false}
                         />
                       </td>
                       <td className="p-2">
@@ -214,6 +217,9 @@ export function PhotoScanModal({ deckId, isOpen, onClose }: PhotoScanModalProps)
                           onChange={e => updateCard(i, "gapText", e.target.value)}
                           className="w-full bg-transparent border-b border-transparent hover:border-zinc-300 focus:border-blue-500 outline-none px-1 py-1"
                           placeholder="z.B. I go to ___"
+                          autoComplete="off"
+                          autoCorrect="off"
+                          spellCheck={false}
                         />
                       </td>
                       <td className="p-2">
@@ -221,6 +227,9 @@ export function PhotoScanModal({ deckId, isOpen, onClose }: PhotoScanModalProps)
                           value={card.mnemonic || ""}
                           onChange={e => updateCard(i, "mnemonic", e.target.value)}
                           className="w-full bg-transparent border-b border-transparent hover:border-zinc-300 focus:border-blue-500 outline-none px-1 py-1"
+                          autoComplete="off"
+                          autoCorrect="off"
+                          spellCheck={false}
                         />
                       </td>
                       <td className="p-2">
@@ -228,6 +237,9 @@ export function PhotoScanModal({ deckId, isOpen, onClose }: PhotoScanModalProps)
                           value={card.contextSentence || ""}
                           onChange={e => updateCard(i, "contextSentence", e.target.value)}
                           className="w-full bg-transparent border-b border-transparent hover:border-zinc-300 focus:border-blue-500 outline-none px-1 py-1"
+                          autoComplete="off"
+                          autoCorrect="off"
+                          spellCheck={false}
                         />
                       </td>
                       <td className="p-2">
