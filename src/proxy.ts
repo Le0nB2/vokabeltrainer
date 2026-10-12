@@ -1,6 +1,15 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 
+function secureCompare(a: string, b: string) {
+  if (a.length !== b.length) return false;
+  let result = 0;
+  for (let i = 0; i < a.length; i++) {
+    result |= a.charCodeAt(i) ^ b.charCodeAt(i);
+  }
+  return result === 0;
+}
+
 export function proxy(req: NextRequest) {
   const basicAuthUser = process.env.BASIC_AUTH_USER;
   const basicAuthPassword = process.env.BASIC_AUTH_PASSWORD;
@@ -23,7 +32,7 @@ export function proxy(req: NextRequest) {
           const user = decoded.slice(0, colonIndex);
           const pwd = decoded.slice(colonIndex + 1);
 
-          if (user === basicAuthUser && pwd === basicAuthPassword) {
+          if (secureCompare(user, basicAuthUser) && secureCompare(pwd, basicAuthPassword)) {
             return NextResponse.next();
           }
         }
