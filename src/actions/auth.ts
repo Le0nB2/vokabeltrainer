@@ -2,6 +2,7 @@
 
 import { cookies, headers } from "next/headers"
 import { revalidatePath } from "next/cache"
+import { createHash, timingSafeEqual } from "crypto"
 export async function checkPassword(password: string) {
   const envPassword = process.env.SETTINGS_PASSWORD
 
@@ -9,7 +10,11 @@ export async function checkPassword(password: string) {
     return { success: true }
   }
 
-  if (password === envPassword) {
+  const hashInput = createHash("sha256").update(password).digest()
+  const hashEnv = createHash("sha256").update(envPassword).digest()
+  const isMatch = timingSafeEqual(hashInput, hashEnv)
+
+  if (isMatch) {
     const headersList = await headers()
     const isHttps = headersList.get("x-forwarded-proto") === "https"
     const cookieStore = await cookies()
