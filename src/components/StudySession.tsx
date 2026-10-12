@@ -21,6 +21,7 @@ export function StudySession({ deck, dueCards, settings }: { deck: { id: string,
   const [studyMode, setStudyMode] = useState<'smart' | 'classic'>('smart')
   const [typingInput, setTypingInput] = useState('')
   const [typingFeedback, setTypingFeedback] = useState<{ status: string, message: string, input?: string, rating: 'again' | 'hard' | 'good' | 'easy' } | null>(null)
+  const [backCardCache, setBackCardCache] = useState<any>(null)
   const isGlobal = deck.id === 'global';
 
 
@@ -81,11 +82,13 @@ export function StudySession({ deck, dueCards, settings }: { deck: { id: string,
 
 
     setIsFlipped(false)
+    if (currentIndex + 1 < cards.length) {
+      setCurrentIndex(curr => curr + 1)
+      // state will be updated by useEffect
+    }
+
     setTimeout(async () => {
-      if (currentIndex + 1 < cards.length) {
-        setCurrentIndex(curr => curr + 1)
-        // state will be updated by useEffect
-      } else {
+      if (currentIndex + 1 >= cards.length) {
         setSessionCompleted(true)
         // Session complete, save results
         try {
@@ -112,7 +115,8 @@ export function StudySession({ deck, dueCards, settings }: { deck: { id: string,
 
       e.preventDefault()
       if (!isFlipped && !isTypingMode) {
-        setIsFlipped(true)
+        setBackCardCache({ card: currentCard, isEnglishQuestion, askDirection, showGapText });
+        setIsFlipped(true);
       } else if (isFlipped && typingFeedback) {
         handleAnswer(typingFeedback.rating);
         setTypingInput('');
@@ -242,6 +246,11 @@ export function StudySession({ deck, dueCards, settings }: { deck: { id: string,
   const isTypingMode = studyMode === 'smart' && currentCard?.box >= 4;
   const correctAnswer = !isEnglishQuestion ? currentCard?.front : currentCard?.back;
 
+  const backCard = backCardCache?.card || currentCard;
+  const backIsEnglishQuestion = backCardCache ? backCardCache.isEnglishQuestion : isEnglishQuestion;
+  const backAskDirection = backCardCache ? backCardCache.askDirection : askDirection;
+  const backShowGapText = backCardCache ? backCardCache.showGapText : showGapText;
+
   const handleTypingSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!typingInput.trim()) return;
@@ -304,7 +313,12 @@ export function StudySession({ deck, dueCards, settings }: { deck: { id: string,
       {/* Card area */}
       <div
         className="relative w-full max-w-2xl perspective-1000 cursor-pointer"
-        onClick={() => !isFlipped && !isTypingMode && setIsFlipped(true)}
+        onClick={() => {
+          if (!isFlipped && !isTypingMode) {
+            setBackCardCache({ card: currentCard, isEnglishQuestion, askDirection, showGapText });
+            setIsFlipped(true);
+          }
+        }}
       >
         <div
           className={`w-full relative transition-all duration-500 transform-style-3d ${isFlipped ? 'rotate-x-180' : ''} grid`}
@@ -367,22 +381,22 @@ export function StudySession({ deck, dueCards, settings }: { deck: { id: string,
           {/* Back */}
           <div className="col-start-1 row-start-1 backface-hidden rotate-x-180 bg-white dark:bg-zinc-900 rounded-3xl shadow-lg border border-zinc-200 dark:border-zinc-800 flex flex-col items-center justify-center py-20 px-8 md:py-24 md:px-12 text-center h-full">
             <button
-              onClick={(e) => playAudio(currentCard.front, e)}
+              onClick={(e) => playAudio(backCard.front, e)}
               className="absolute top-6 left-6 p-3 rounded-full hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-500 hover:text-blue-600 transition-colors"
               title="Aussprache anhören"
             >
               <Volume2 className="w-6 h-6" />
             </button>
-            <span className="text-2xl md:text-3xl font-medium text-zinc-500 mb-2 [overflow-wrap:anywhere] w-full">{!isEnglishQuestion ? currentCard.back : currentCard.front}</span>
-            <span className="text-3xl md:text-5xl font-bold text-blue-600 dark:text-blue-500 mb-6 [overflow-wrap:anywhere] w-full">{!isEnglishQuestion ? currentCard.front : currentCard.back}</span>
-            {currentCard.gapText && (
+            <span className="text-2xl md:text-3xl font-medium text-zinc-500 mb-2 [overflow-wrap:anywhere] w-full">{!backIsEnglishQuestion ? backCard.back : backCard.front}</span>
+            <span className="text-3xl md:text-5xl font-bold text-blue-600 dark:text-blue-500 mb-6 [overflow-wrap:anywhere] w-full">{!backIsEnglishQuestion ? backCard.front : backCard.back}</span>
+            {backCard.gapText && (
                <div className="text-md text-zinc-500 mb-4 italic [overflow-wrap:anywhere] w-full">
-                 {currentCard.gapText.replace('___', currentCard.front)}
+                 {backCard.gapText.replace('___', backCard.front)}
                </div>
             )}
-            {currentCard.notes && (
+            {backCard.notes && (
               <div className="text-lg md:text-xl text-zinc-600 dark:text-zinc-400 bg-zinc-50 dark:bg-zinc-800/50 p-4 rounded-xl [overflow-wrap:anywhere] w-full">
-                {currentCard.notes}
+                {backCard.notes}
               </div>
             )}
 
@@ -404,7 +418,7 @@ export function StudySession({ deck, dueCards, settings }: { deck: { id: string,
             {/* Box badge */}
             <div className="absolute top-6 right-6">
               <span className="inline-flex items-center justify-center px-3 py-1 rounded-full text-xs font-medium bg-zinc-100 dark:bg-zinc-800 text-zinc-500">
-                Box {currentCard.box}
+                Box {backCard.box}
               </span>
             </div>
           </div>
