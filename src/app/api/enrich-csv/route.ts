@@ -1,13 +1,30 @@
 import { NextRequest, NextResponse } from "next/server";
+import { z } from "zod";
 import { enrichCards, QuotaExceededError } from "@/lib/services/ai-enrichment";
+
+
+const cardSchema = z.object({
+  id: z.string(),
+  front: z.string(),
+  back: z.string()
+});
+
+const requestSchema = z.object({
+  cards: z.array(cardSchema).min(1)
+});
 
 export async function POST(req: NextRequest) {
   try {
-    const { cards } = await req.json();
 
-    if (!cards || !Array.isArray(cards) || cards.length === 0) {
-      return NextResponse.json({ error: "No cards provided" }, { status: 400 });
+    const body = await req.json();
+    const parseResult = requestSchema.safeParse(body);
+
+    if (!parseResult.success) {
+      return NextResponse.json({ error: "Invalid input", details: parseResult.error.format() }, { status: 400 });
     }
+
+    const { cards } = parseResult.data;
+
 
     const rawKeys = process.env.GEMINI_API_KEYS || process.env.GEMINI_API_KEY;
     if (!rawKeys) {
