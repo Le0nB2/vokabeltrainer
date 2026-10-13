@@ -156,3 +156,25 @@ export async function updateCardDetails(
   revalidatePath(`/decks/${deckId}`);
   return updated;
 }
+
+export async function updateCardsEnrichmentBulk(
+  deckId: string,
+  updates: {
+    id: string;
+    gapText?: string | null;
+    mnemonic?: string | null;
+    contextSentence?: string | null;
+  }[]
+) {
+  for (const update of updates) {
+    await prisma.card.update({
+      where: { id: update.id },
+      data: {
+        ...(update.gapText !== undefined && { gapText: update.gapText }),
+        ...(update.mnemonic !== undefined && { mnemonic: update.mnemonic }),
+        ...(update.contextSentence !== undefined && { contextSentence: update.contextSentence }),
+      },
+    });
+  }
+  revalidatePath(`/decks/${deckId}`);
+}
