@@ -46,45 +46,45 @@ describe('proxy middleware basic auth', () => {
     } as unknown as NextRequest
   }
 
-  it('should bypass auth if env vars are missing', () => {
+  it('should bypass auth if env vars are missing', async () => {
     delete process.env.BASIC_AUTH_USER
     const req = createMockRequest(null)
-    const result = proxy(req)
+    const result = await proxy(req)
     expect(result).toEqual({ status: 200, type: 'next' })
   })
 
-  it('should return 401 if auth header is missing', () => {
+  it('should return 401 if auth header is missing', async () => {
     const req = createMockRequest(null)
-    const result: any = proxy(req)
+    const result: any = await proxy(req)
     expect(result.status).toBe(401)
     expect(result.headers.get('WWW-Authenticate')).toBe('Basic realm="Secure Area"')
   })
 
-  it('should allow valid credentials', () => {
+  it('should allow valid credentials', async () => {
     const authHeader = `Basic ${btoa('testuser:testpassword:with:colons')}`
     const req = createMockRequest(authHeader)
-    const result = proxy(req)
+    const result = await proxy(req)
     expect(result).toEqual({ status: 200, type: 'next' })
   })
 
-  it('should return 401 for invalid credentials', () => {
+  it('should return 401 for invalid credentials', async () => {
     const authHeader = `Basic ${btoa('testuser:wrongpassword')}`
     const req = createMockRequest(authHeader)
-    const result: any = proxy(req)
+    const result: any = await proxy(req)
     expect(result.status).toBe(401)
   })
 
-  it('should return 401 for malformed base64', () => {
+  it('should return 401 for malformed base64', async () => {
     const authHeader = `Basic invalid_base64_string!!!!`
     const req = createMockRequest(authHeader)
-    const result: any = proxy(req)
+    const result: any = await proxy(req)
     expect(result.status).toBe(401)
   })
 
-  it('should return 401 for valid base64 but missing colon', () => {
+  it('should return 401 for valid base64 but missing colon', async () => {
     const authHeader = `Basic ${btoa('testuserpassword')}`
     const req = createMockRequest(authHeader)
-    const result: any = proxy(req)
+    const result: any = await proxy(req)
     expect(result.status).toBe(401)
   })
 })
