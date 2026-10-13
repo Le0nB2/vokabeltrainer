@@ -3,6 +3,7 @@ import { ArrowLeft, Settings as SettingsIcon } from "lucide-react"
 import { ImportExport } from "@/components/ImportExport"
 import { MinigameSettings } from "@/components/MinigameSettings"
 import { NotificationSettings } from "@/components/NotificationSettings"
+import { AudioSettings } from "@/components/AudioSettings"
 import { ApiUsageChart } from "@/components/ApiUsageChart"
 import { getSettings } from "@/actions/settings"
 import { getApiStats } from "@/actions/api-stats"
@@ -30,6 +31,7 @@ export default async function SettingsPage() {
 
         <ApiUsageChart data={apiStats} />
         <NotificationSettings initialSettings={settings} />
+        <AudioSettings initialSettings={settings} />
         <MinigameSettings initialSettings={settings} />
         <ImportExport />
       </div>

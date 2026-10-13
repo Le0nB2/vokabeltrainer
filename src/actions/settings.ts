@@ -115,6 +115,7 @@ export async function updateSettings(data: {
   reactionTesterEnabled?: boolean;
   wordDropEnabled?: boolean;
   notificationsEnabled?: boolean;
+  speechLanguage?: string;
 }) {
   const updatedSettings = await prisma.settings.update({
     where: { id: "default" },

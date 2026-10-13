@@ -61,6 +61,7 @@ model Settings {
   wordDropEnabled       Boolean @default(true)
   worksheetCount        Int     @default(0)
   notificationsEnabled  Boolean @default(false)
+  speechLanguage        String  @default("en-GB")
 }
 
 model ApiUsageLog {

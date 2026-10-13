@@ -8,7 +8,7 @@ import { ArrowLeft, Check, X, RotateCcw, Volume2, Brain, Zap, Keyboard, Type } f
 import { evaluateAnswer } from "@/lib/utils/string"
 import { MinigameOverlay } from "./games/MinigameOverlay"
 
-export function StudySession({ deck, dueCards, settings }: { deck: { id: string, lastResultCorrect?: number | null, lastResultIncorrect?: number | null, cards: { id: string, deckId?: string, front: string, back: string, notes?: string | null, box: number, gapText?: string | null, lapses: number, mnemonic?: string | null }[] }, dueCards: { id: string, deckId?: string, front: string, back: string, notes?: string | null, box: number, gapText?: string | null, lapses: number, mnemonic?: string | null }[], settings: {minigamesEnabled: boolean, minigameIntervalMin: number, minigameIntervalMax: number, speedMatchEnabled: boolean, balloonPopEnabled: boolean, reactionTesterEnabled: boolean, wordDropEnabled: boolean} }) {
+export function StudySession({ deck, dueCards, settings }: { deck: { id: string, lastResultCorrect?: number | null, lastResultIncorrect?: number | null, cards: { id: string, deckId?: string, front: string, back: string, notes?: string | null, box: number, gapText?: string | null, lapses: number, mnemonic?: string | null }[] }, dueCards: { id: string, deckId?: string, front: string, back: string, notes?: string | null, box: number, gapText?: string | null, lapses: number, mnemonic?: string | null }[], settings: {minigamesEnabled: boolean, minigameIntervalMin: number, minigameIntervalMax: number, speedMatchEnabled: boolean, balloonPopEnabled: boolean, reactionTesterEnabled: boolean, wordDropEnabled: boolean, speechLanguage: string} }) {
   const [cards, setCards] = useState(dueCards)
   const [currentIndex, setCurrentIndex] = useState(0)
   const [isFlipped, setIsFlipped] = useState(false)
@@ -142,7 +142,7 @@ export function StudySession({ deck, dueCards, settings }: { deck: { id: string,
       // Cancel any ongoing speech
       window.speechSynthesis.cancel();
       const utterance = new SpeechSynthesisUtterance(text);
-      utterance.lang = 'en-US';
+      utterance.lang = settings.speechLanguage || 'en-GB';
       window.speechSynthesis.speak(utterance);
     }
   }
