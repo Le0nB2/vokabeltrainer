@@ -3,8 +3,6 @@ import { GoogleGenAI, Type } from "@google/genai";
 import prisma from "@/lib/prisma";
 
 
-let currentKeyIndex = 0;
-
 export async function POST(req: NextRequest) {
   try {
     const formData = await req.formData();
@@ -38,8 +36,8 @@ export async function POST(req: NextRequest) {
     const models = ["gemini-3.5-flash-lite", "gemini-3.1-flash-lite"];
 
     // Try keys starting from the currentKeyIndex
-    for (let i = 0; i < apiKeys.length; i++) {
-      const attemptIndex = (currentKeyIndex + i) % apiKeys.length;
+    for (let attemptIndex = 0; attemptIndex < apiKeys.length; attemptIndex++) {
+
       const apiKey = apiKeys[attemptIndex];
       const ai = new GoogleGenAI({ apiKey });
 
@@ -50,7 +48,24 @@ export async function POST(req: NextRequest) {
           const response = await ai.models.generateContent({
             model: modelToUse,
             contents: [
-              "Extrahiere alle Vokabelpaare aus diesem Foto (Buchseite, Liste, Notizbuch). Trenne Ausgangswort und Übersetzung/Bedeutung exakt. Korrigiere offensichtliche Lesefehler. Generiere zudem für jede Vokabel zwingend eine witzige/bildhafte, jugendfreie und für 11- bis 13-Jährige geeignete Eselsbrücke auf Deutsch ('mnemonic') sowie einen einfachen englischen Beispielsatz ('contextSentence'). Generiere zudem zwingend einen Lückentext ('gapText', englischer Beispielsatz, in dem das englische Wort fehlt). Behalte 'notes' für grammatikalische Hinweise bei. Ignoriere Seitenzahlen und Überschriften.",
+              `Du bist ein didaktischer Englischlehrer für Schüler im Alter von 11 bis 13 Jahren (5.–7. Klasse). Extrahiere alle Vokabelpaare aus diesem Foto (Buchseite, Liste, Notizbuch).
+
+WICHTIGE REGELN:
+1. Trenne das englische Ausgangswort ('front') und die deutsche Übersetzung/Bedeutung ('back') exakt. Korrigiere offensichtliche Lesefehler.
+   - WICHTIG: Keine Klammern in Sätzen oder Wörtern (z. B. "It's your turn" statt "(It's) your turn", "to find" statt "(to) find").
+2. Exakte Buch-Bedeutung priorisieren: Wenn das Buch für ein Wort eine spezifische Bedeutung angibt (z.B. "year" = "der Jahrgang / die Jahrgangsstufe"), muss genau diese Bedeutung für 'back' und für den Beispielsatz 'contextSentence' verwendet werden.
+3. Saubere Übernahme von Alternativen: Trennungen mit Schrägstrich aus dem Buch (z.B. "Du bist dran / an der Reihe" oder "das Sandwich, (zusammengeklapptes) belegtes Brot") sollen im Feld 'back' vollständig erhalten bleiben und nicht abgeschnitten werden.
+4. Lautschrift: Falls auf dem Bild Lautschrift vorhanden ist, extrahiere sie in eckigen Klammern (z.B. [bɔːl]) in das Feld 'phonetic', sonst leer.
+5. Hinweise & Grammatik: Lese die Zusatzspalte rechts konsequent aus und schreibe sie in das Feld 'notes' (z.B. Gegenteile "new ◄► old", Fragen "How old are you, please?", Aussprache-Tipps, Signalwörter, grammatikalische Besonderheiten).
+6. Eselsbrücken ('mnemonic') nach der Schlüsselwortmethode:
+   - Finde ein DEUTSCHES Wort, das lautmalerisch an das englische Wort erinnert (Klangwort).
+   - KEINE Fantasiewörter! Das deutsche Klangwort MUSS ein echtes, existierendes deutsches Wort aus dem Duden sein.
+   - ACHTUNG KOGNATE: Falls das englische Wort bereits ein deutsches Lehnwort/Kognat ist (wie "ball", "orange", "sandwich", "banana"), erfinde KEIN künstliches Klangwort (keine Binsenweisheiten wie "Ball klingt wie Ball"). Baue stattdessen eine kurze, merkfähige Szene oder weise auf Besonderheiten (z. B. die englische Aussprache) hin.
+   - Falls kein direktes deutsches Klangwort existiert, wähle ein Teilwort oder eine treffende lautmalerische Assoziation (z.B. "please" -> "Prise", "wrong" -> "Gong").
+   - Verknüpfe dieses Klangwort in einer kurzen, bildhaften Szene mit der deutschen Übersetzung. Keine reinen Reime ohne Klangbezug, keine Beleidigungen, strikt jugendfrei.
+7. Erstelle einen einfachen englischen Beispielsatz ('contextSentence'). Dieser darf keine optionalen Klammern enthalten.
+8. Erstelle zwingend einen Lückentext ('gapText'), der EXAKT derselbe Satz wie 'contextSentence' ist, bei dem jedoch AUSSCHLIESSLICH das Zielwort oder die Kernphrase aus 'front' durch '___' ersetzt wurde.
+9. Ignoriere Seitenzahlen und Überschriften.`,
               { inlineData: { data: base64Image, mimeType: mimeType } }
             ],
             config: {
@@ -60,29 +75,33 @@ export async function POST(req: NextRequest) {
                 items: {
                   type: Type.OBJECT,
                   properties: {
+                    phonetic: {
+                      type: Type.STRING,
+                      description: "Die Lautschrift in eckigen Klammern, wie auf dem Bild angegeben, z. B. [bɔːl]. Sonst leer.",
+                    },
                     front: {
                       type: Type.STRING,
-                      description: "Das Ausgangswort oder die Frage",
+                      description: "Das englische Ausgangswort",
                     },
                     back: {
                       type: Type.STRING,
-                      description: "Die Übersetzung oder die Antwort",
+                      description: "Die deutsche Übersetzung oder Bedeutung. Spezifische Bedeutungen aus dem Buch priorisieren. Alternativen mit Schrägstrich oder Klammern vollständig erhalten.",
                     },
                     notes: {
                       type: Type.STRING,
-                      description: "Optionale Beispielsätze oder grammatikalische Notizen",
+                      description: "Zusatzinfos aus der dritten Spalte rechts, z.B. Gegenteile ('new ◄► old'), typische Beispielsätze/Fragen ('How old are you, please?'), Aussprache-Tipps, Signalwörter oder grammatikalische Besonderheiten. Lese diese Spalte konsequent aus. Sonst leer.",
                     },
                     gapText: {
                       type: Type.STRING,
-                      description: "Ein englischer Beispielsatz in dem das Ausgangswort durch ___ ersetzt ist.",
+                      description: "Exakt identisch mit contextSentence, wobei das Wort aus 'front' durch '___' ersetzt wurde.",
                     },
                     mnemonic: {
                       type: Type.STRING,
-                      description: "Eine witzige/bildhafte, jugendfreie und für 11- bis 13-Jährige geeignete Eselsbrücke auf Deutsch",
+                      description: "Bildhafte Eselsbrücke nach der Schlüsselwortmethode. Das deutsche Klangwort muss ein echtes, existierendes deutsches Wort aus dem Duden sein (oder eine treffende lautmalerische Assoziation/Teilwort, falls nicht vorhanden). Z.B. 'please' -> 'Prise', 'wrong' -> 'Gong'. Verknüpft mit der Übersetzung, jugendfrei.",
                     },
                     contextSentence: {
                       type: Type.STRING,
-                      description: "Ein einfacher englischer Beispielsatz",
+                      description: "Ein einfacher, für 11-13-Jährige verständlicher englischer Beispielsatz.",
                     },
                   },
                   required: ["front", "back", "mnemonic", "contextSentence", "gapText"],
@@ -106,11 +125,9 @@ export async function POST(req: NextRequest) {
               isSuccess: true,
               endpoint: "scan-image"
             }
-          });
+          }).catch(err => console.error("DB Log Error:", err));
 
 
-          // Update the global index to the key that just succeeded
-          currentKeyIndex = attemptIndex;
           break; // Success, exit inner model loop
         } catch (error: unknown) {
           // Log error
@@ -120,7 +137,7 @@ export async function POST(req: NextRequest) {
               isSuccess: false,
               endpoint: "scan-image"
             }
-          });
+          }).catch(err => console.error("DB Log Error:", err));
 
           lastError = error;
           const errorMessage = (error as Error).message || String(error);
@@ -135,7 +152,7 @@ export async function POST(req: NextRequest) {
           if (errorMessage.includes("429") || errorMessage.includes("Quota exceeded") || errorMessage.includes("RESOURCE_EXHAUSTED")) {
             console.warn(`API key at index ${attemptIndex} exhausted quota. Trying next key if available.`);
 
-            if (i === apiKeys.length - 1 && modelIndex === models.length - 1) {
+            if (attemptIndex === apiKeys.length - 1 && modelIndex === models.length - 1) {
               return NextResponse.json(
                 { error: "Dein kostenloses Google API-Kontingente ist aufgebraucht. Versuche es in ein paar Stunden noch einmal" },
                 { status: 429 }
