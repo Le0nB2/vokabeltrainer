@@ -20,9 +20,6 @@ const styles = StyleSheet.create({
     lineHeight: 1.4,
   },
   header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-end',
     borderBottomWidth: 2,
     borderBottomColor: '#000',
     paddingBottom: 10,
