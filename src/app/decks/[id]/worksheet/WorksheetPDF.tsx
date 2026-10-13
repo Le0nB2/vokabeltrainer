@@ -20,14 +20,16 @@ const styles = StyleSheet.create({
     lineHeight: 1.4,
   },
   header: {
+    paddingBottom: 5,
+    marginBottom: 20,
     borderBottomWidth: 2,
     borderBottomColor: '#000',
-    paddingBottom: 10,
-    marginBottom: 20,
   },
   title: {
     fontSize: 24,
     fontWeight: 'bold',
+    marginBottom: 10,
+    paddingTop: 10,
   },
   pageIdDate: {
     position: 'absolute',
