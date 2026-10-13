@@ -94,7 +94,7 @@ Da du jedoch die kostenlose Version von Render nutzt, "schläft" deine App ein, 
 3. Wenn alles fertig ist, siehst du oben links einen grünen Status "Live" und darunter einen Link (z.B. `https://mein-vokabeltrainer.onrender.com`).
 4. Klicke auf den Link – **Fertig!** Dein Vokabeltrainer ist nun im Internet erreichbar.
 
-### Lokales Setup (Docker)
+## Lokales Setup (Docker)
 
 Die App ist vollständig containerisiert und kann ohne lokale Node.js Installation ausgeführt werden.
 
