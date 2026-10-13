@@ -2,14 +2,22 @@ import { generateOptimizedPdf } from '@/lib/utils/pdf-helper';
 import { NextRequest, NextResponse } from "next/server";
 import { GoogleGenAI, Type, Schema } from "@google/genai";
 import prisma from "@/lib/prisma";
+import { z } from "zod";
+
+const requestSchema = z.object({
+  deckId: z.string().min(1, "No deckId provided")
+});
 
 export async function POST(req: NextRequest) {
   try {
-    const { deckId } = await req.json();
+    const body = await req.json();
+    const parseResult = requestSchema.safeParse(body);
 
-    if (!deckId) {
-      return NextResponse.json({ error: "No deckId provided" }, { status: 400 });
+    if (!parseResult.success) {
+      return NextResponse.json({ error: "Invalid request body" }, { status: 400 });
     }
+
+    const { deckId } = parseResult.data;
 
     const deck = await prisma.deck.findUnique({
       where: { id: deckId },
