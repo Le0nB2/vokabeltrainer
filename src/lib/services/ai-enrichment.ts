@@ -70,6 +70,17 @@ ${JSON.stringify(cards, null, 2)}
         }
 
         enrichedCards = JSON.parse(textResponse);
+
+        // Cleanup step: if gapText only contains "___", set it to null
+        if (Array.isArray(enrichedCards)) {
+          enrichedCards = enrichedCards.map((card: any) => {
+            if (card.gapText && card.gapText.trim() === "___") {
+              return { ...card, gapText: null };
+            }
+            return card;
+          });
+        }
+
         success = true;
 
         // Log success
