@@ -27,13 +27,12 @@ export function CsvImportModal({ deckId, isOpen, onClose }: CsvImportModalProps)
     setProgress(0)
     setProgressText("Parse CSV...")
 
-    Papa.parse(file, {
+    Papa.parse<Record<string, string>>(file, {
       header: true,
       skipEmptyLines: true,
       complete: async (results) => {
         try {
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          let cards = results.data.map((row: any, index: number) => {
+          let cards = results.data.map((row, index: number) => {
             // Support standard fields with fallbacks
             const keys = Object.keys(row)
             const front = row.front || row[keys[0]] || ""
