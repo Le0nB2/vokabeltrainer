@@ -1,0 +1,155 @@
+
+> vokabeltrainer@0.1.0 dev
+> next dev
+
+▲ Next.js 16.3.8 (Turbopack)
+- Local:         http://localhost:3000
+- Network:       http://192.168.0.2:3000
+✓ Ready in 543ms
+✓ Running next.config.ts took 46ms
+Attention: Next.js now collects completely anonymous telemetry regarding usage.
+This information is used to shape Next.js' roadmap and prioritize features.
+You can learn more, including how to opt-out if you'd not like to participate in this anonymous program, by visiting the following URL:
+https://nextjs.org/telemetry
+
+⚠ The Edge Runtime is deprecated. You can use the "nodejs" runtime instead. Learn more: https://nextjs.org/docs/messages/edge-runtime-deprecated
+
+○ Compiling /settings ...
+⨯ Error [PrismaClientKnownRequestError]:
+Invalid `{imported module ./src/lib/prisma.ts}["default"].settings.findUnique()` invocation in
+/app/.next/dev/server/chunks/ssr/_1aymy2h._.js:290:165
+
+  287     }
+  288 }
+  289 async function getSettings() {
+→ 290     const settings = await {imported module ./src/lib/prisma.ts}["default"].settings.findUnique(
+The table `main.Settings` does not exist in the current database.
+    at <unknown> (src/actions/settings.ts:98:42)
+    at async getSettings (src/actions/settings.ts:98:20)
+    at async SettingsPage (src/app/settings/page.tsx:16:20)
+   96 |
+   97 | export async function getSettings() {
+>  98 |   const settings = await prisma.settings.findUnique({
+      |                                          ^
+   99 |     where: { id: "default" }
+  100 |   })
+  101 |   if (!settings) { {
+  code: 'P2021',
+  clientVersion: '5.22.0',
+  meta: { modelName: 'Settings', table: 'main.Settings' },
+  digest: '3988085810'
+}
+ GET /settings 500 in 6.3s (next.js: 5.3s, proxy.ts: 573ms, application-code: 420ms)
+[browser] Encountered a script tag while rendering React component. Scripts inside React components are never executed when rendering on the client. Consider using template tag instead (https://developer.mozilla.org/en-US/docs/Web/HTML/Element/template).
+[browser] Uncaught PrismaClientKnownRequestError:
+Invalid `__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$lib$2f$prisma$2e$ts__$5b$app$2d$rsc$5d$__$28$ecmascript$29$__["default"].settings.findUnique()` invocation in
+/app/.next/dev/server/chunks/ssr/_1aymy2h._.js:290:165
+
+  287     }
+  288 }
+  289 async function getSettings() {
+→ 290     const settings = await __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$lib$2f$prisma$2e$ts__$5b$app$2d$rsc$5d$__$28$ecmascript$29$__["default"].settings.findUnique(
+The table `main.Settings` does not exist in the current database.
+    at <unknown> (src/actions/settings.ts:98:42)
+    at  getSettings (src/actions/settings.ts:98:20)
+    at  SettingsPage (src/app/settings/page.tsx:16:20)
+   96 |
+   97 | export async function getSettings() {
+>  98 |   const settings = await prisma.settings.findUnique({
+      |                                          ^
+   99 |     where: { id: "default" }
+  100 |   })
+  101 |   if (!settings) {
+ GET /einstellungen 404 in 415ms (next.js: 332ms, proxy.ts: 15ms, application-code: 68ms)
+⨯ Error [PrismaClientKnownRequestError]:
+Invalid `{imported module ./src/lib/prisma.ts}["default"].settings.findUnique()` invocation in
+/app/.next/dev/server/chunks/ssr/_1aymy2h._.js:290:165
+
+  287     }
+  288 }
+  289 async function getSettings() {
+→ 290     const settings = await {imported module ./src/lib/prisma.ts}["default"].settings.findUnique(
+The table `main.Settings` does not exist in the current database.
+    at <unknown> (src/actions/settings.ts:98:42)
+    at async getSettings (src/actions/settings.ts:98:20)
+    at async SettingsPage (src/app/settings/page.tsx:16:20)
+   96 |
+   97 | export async function getSettings() {
+>  98 |   const settings = await prisma.settings.findUnique({
+      |                                          ^
+   99 |     where: { id: "default" }
+  100 |   })
+  101 |   if (!settings) { {
+  code: 'P2021',
+  clientVersion: '5.22.0',
+  meta: { modelName: 'Settings', table: 'main.Settings' },
+  digest: '3988085810'
+}
+ GET /settings 500 in 104ms (next.js: 12ms, proxy.ts: 6ms, application-code: 86ms)
+[browser] Encountered a script tag while rendering React component. Scripts inside React components are never executed when rendering on the client. Consider using template tag instead (https://developer.mozilla.org/en-US/docs/Web/HTML/Element/template).
+[browser] Uncaught PrismaClientKnownRequestError:
+Invalid `__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$lib$2f$prisma$2e$ts__$5b$app$2d$rsc$5d$__$28$ecmascript$29$__["default"].settings.findUnique()` invocation in
+/app/.next/dev/server/chunks/ssr/_1aymy2h._.js:290:165
+
+  287     }
+  288 }
+  289 async function getSettings() {
+→ 290     const settings = await __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$lib$2f$prisma$2e$ts__$5b$app$2d$rsc$5d$__$28$ecmascript$29$__["default"].settings.findUnique(
+The table `main.Settings` does not exist in the current database.
+    at <unknown> (src/actions/settings.ts:98:42)
+    at  getSettings (src/actions/settings.ts:98:20)
+    at  SettingsPage (src/app/settings/page.tsx:16:20)
+   96 |
+   97 | export async function getSettings() {
+>  98 |   const settings = await prisma.settings.findUnique({
+      |                                          ^
+   99 |     where: { id: "default" }
+  100 |   })
+  101 |   if (!settings) {
+⨯ Error [PrismaClientKnownRequestError]:
+Invalid `{imported module ./src/lib/prisma.ts}["default"].settings.findUnique()` invocation in
+/app/.next/dev/server/chunks/ssr/_1aymy2h._.js:290:165
+
+  287     }
+  288 }
+  289 async function getSettings() {
+→ 290     const settings = await {imported module ./src/lib/prisma.ts}["default"].settings.findUnique(
+The table `main.Settings` does not exist in the current database.
+    at <unknown> (src/actions/settings.ts:98:42)
+    at async getSettings (src/actions/settings.ts:98:20)
+    at async SettingsPage (src/app/settings/page.tsx:16:20)
+   96 |
+   97 | export async function getSettings() {
+>  98 |   const settings = await prisma.settings.findUnique({
+      |                                          ^
+   99 |     where: { id: "default" }
+  100 |   })
+  101 |   if (!settings) { {
+  code: 'P2021',
+  clientVersion: '5.22.0',
+  meta: { modelName: 'Settings', table: 'main.Settings' },
+  digest: '3988085810'
+}
+ GET /settings 500 in 93ms (next.js: 6ms, proxy.ts: 7ms, application-code: 80ms)
+[browser] Encountered a script tag while rendering React component. Scripts inside React components are never executed when rendering on the client. Consider using template tag instead (https://developer.mozilla.org/en-US/docs/Web/HTML/Element/template).
+[browser] Uncaught PrismaClientKnownRequestError:
+Invalid `__TURBOPACK__imported__module__$5b$project$5d2f$src$2f$lib$2f$prisma$2e$ts__$5b$app$2d$rsc$5d$__$28$ecmascript$29$__["default"].settings.findUnique()` invocation in
+/app/.next/dev/server/chunks/ssr/_1aymy2h._.js:290:165
+
+  287     }
+  288 }
+  289 async function getSettings() {
+→ 290     const settings = await __TURBOPACK__imported__module__$5b$project$5d2f$src$2f$lib$2f$prisma$2e$ts__$5b$app$2d$rsc$5d$__$28$ecmascript$29$__["default"].settings.findUnique(
+The table `main.Settings` does not exist in the current database.
+    at <unknown> (src/actions/settings.ts:98:42)
+    at  getSettings (src/actions/settings.ts:98:20)
+    at  SettingsPage (src/app/settings/page.tsx:16:20)
+   96 |
+   97 | export async function getSettings() {
+>  98 |   const settings = await prisma.settings.findUnique({
+      |                                          ^
+   99 |     where: { id: "default" }
+  100 |   })
+  101 |   if (!settings) {
+ GET /settings 200 in 254ms (next.js: 5ms, proxy.ts: 6ms, application-code: 243ms)
+[?25h

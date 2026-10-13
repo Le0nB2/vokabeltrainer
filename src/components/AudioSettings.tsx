@@ -30,13 +30,13 @@ export function AudioSettings({ initialSettings }: { initialSettings: Settings }
       </h2>
 
       <div className="space-y-6">
-        <label className="flex items-center justify-between p-4 bg-zinc-50 dark:bg-zinc-800/50 rounded-lg cursor-pointer">
+        <label className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-4 bg-zinc-50 dark:bg-zinc-800/50 rounded-lg cursor-pointer">
           <div>
             <div className="font-medium">Sprache für Vorlesefunktion</div>
             <div className="text-sm text-zinc-500 mt-1">Wähle den bevorzugten Dialekt.</div>
           </div>
           <select
-            className="bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 rounded-md py-2 px-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 rounded-md py-2 px-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 w-full sm:w-auto"
             value={settings.speechLanguage}
             onChange={(e) => handleChange("speechLanguage", e.target.value)}
           >
