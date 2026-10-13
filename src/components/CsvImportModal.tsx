@@ -27,13 +27,12 @@ export function CsvImportModal({ deckId, isOpen, onClose }: CsvImportModalProps)
     setProgress(0)
     setProgressText("Parse CSV...")
 
-    Papa.parse(file, {
+    Papa.parse<Record<string, string>>(file, {
       header: true,
       skipEmptyLines: true,
       complete: async (results) => {
         try {
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          let cards = results.data.map((row: any, index: number) => {
+          let cards = results.data.map((row, index: number) => {
             // Support standard fields with fallbacks
             const keys = Object.keys(row)
             const front = row.front || row[keys[0]] || ""
@@ -57,14 +56,16 @@ export function CsvImportModal({ deckId, isOpen, onClose }: CsvImportModalProps)
             setProgressText(`Generiere KI-Felder für ${cardsToEnrich.length} Karte(n)...`)
 
             // Process in batches to avoid huge payloads and long timeouts
-            const batchSize = 30;
+            const batchSize = 20;
             const enrichedResults: any[] = [];
+            const totalBatches = Math.ceil(cardsToEnrich.length / batchSize);
 
             for (let i = 0; i < cardsToEnrich.length; i += batchSize) {
               const batch = cardsToEnrich.slice(i, i + batchSize);
+              const currentBatch = Math.floor(i / batchSize) + 1;
 
               setProgress(Math.round(((i) / cardsToEnrich.length) * 100))
-              setProgressText(`Generiere KI-Felder (Batch ${Math.floor(i/batchSize)+1}/${Math.ceil(cardsToEnrich.length/batchSize)})...`)
+              setProgressText(`Generiere KI-Felder (Batch ${currentBatch}/${totalBatches})...`)
 
               const reqBody = {
                 cards: batch.map(c => ({ id: c.id, front: c.front, back: c.back }))
@@ -77,7 +78,7 @@ export function CsvImportModal({ deckId, isOpen, onClose }: CsvImportModalProps)
               });
 
               if (!res.ok) {
-                const data = await res.json();
+                const data = await res.json().catch(() => ({}));
                 throw new Error(data.error || "Fehler bei der KI-Generierung");
               }
 

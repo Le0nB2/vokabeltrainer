@@ -116,6 +116,17 @@ WICHTIGE REGELN:
           }
 
           parsedCards = JSON.parse(textResponse);
+
+          // Cleanup step: if gapText only contains "___", set it to null
+          if (Array.isArray(parsedCards)) {
+            parsedCards = parsedCards.map((card: any) => {
+              if (card.gapText && card.gapText.trim() === "___") {
+                return { ...card, gapText: null };
+              }
+              return card;
+            });
+          }
+
           success = true;
 
           // Log success
