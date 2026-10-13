@@ -64,7 +64,7 @@ export async function POST(req: NextRequest) {
     const promptText = `
 Erstelle ein Arbeitsblatt für die Klassenstufe 5-7 basierend auf den folgenden Vokabeln. Das Fach ist Englisch.
 Die Zielsprache der Vokabeln ist Englisch (front = Englisch, back = Deutsch). Generiere sehr viele Aufgaben nach dem geforderten JSON Schema, sodass diese gedruckt ca. 4 DIN-A4-Seiten füllen.
-Generiere exakt 12 Multiple-Choice-Aufgaben, exakt 16 Lückentexte, 10-15 Words in a Box-Aufgaben und exakt 26 Übersetzungsaufgaben.
+Generiere exakt 14 Multiple-Choice-Aufgaben, exakt 16 Lückentexte, 10-15 Words in a Box-Aufgaben und exakt 26 Übersetzungsaufgaben.
 WICHTIG:
 1. Mische die Reihenfolge der Wörter in der Word Box zufällig durch!
 2. Die Lückensätze für 'Words in a box' müssen sprachlich für die Klassenstufe 5-7 (Englisch) geeignet sein. Sie müssen so formuliert sein, dass jede Vokabel aus der Box absolut eindeutig nur in genau EINEN bestimmten Satz inhaltlich und grammatikalisch passt (keine Mehrdeutigkeiten)!
@@ -81,7 +81,7 @@ ${JSON.stringify(selectedCards.map(c => ({ englisch: c.front, deutsch: c.back })
           properties: {
             multipleChoice: {
               type: Type.ARRAY,
-              description: "Exakt 12 Aufgaben. 'Welcher Satz ist grammatikalisch und inhaltlich richtig?'",
+              description: "Exakt 14 Aufgaben. 'Welcher Satz ist grammatikalisch und inhaltlich richtig?'",
               items: {
                 type: Type.OBJECT,
                 properties: {
