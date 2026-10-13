@@ -1,10 +1,11 @@
 "use client"
 
 import { useState } from "react"
-import { Plus, Camera, FileUp, Search, Trash2, Pencil } from "lucide-react"
+import { Plus, Camera, FileUp, Search, Trash2, Pencil, ChevronDown } from "lucide-react"
 import { AddCardModal } from "./AddCardModal"
 import { EditCardModal } from "./EditCardModal"
 import { CsvImportModal } from "./CsvImportModal"
+import { EnrichCardsModal } from "./EnrichCardsModal"
 import { PhotoScanModal } from "./PhotoScanModal"
 import { deleteCard } from "@/actions/cards"
 
@@ -25,6 +26,8 @@ export function DeckToolbar({ deck }: { deck: { id: string, cards: CardType[] } 
   const [showCsvModal, setShowCsvModal] = useState(false)
   const [showPhotoModal, setShowPhotoModal] = useState(false)
   const [cardToEdit, setCardToEdit] = useState<CardType | null>(null)
+  const [showEnrichModal, setShowEnrichModal] = useState(false)
+  const [showManuellDropdown, setShowManuellDropdown] = useState(false)
 
   const [search, setSearch] = useState("")
   const [boxFilter, setBoxFilter] = useState("all") // "all" or "1"-"7"
@@ -40,9 +43,27 @@ export function DeckToolbar({ deck }: { deck: { id: string, cards: CardType[] } 
       <div className="bg-white dark:bg-zinc-900 rounded-xl p-4 shadow-sm border border-zinc-200 dark:border-zinc-800 mb-6 flex flex-col md:flex-row gap-4 justify-between">
 
         <div className="flex items-center gap-2">
-          <button onClick={() => setShowAddModal(true)} className="flex items-center gap-2 px-3 py-2 bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700 rounded-lg text-sm font-medium transition-colors">
-            <Plus className="w-4 h-4" /> Manuell
-          </button>
+          <div className="relative flex">
+            <button onClick={() => setShowAddModal(true)} className="flex items-center gap-2 px-3 py-2 bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700 rounded-l-lg border-r border-zinc-200 dark:border-zinc-700 text-sm font-medium transition-colors">
+              <Plus className="w-4 h-4" /> Manuell
+            </button>
+            <button onClick={() => setShowManuellDropdown(!showManuellDropdown)} className="flex items-center px-2 py-2 bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700 rounded-r-lg text-sm font-medium transition-colors">
+              <ChevronDown className="w-4 h-4" />
+            </button>
+            {showManuellDropdown && (
+              <div className="absolute top-full left-0 mt-1 w-48 bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-lg shadow-lg z-10 py-1">
+                <button
+                  onClick={() => {
+                    setShowManuellDropdown(false)
+                    setShowEnrichModal(true)
+                  }}
+                  className="w-full text-left px-4 py-2 text-sm hover:bg-zinc-100 dark:hover:bg-zinc-700 transition-colors"
+                >
+                  Lückentext generieren
+                </button>
+              </div>
+            )}
+          </div>
           <button onClick={() => setShowCsvModal(true)} className="flex items-center gap-2 px-3 py-2 bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700 rounded-lg text-sm font-medium transition-colors">
             <FileUp className="w-4 h-4" /> CSV
           </button>
@@ -148,6 +169,7 @@ export function DeckToolbar({ deck }: { deck: { id: string, cards: CardType[] } 
         isOpen={!!cardToEdit}
         onClose={() => setCardToEdit(null)}
       />
+      <EnrichCardsModal deckId={deck.id} cards={deck.cards} isOpen={showEnrichModal} onClose={() => setShowEnrichModal(false)} />
     </div>
   )
 }
