@@ -56,45 +56,35 @@ export function CsvImportModal({ deckId, isOpen, onClose }: CsvImportModalProps)
             setProgressText(`Generiere KI-Felder für ${cardsToEnrich.length} Karte(n)...`)
 
             // Process in batches to avoid huge payloads and long timeouts
-            const batchSize = 30;
+            const batchSize = 20;
+            const enrichedResults: any[] = [];
             const totalBatches = Math.ceil(cardsToEnrich.length / batchSize);
-            let completedBatches = 0;
-
-            const batchPromises = [];
 
             for (let i = 0; i < cardsToEnrich.length; i += batchSize) {
               const batch = cardsToEnrich.slice(i, i + batchSize);
+              const currentBatch = Math.floor(i / batchSize) + 1;
+
+              setProgress(Math.round(((i) / cardsToEnrich.length) * 100))
+              setProgressText(`Generiere KI-Felder (Batch ${currentBatch}/${totalBatches})...`)
 
               const reqBody = {
                 cards: batch.map(c => ({ id: c.id, front: c.front, back: c.back }))
               };
 
-              const promise = fetch("/api/enrich-csv", {
+              const res = await fetch("/api/enrich-csv", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify(reqBody)
-              }).then(async (res) => {
-                if (!res.ok) {
-                  const data = await res.json().catch(() => ({}));
-                  throw new Error(data.error || "Fehler bei der KI-Generierung");
-                }
-                const data = await res.json();
-
-                completedBatches++;
-                setProgress(Math.round((completedBatches / totalBatches) * 100));
-                setProgressText(`Generiere KI-Felder (Batch ${completedBatches}/${totalBatches})...`);
-
-                return data.cards;
               });
 
-              batchPromises.push(promise);
+              if (!res.ok) {
+                const data = await res.json().catch(() => ({}));
+                throw new Error(data.error || "Fehler bei der KI-Generierung");
+              }
+
+              const data = await res.json();
+              enrichedResults.push(...data.cards);
             }
-
-            setProgressText(`Generiere KI-Felder (0/${totalBatches})...`);
-            setProgress(0);
-
-            const resultsArray = await Promise.all(batchPromises);
-            const enrichedResults = resultsArray.flat();
 
             // Merge back
             setProgress(100)
