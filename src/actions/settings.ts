@@ -2,9 +2,27 @@
 
 import prisma from "@/lib/prisma"
 import { revalidatePath } from "next/cache"
+import { cookies } from "next/headers"
+import { verifySessionCookie } from "@/lib/auth-utils"
+
+async function checkSettingsAuth(): Promise<boolean> {
+  const envPassword = process.env.SETTINGS_PASSWORD
+  if (!envPassword) return true
+  const cookieStore = await cookies()
+  return verifySessionCookie(cookieStore.get("settings_auth")?.value, envPassword)
+}
 
 export async function importData(jsonData: string) {
   try {
+    const isAuth = await checkSettingsAuth()
+    if (!isAuth) {
+      return { success: false, error: "Nicht autorisiert. Bitte melde dich mit dem Einstellungspasswort an." }
+    }
+
+    if (jsonData.length > 50 * 1024 * 1024) {
+      return { success: false, error: "Importdatei ist zu groß (maximal 50 MB erlaubt)." }
+    }
+
     const parsedData = JSON.parse(jsonData)
 
     let data;
@@ -117,6 +135,11 @@ export async function updateSettings(data: {
   notificationsEnabled?: boolean;
   speechLanguage?: string;
 }) {
+  const isAuth = await checkSettingsAuth()
+  if (!isAuth) {
+    throw new Error("Nicht autorisiert. Bitte melde dich mit dem Einstellungspasswort an.")
+  }
+
   const updatedSettings = await prisma.settings.update({
     where: { id: "default" },
     data

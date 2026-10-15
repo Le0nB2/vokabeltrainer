@@ -12,6 +12,19 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "No image provided" }, { status: 400 });
     }
 
+    // Limit upload size to 10MB to prevent memory exhaustion / DoS
+    const MAX_FILE_SIZE = 10 * 1024 * 1024;
+    if (file.size > MAX_FILE_SIZE) {
+      return NextResponse.json({ error: "Datei ist zu groß (maximal 10 MB erlaubt)" }, { status: 400 });
+    }
+
+    // Validate MIME type
+    const ALLOWED_MIME_TYPES = ["image/jpeg", "image/png", "image/webp", "image/heic", "image/heif"];
+    const mimeType = file.type || "image/jpeg";
+    if (!ALLOWED_MIME_TYPES.includes(mimeType)) {
+      return NextResponse.json({ error: "Ungültiger Dateityp (nur JPEG, PNG, WebP erlaubt)" }, { status: 400 });
+    }
+
     // Read multiple keys or fallback to single key
     const rawKeys = process.env.GEMINI_API_KEYS || process.env.GEMINI_API_KEY;
     if (!rawKeys) {
@@ -27,7 +40,6 @@ export async function POST(req: NextRequest) {
     const arrayBuffer = await file.arrayBuffer();
     const buffer = Buffer.from(arrayBuffer);
     const base64Image = buffer.toString("base64");
-    const mimeType = file.type;
 
     let lastError: unknown = null;
     let success = false;
@@ -193,6 +205,10 @@ WICHTIGE REGELN:
 
   } catch (error: unknown) {
     console.error("Scan error:", error);
-    return NextResponse.json({ error: (error as Error).message || String(error) || "Internal server error" }, { status: 500 });
+    const message = (error as Error)?.message || "";
+    if (message.includes("Google API-Kontingente ist aufgebraucht")) {
+      return NextResponse.json({ error: message }, { status: 429 });
+    }
+    return NextResponse.json({ error: "Fehler bei der Bildanalyse. Bitte versuche es erneut." }, { status: 500 });
   }
 }

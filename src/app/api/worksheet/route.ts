@@ -305,6 +305,10 @@ ${JSON.stringify(selectedCards.map(c => ({ englisch: c.front, deutsch: c.back })
 
   } catch (error: unknown) {
     console.error("Worksheet error:", error);
-    return NextResponse.json({ error: (error as Error).message || String(error) || "Internal server error" }, { status: 500 });
+    const message = (error as Error)?.message || "";
+    if (message.includes("Google API-Kontingente ist aufgebraucht")) {
+      return NextResponse.json({ error: message }, { status: 429 });
+    }
+    return NextResponse.json({ error: "Fehler beim Erstellen des Arbeitsblatts. Bitte versuche es erneut." }, { status: 500 });
   }
 }

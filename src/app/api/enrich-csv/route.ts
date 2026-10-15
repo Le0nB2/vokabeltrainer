@@ -48,6 +48,6 @@ export async function POST(req: NextRequest) {
       );
     }
     console.error("Enrich CSV error:", error);
-    return NextResponse.json({ error: (error as Error).message || String(error) || "Internal server error" }, { status: 500 });
+    return NextResponse.json({ error: "Fehler bei der KI-Anreicherung. Bitte versuche es erneut." }, { status: 500 });
   }
 }

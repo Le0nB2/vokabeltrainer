@@ -8,6 +8,9 @@ services:
       - "3001:3000"
     environment:
       - GEMINI_API_KEY=${GEMINI_API_KEY}
+      - SETTINGS_PASSWORD=${SETTINGS_PASSWORD}
+      - BASIC_AUTH_USER=${BASIC_AUTH_USER}
+      - BASIC_AUTH_PASSWORD=${BASIC_AUTH_PASSWORD}
     volumes:
       - app_data:/app/prisma
 
