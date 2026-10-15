@@ -116,6 +116,23 @@ describe('proxy middleware session auth', () => {
     expect(result).toEqual({ status: 200, type: 'next' })
   })
 
+  it('should allow unauthenticated access to app icons and manifest', async () => {
+    const paths = [
+      '/apple-icon',
+      '/apple-touch-icon.png',
+      '/apple-touch-icon-precomposed.png',
+      '/favicon.ico',
+      '/manifest.json',
+      '/icon-192.png',
+    ]
+
+    for (const p of paths) {
+      const req = createMockRequest(p)
+      const result = await proxy(req)
+      expect(result).toEqual({ status: 200, type: 'next' })
+    }
+  })
+
   it('should return 401 JSON without WWW-Authenticate header for unauthenticated /api requests', async () => {
     const req = createMockRequest('/api/notifications/due-count')
     const result: any = await proxy(req)

@@ -54,8 +54,18 @@ export async function proxy(req: NextRequest) {
   }
 
   // Unauthenticated user:
-  // Allow access to login page
-  if (pathname === "/login") {
+  // Allow access to login page, static icons, and app manifest
+  if (
+    pathname === "/login" ||
+    pathname === "/apple-icon" ||
+    pathname === "/apple-touch-icon.png" ||
+    pathname === "/apple-touch-icon-precomposed.png" ||
+    pathname === "/favicon.ico" ||
+    pathname === "/manifest.json" ||
+    pathname === "/manifest.webmanifest" ||
+    pathname === "/icon.png" ||
+    pathname.startsWith("/icon-")
+  ) {
     return NextResponse.next();
   }
 
@@ -79,9 +89,11 @@ export const config = {
      * - _next/static (static files)
      * - _next/image (image optimization files)
      * - favicon.ico (favicon file)
-     * - images in public folder like public/assets
+     * - apple-icon / apple-touch-icon
+     * - manifest.json / manifest.webmanifest
+     * - images and media in public folder
      */
-    "/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)",
+    "/((?!_next/static|_next/image|favicon\\.ico|apple-icon|apple-touch-icon|manifest\\.json|manifest\\.webmanifest|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico|webmanifest)$).*)",
   ],
 };
 

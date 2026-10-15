@@ -91,27 +91,29 @@ export default async function Dashboard() {
             </div>
           )}
           <div className="flex gap-2 sm:gap-3 items-center w-full sm:w-auto">
-            <Link href="/settings" className="hidden sm:block text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-100 transition-colors p-2" title="Einstellungen">
-              <Settings className="w-5 h-5" />
-            </Link>
-            {isAuthEnabled && (
-              <LogoutButton className="hidden sm:inline-flex items-center text-zinc-500 hover:text-red-600 dark:hover:text-red-400 transition-colors p-2 rounded-lg" />
-            )}
-          <form action={async (formData) => {
-            "use server"
-            const title = formData.get("title") as string
-            if (title) await createDeck(title)
-          }} className="flex gap-2 w-full sm:w-auto">
-            <input
-              name="title"
-              placeholder="Neues Deck Name..."
-              required
-              className="flex-1 sm:w-auto border rounded-lg px-3 py-2 text-sm dark:bg-zinc-900 dark:border-zinc-800 min-w-0"
-            />
-            <button type="submit" className="shrink-0 flex items-center gap-1 bg-zinc-900 dark:bg-zinc-100 text-white dark:text-zinc-900 px-4 py-2 rounded-lg text-sm font-medium hover:opacity-90">
-              <Plus className="w-4 h-4" /> Anlegen
-            </button>
-          </form>
+            <form action={async (formData) => {
+              "use server"
+              const title = formData.get("title") as string
+              if (title) await createDeck(title)
+            }} className="flex gap-2 w-full sm:w-auto">
+              <input
+                name="title"
+                placeholder="Neues Deck Name..."
+                required
+                className="flex-1 sm:w-auto border rounded-lg px-3 py-2 text-sm dark:bg-zinc-900 dark:border-zinc-800 min-w-0"
+              />
+              <button type="submit" className="shrink-0 flex items-center gap-1 bg-zinc-900 dark:bg-zinc-100 text-white dark:text-zinc-900 px-4 py-2 rounded-lg text-sm font-medium hover:opacity-90">
+                <Plus className="w-4 h-4" /> Anlegen
+              </button>
+            </form>
+            <div className="hidden sm:flex items-center gap-1 sm:gap-2">
+              <Link href="/settings" className="text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-100 transition-colors p-2" title="Einstellungen">
+                <Settings className="w-5 h-5" />
+              </Link>
+              {isAuthEnabled && (
+                <LogoutButton className="inline-flex items-center text-zinc-500 hover:text-red-600 dark:hover:text-red-400 transition-colors p-2 rounded-lg" />
+              )}
+            </div>
           </div>
         </header>
 
