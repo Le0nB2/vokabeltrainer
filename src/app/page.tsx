@@ -4,6 +4,8 @@ import { Plus, BookOpen, Settings, Brain } from "lucide-react"
 import { DeckMenu } from "@/components/DeckMenu"
 import { DeckPieChart } from "@/components/DeckPieChart"
 import { LearningStatsChart } from "@/components/LearningStatsChart"
+import { LogoutButton } from "@/components/LogoutButton"
+import { getAppAuthCredentials } from "@/lib/auth-utils"
 import prisma from "@/lib/prisma"
 import { subDays, format } from "date-fns"
 
@@ -13,6 +15,7 @@ export default async function Dashboard() {
   const decks = await getDecks()
   const now = new Date()
 
+  const { isConfigured: isAuthEnabled } = getAppAuthCredentials()
   const totalDueCount = decks.reduce((acc, deck) => acc + deck.cards.filter(c => c.dueDate <= now).length, 0)
 
 
@@ -66,9 +69,12 @@ export default async function Dashboard() {
               <BookOpen className="w-8 h-8 text-blue-600 shrink-0" />
               <h1 className="text-2xl sm:text-3xl font-bold truncate">Vokabeltrainer</h1>
             </div>
-            <Link href="/settings" className="sm:hidden text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-100 transition-colors p-2" title="Einstellungen">
-              <Settings className="w-6 h-6" />
-            </Link>
+            <div className="flex items-center gap-1 sm:hidden">
+              <Link href="/settings" className="text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-100 transition-colors p-2" title="Einstellungen">
+                <Settings className="w-6 h-6" />
+              </Link>
+              {isAuthEnabled && <LogoutButton />}
+            </div>
           </div>
           {totalDueCount > 0 && (
             <div className="w-full sm:w-auto mb-4 sm:mb-0">
@@ -84,10 +90,13 @@ export default async function Dashboard() {
               </Link>
             </div>
           )}
-          <div className="flex gap-4 items-center w-full sm:w-auto">
+          <div className="flex gap-2 sm:gap-3 items-center w-full sm:w-auto">
             <Link href="/settings" className="hidden sm:block text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-100 transition-colors p-2" title="Einstellungen">
               <Settings className="w-5 h-5" />
             </Link>
+            {isAuthEnabled && (
+              <LogoutButton className="hidden sm:inline-flex items-center text-zinc-500 hover:text-red-600 dark:hover:text-red-400 transition-colors p-2 rounded-lg" />
+            )}
           <form action={async (formData) => {
             "use server"
             const title = formData.get("title") as string
