@@ -1,36 +1,59 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { proxy } from '../src/proxy'
 import { NextRequest } from 'next/server'
+import { createAppSessionToken, getAppSecret, AUTH_COOKIE_NAME } from '../src/lib/auth-utils'
 
 // Mock next/server response methods
 vi.mock('next/server', () => {
   return {
     NextResponse: class {
-      body: string
+      body: any
       status: number
       headers: Map<string, string>
+      url?: string
+      type: string
 
-      constructor(body: string, init: any) {
+      constructor(body: any, init: any) {
         this.body = body
-        this.status = init?.status
+        this.status = init?.status || 200
         this.headers = new Map(Object.entries(init?.headers || {}))
+        this.type = 'response'
       }
 
       static next() {
         return { status: 200, type: 'next' }
       }
-    }
+
+      static redirect(url: string | URL) {
+        return {
+          status: 307,
+          type: 'redirect',
+          url: typeof url === 'string' ? url : url.toString(),
+        }
+      }
+
+      static json(body: any, init?: any) {
+        return {
+          status: init?.status || 200,
+          type: 'json',
+          body,
+          headers: new Map(Object.entries(init?.headers || {})),
+        }
+      }
+    },
   }
 })
 
-describe('proxy middleware basic auth', () => {
+describe('proxy middleware session auth', () => {
   const originalEnv = process.env
 
   beforeEach(() => {
     vi.resetModules()
     process.env = { ...originalEnv }
-    process.env.BASIC_AUTH_USER = 'testuser'
-    process.env.BASIC_AUTH_PASSWORD = 'testpassword:with:colons'
+    process.env.AUTH_USER = 'testuser'
+    process.env.AUTH_PASSWORD = 'testpassword123'
+    delete process.env.BASIC_AUTH_USER
+    delete process.env.BASIC_AUTH_PASSWORD
     vi.clearAllMocks()
   })
 
@@ -38,53 +61,163 @@ describe('proxy middleware basic auth', () => {
     process.env = originalEnv
   })
 
-  function createMockRequest(authHeader?: string | null): NextRequest {
+  function createMockRequest(pathname = '/', cookieValue?: string | null): NextRequest {
+    const url = new URL(pathname, 'http://localhost:3000')
+    const cookiesMap = new Map<string, { name: string; value: string }>()
+    if (cookieValue) {
+      cookiesMap.set(AUTH_COOKIE_NAME, { name: AUTH_COOKIE_NAME, value: cookieValue })
+    }
+
     return {
+      url: url.toString(),
+      nextUrl: url,
       headers: {
-        get: (name: string) => (name.toLowerCase() === 'authorization' ? authHeader : null),
+        get: (name: string) => {
+          if (name.toLowerCase() === 'cookie' && cookieValue) {
+            return `${AUTH_COOKIE_NAME}=${cookieValue}`
+          }
+          return null
+        },
+      },
+      cookies: {
+        get: (name: string) => cookiesMap.get(name),
       },
     } as unknown as NextRequest
   }
 
   it('should bypass auth if env vars are missing', async () => {
+    delete process.env.AUTH_USER
+    delete process.env.AUTH_PASSWORD
     delete process.env.BASIC_AUTH_USER
-    const req = createMockRequest(null)
+    delete process.env.BASIC_AUTH_PASSWORD
+
+    const req = createMockRequest('/')
     const result = await proxy(req)
     expect(result).toEqual({ status: 200, type: 'next' })
   })
 
-  it('should return 401 if auth header is missing', async () => {
-    const req = createMockRequest(null)
+  it('should redirect unauthenticated page requests from / to /login', async () => {
+    const req = createMockRequest('/')
     const result: any = await proxy(req)
-    expect(result.status).toBe(401)
-    expect(result.headers.get('WWW-Authenticate')).toBe('Basic realm="Secure Area"')
+    expect(result.type).toBe('redirect')
+    expect(result.url).toBe('http://localhost:3000/login')
   })
 
-  it('should allow valid credentials', async () => {
-    const authHeader = `Basic ${btoa('testuser:testpassword:with:colons')}`
-    const req = createMockRequest(authHeader)
+  it('should redirect unauthenticated page requests preserving target in redirect param', async () => {
+    const req = createMockRequest('/decks/deck-123?filter=due')
+    const result: any = await proxy(req)
+    expect(result.type).toBe('redirect')
+    expect(result.url).toBe('http://localhost:3000/login?redirect=%2Fdecks%2Fdeck-123%3Ffilter%3Ddue')
+  })
+
+  it('should allow unauthenticated access to /login', async () => {
+    const req = createMockRequest('/login')
     const result = await proxy(req)
     expect(result).toEqual({ status: 200, type: 'next' })
   })
 
-  it('should return 401 for invalid credentials', async () => {
-    const authHeader = `Basic ${btoa('testuser:wrongpassword')}`
-    const req = createMockRequest(authHeader)
-    const result: any = await proxy(req)
-    expect(result.status).toBe(401)
+  it('should allow unauthenticated access to app icons and manifest', async () => {
+    const paths = [
+      '/apple-icon',
+      '/apple-touch-icon.png',
+      '/apple-touch-icon-precomposed.png',
+      '/favicon.ico',
+      '/manifest.json',
+      '/icon-192.png',
+    ]
+
+    for (const p of paths) {
+      const req = createMockRequest(p)
+      const result = await proxy(req)
+      expect(result).toEqual({ status: 200, type: 'next' })
+    }
   })
 
-  it('should return 401 for malformed base64', async () => {
-    const authHeader = `Basic invalid_base64_string!!!!`
-    const req = createMockRequest(authHeader)
+  it('should return 401 JSON without WWW-Authenticate header for unauthenticated /api requests', async () => {
+    const req = createMockRequest('/api/notifications/due-count')
     const result: any = await proxy(req)
     expect(result.status).toBe(401)
+    expect(result.body).toEqual({ error: 'Unauthorized' })
+    expect(result.headers.get('WWW-Authenticate')).toBeUndefined()
   })
 
-  it('should return 401 for valid base64 but missing colon', async () => {
-    const authHeader = `Basic ${btoa('testuserpassword')}`
-    const req = createMockRequest(authHeader)
+  it('should allow access with a valid session cookie', async () => {
+    const secret = getAppSecret('testpassword123')
+    const validToken = createAppSessionToken('testuser', secret)
+    const req = createMockRequest('/', validToken)
+
+    const result = await proxy(req)
+    expect(result).toEqual({ status: 200, type: 'next' })
+  })
+
+  it('should redirect authenticated users from /login to /', async () => {
+    const secret = getAppSecret('testpassword123')
+    const validToken = createAppSessionToken('testuser', secret)
+    const req = createMockRequest('/login', validToken)
+
     const result: any = await proxy(req)
-    expect(result.status).toBe(401)
+    expect(result.type).toBe('redirect')
+    expect(result.url).toBe('http://localhost:3000/')
+  })
+
+  it('should redirect authenticated users from /login to redirect parameter if specified', async () => {
+    const secret = getAppSecret('testpassword123')
+    const validToken = createAppSessionToken('testuser', secret)
+    const req = createMockRequest('/login?redirect=%2Fstudy', validToken)
+
+    const result: any = await proxy(req)
+    expect(result.type).toBe('redirect')
+    expect(result.url).toBe('http://localhost:3000/study')
+  })
+
+  it('should reject invalid session tokens and redirect to /login', async () => {
+    const req = createMockRequest('/', 'invalid.token')
+    const result: any = await proxy(req)
+    expect(result.type).toBe('redirect')
+    expect(result.url).toBe('http://localhost:3000/login')
+  })
+
+  it('should reject expired session tokens', async () => {
+    const secret = getAppSecret('testpassword123')
+    // Create token expired 10 seconds ago
+    const expiredToken = createAppSessionToken('testuser', secret, -10)
+    const req = createMockRequest('/', expiredToken)
+
+    const result: any = await proxy(req)
+    expect(result.type).toBe('redirect')
+    expect(result.url).toBe('http://localhost:3000/login')
+  })
+
+  it('should reject session tokens signed with wrong secret', async () => {
+    const wrongSecretToken = createAppSessionToken('testuser', 'wrong-secret')
+    const req = createMockRequest('/', wrongSecretToken)
+
+    const result: any = await proxy(req)
+    expect(result.type).toBe('redirect')
+    expect(result.url).toBe('http://localhost:3000/login')
+  })
+
+  it('should reject session tokens for different user', async () => {
+    const secret = getAppSecret('testpassword123')
+    const otherUserToken = createAppSessionToken('otheruser', secret)
+    const req = createMockRequest('/', otherUserToken)
+
+    const result: any = await proxy(req)
+    expect(result.type).toBe('redirect')
+    expect(result.url).toBe('http://localhost:3000/login')
+  })
+
+  it('should fallback to BASIC_AUTH_USER and BASIC_AUTH_PASSWORD if AUTH_USER/AUTH_PASSWORD are not set', async () => {
+    delete process.env.AUTH_USER
+    delete process.env.AUTH_PASSWORD
+    process.env.BASIC_AUTH_USER = 'legacyuser'
+    process.env.BASIC_AUTH_PASSWORD = 'legacypassword'
+
+    const secret = getAppSecret('legacypassword')
+    const validToken = createAppSessionToken('legacyuser', secret)
+    const req = createMockRequest('/', validToken)
+
+    const result = await proxy(req)
+    expect(result).toEqual({ status: 200, type: 'next' })
   })
 })

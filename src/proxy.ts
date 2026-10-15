@@ -1,64 +1,85 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
-
-async function secureCompare(a: string, b: string) {
-  const encoder = new TextEncoder();
-  const aHash = await crypto.subtle.digest("SHA-256", encoder.encode(a));
-  const bHash = await crypto.subtle.digest("SHA-256", encoder.encode(b));
-
-  const aArray = new Uint8Array(aHash);
-  const bArray = new Uint8Array(bHash);
-
-  let result = 0;
-  for (let i = 0; i < aArray.length; i++) {
-    result |= aArray[i] ^ bArray[i];
-  }
-  return result === 0;
-}
+import {
+  AUTH_COOKIE_NAME,
+  getAppAuthCredentials,
+  getAppSecret,
+  verifyAppSessionToken,
+} from "./lib/auth-utils";
 
 export async function proxy(req: NextRequest) {
-  const basicAuthUser = process.env.BASIC_AUTH_USER;
-  const basicAuthPassword = process.env.BASIC_AUTH_PASSWORD;
+  const { user: authUser, password: authPassword, isConfigured } = getAppAuthCredentials();
+  const url = req.nextUrl
+    ? new URL(req.nextUrl.toString())
+    : new URL(req.url || "/", "http://localhost");
+  const pathname = url.pathname;
 
   // Bypass auth if credentials are not configured in environment
-  if (!basicAuthUser || !basicAuthPassword) {
+  if (!isConfigured) {
+    if (pathname === "/login") {
+      url.pathname = "/";
+      url.search = "";
+      return NextResponse.redirect(url);
+    }
     return NextResponse.next();
   }
 
-  const basicAuth = req.headers.get("authorization");
-
-  if (basicAuth) {
-    const authValue = basicAuth.split(" ")[1];
-    if (authValue) {
-      try {
-        const decoded = atob(authValue);
-        const colonIndex = decoded.indexOf(":");
-
-        if (colonIndex > -1) {
-          const user = decoded.slice(0, colonIndex);
-          const pwd = decoded.slice(colonIndex + 1);
-
-          const [isUserValid, isPwdValid] = await Promise.all([
-            secureCompare(user, basicAuthUser),
-            secureCompare(pwd, basicAuthPassword)
-          ]);
-
-          if (isUserValid && isPwdValid) {
-            return NextResponse.next();
-          }
-        }
-      } catch (e) {
-        // Ignore errors (e.g. invalid base64) to fall through to 401
+  // Get session cookie (support both NextRequest.cookies and Cookie header fallback)
+  let sessionCookie = req.cookies?.get(AUTH_COOKIE_NAME)?.value;
+  if (!sessionCookie) {
+    const rawCookie = req.headers?.get("cookie");
+    if (rawCookie) {
+      const match = rawCookie
+        .split(";")
+        .map((c) => c.trim())
+        .find((c) => c.startsWith(`${AUTH_COOKIE_NAME}=`));
+      if (match) {
+        sessionCookie = match.slice(AUTH_COOKIE_NAME.length + 1);
       }
     }
   }
 
-  return new NextResponse("Auth required", {
-    status: 401,
-    headers: {
-      "WWW-Authenticate": 'Basic realm="Secure Area"',
-    },
-  });
+  const secret = getAppSecret(authPassword);
+  const isAuthenticated = verifyAppSessionToken(sessionCookie, authUser, secret);
+
+  // Authenticated user
+  if (isAuthenticated) {
+    if (pathname === "/login") {
+      const redirectTarget = url.searchParams.get("redirect");
+      const target = redirectTarget && redirectTarget.startsWith("/") ? redirectTarget : "/";
+      const targetUrl = new URL(target, url.origin);
+      return NextResponse.redirect(targetUrl);
+    }
+    return NextResponse.next();
+  }
+
+  // Unauthenticated user:
+  // Allow access to login page, static icons, and app manifest
+  if (
+    pathname === "/login" ||
+    pathname === "/apple-icon" ||
+    pathname === "/apple-touch-icon.png" ||
+    pathname === "/apple-touch-icon-precomposed.png" ||
+    pathname === "/favicon.ico" ||
+    pathname === "/manifest.json" ||
+    pathname === "/manifest.webmanifest" ||
+    pathname === "/icon.png" ||
+    pathname.startsWith("/icon-")
+  ) {
+    return NextResponse.next();
+  }
+
+  // For API routes, return 401 JSON without WWW-Authenticate: Basic header
+  if (pathname.startsWith("/api/")) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  // For protected page routes, redirect to /login preserving the requested path
+  const loginUrl = new URL("/login", url.origin);
+  if (pathname !== "/") {
+    loginUrl.searchParams.set("redirect", pathname + url.search);
+  }
+  return NextResponse.redirect(loginUrl);
 }
 
 export const config = {
@@ -68,8 +89,11 @@ export const config = {
      * - _next/static (static files)
      * - _next/image (image optimization files)
      * - favicon.ico (favicon file)
-     * - images in public folder like public/assets
+     * - apple-icon / apple-touch-icon
+     * - manifest.json / manifest.webmanifest
+     * - images and media in public folder
      */
-    "/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)",
+    "/((?!_next/static|_next/image|favicon\\.ico|apple-icon|apple-touch-icon|manifest\\.json|manifest\\.webmanifest|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico|webmanifest)$).*)",
   ],
 };
+
