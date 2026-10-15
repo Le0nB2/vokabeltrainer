@@ -100,6 +100,7 @@ export function StudySession({ deck, dueCards, settings }: { deck: { id: string,
         }
       }
       setIsTransitioning(false);
+      setBackCardCache(null);
     }, 400) // Wait for flip animation to mostly finish
   }
 
@@ -219,6 +220,10 @@ export function StudySession({ deck, dueCards, settings }: { deck: { id: string,
                 setCurrentIndex(0)
                 setStats({ correct: 0, incorrect: 0 })
                 setSessionCompleted(deck.cards.length === 0)
+                setBackCardCache(null)
+                setTypingFeedback(null)
+                setTypingInput('')
+                setIsFlipped(false)
               }
             }}
             className="block w-full py-3 bg-blue-600 text-white rounded-xl font-medium hover:bg-blue-700 transition-colors mb-3 flex items-center justify-center gap-2"
@@ -262,6 +267,7 @@ export function StudySession({ deck, dueCards, settings }: { deck: { id: string,
     else if (result.status === 'TYPO') rating = 'hard';
     else rating = 'again';
 
+    setBackCardCache({ card: currentCard, isEnglishQuestion, askDirection, showGapText });
     setTypingFeedback({ ...result, rating, input: typingInput });
     setIsFlipped(true);
   };
