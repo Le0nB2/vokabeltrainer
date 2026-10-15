@@ -1,8 +1,22 @@
 import { NextResponse } from 'next/server'
+import { cookies } from 'next/headers'
 import prisma from '@/lib/prisma'
+import { verifySessionCookie } from '@/lib/auth-utils'
 
 export async function GET() {
   try {
+    const envPassword = process.env.SETTINGS_PASSWORD
+    if (envPassword) {
+      const cookieStore = await cookies()
+      const isAuthenticated = verifySessionCookie(
+        cookieStore.get("settings_auth")?.value,
+        envPassword
+      )
+      if (!isAuthenticated) {
+        return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+      }
+    }
+
     const settings = await prisma.settings.findUnique({
       where: { id: "default" }
     })

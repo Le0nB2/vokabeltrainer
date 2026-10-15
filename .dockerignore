@@ -1,0 +1,33 @@
+# Git
+.git
+.github
+
+# Environment files
+.env
+.env.*
+!.env.example
+
+# Local certificates and private keys
+certs/
+*.pem
+*.key
+*.crt
+
+# Dependencies and build artifacts
+node_modules
+.next
+out
+build
+coverage
+
+# Databases
+prisma/*.db
+prisma/*.db-journal
+
+# Logs and process IDs
+*.log
+*.pid
+
+# OS metadata
+.DS_Store
+Thumbs.db

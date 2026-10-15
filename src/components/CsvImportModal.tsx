@@ -11,6 +11,15 @@ interface CsvImportModalProps {
   onClose: () => void
 }
 
+function sanitizeCsvField(val: string | undefined): string | undefined {
+  if (!val) return val
+  const trimmed = val.trim()
+  if (/^[=+\-@\t\r]/.test(trimmed)) {
+    return `'${trimmed}`
+  }
+  return val
+}
+
 export function CsvImportModal({ deckId, isOpen, onClose }: CsvImportModalProps) {
   const [file, setFile] = useState<File | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
@@ -35,12 +44,12 @@ export function CsvImportModal({ deckId, isOpen, onClose }: CsvImportModalProps)
           let cards = results.data.map((row, index: number) => {
             // Support standard fields with fallbacks
             const keys = Object.keys(row)
-            const front = row.front || row[keys[0]] || ""
-            const back = row.back || row[keys[1]] || ""
-            const notes = row.notes || row[keys[2]] || undefined
-            const gapText = row.gapText || row.gap_text || row.lückentext || undefined
-            const mnemonic = row.mnemonic || row.eselsbrücke || undefined
-            const contextSentence = row.contextSentence || row.context_sentence || row.beispielsatz || undefined
+            const front = sanitizeCsvField(row.front || row[keys[0]] || "") || ""
+            const back = sanitizeCsvField(row.back || row[keys[1]] || "") || ""
+            const notes = sanitizeCsvField(row.notes || row[keys[2]])
+            const gapText = sanitizeCsvField(row.gapText || row.gap_text || row.lückentext)
+            const mnemonic = sanitizeCsvField(row.mnemonic || row.eselsbrücke)
+            const contextSentence = sanitizeCsvField(row.contextSentence || row.context_sentence || row.beispielsatz)
             return { id: `card_${index}`, front, back, notes, gapText, mnemonic, contextSentence }
           }).filter(c => c.front && c.back)
 

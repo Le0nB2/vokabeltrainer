@@ -30,5 +30,7 @@ export async function checkPassword(password: string) {
     return { success: true }
   }
 
+  // Add slight delay to mitigate high-speed brute-force attacks
+  await new Promise((resolve) => setTimeout(resolve, 500))
   return { success: false, error: "Falsches Passwort" }
 }
