@@ -2,6 +2,16 @@
 
 Eine moderne, lokal lauffähige Vokabeltrainer-Webanwendung, gebaut mit Next.js (App Router), TypeScript, Tailwind CSS, und Prisma (SQLite).
 
+
+<div align="center">
+  <img src="public/assets/screenshots/screenshot_1.png" width="16%" />
+  <img src="public/assets/screenshots/screenshot_2.png" width="16%" />
+  <img src="public/assets/screenshots/screenshot_3.png" width="16%" />
+  <img src="public/assets/screenshots/screenshot_4.png" width="16%" />
+  <img src="public/assets/screenshots/screenshot_5.png" width="16%" />
+  <img src="public/assets/screenshots/screenshot_6.png" width="16%" />
+</div>
+
 ## Features
 - **Smarteres Spaced Repetition System (SRS):** Adaptives Lernsystem ähnlich zu SuperMemo. Dynamische Berechnung der Intervalle basierend auf dem 'Ease-Factor' der Karte und deiner Bewertung.
   - **Feine SRS-Abstufung**: Anstelle von nur "Gewusst" oder "Nicht gewusst" ermöglicht das System (wie bei FSRS) eine granularere Rückmeldung ("Erneut", "Schwer", "Gut", "Einfach"). So können Intervalle noch besser auf den individuellen Lernfortschritt abgestimmt werden. Das "Leech-Management" erkennt Problemkarten und zeigt gezielt hinterlegte Eselsbrücken an.
