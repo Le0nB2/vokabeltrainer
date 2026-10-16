@@ -415,7 +415,7 @@ export function StudySession({ deck, dueCards, settings }: { deck: { id: string,
                 <div>{typingFeedback.message}</div>
                 {typingFeedback.status !== 'CORRECT' && typingFeedback.input && (
                   <div className="mt-2 text-sm opacity-80 font-normal">
-                    Deine Eingabe: "{typingFeedback.input}"
+                    Deine Eingabe: &quot;{typingFeedback.input}&quot;
                   </div>
                 )}
               </div>

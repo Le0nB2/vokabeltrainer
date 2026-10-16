@@ -1,11 +1,11 @@
 import { renderToBuffer } from '@react-pdf/renderer';
 import WorksheetPDF from '../../app/decks/[id]/worksheet/WorksheetPDF';
 import React from 'react';
-import * as pdfjsLib from 'pdfjs-dist/legacy/build/pdf.js';
+import { PDFDocument } from 'pdf-lib';
 
 export async function getPdfPageCountFromBuffer(buffer: Uint8Array): Promise<number> {
-    const pdfDoc = await pdfjsLib.getDocument({ data: buffer }).promise;
-    return pdfDoc.numPages;
+    const pdfDoc = await PDFDocument.load(buffer);
+    return pdfDoc.getPageCount();
 }
 
 export async function generateOptimizedPdf(

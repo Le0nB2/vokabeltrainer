@@ -94,7 +94,7 @@ export function MinigameOverlay({
                   onClick={() => setShowInstructions(false)}
                   className="mt-8 px-8 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-full font-medium transition-colors"
                 >
-                  Verstanden, los geht's!
+                  Verstanden, los geht&apos;s!
                 </button>
               </div>
             </div>
