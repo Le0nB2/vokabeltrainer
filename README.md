@@ -147,7 +147,7 @@ Beim Start:
 Die App ist nun unter [http://localhost:3001](http://localhost:3001) erreichbar.
 
 ## Tech-Stack
-- Frontend & Backend: Next.js 15 (App Router, Server Actions)
+- Frontend & Backend: Next.js 16 (App Router, Server Actions)
 - Styling: Tailwind CSS, Lucide Icons
 - Datenbank: SQLite via Prisma ORM
 - KI-Analyse: `@google/genai` (Gemini 3.5 Flash Lite Structured Output)
@@ -156,40 +156,43 @@ Die App ist nun unter [http://localhost:3001](http://localhost:3001) erreichbar.
 
 Hier sind die zentralen Dienste, Container-Eigenschaften und Abhängigkeiten des Vokabeltrainer-Projekts aufgeführt.
 
-## Docker Container
+### Docker Container
 
-| Dienst | Image / Basis | Port (Host:Container) | Letzte Stable-Version | Update-Hinweise |
-| :--- | :--- | :--- | :--- | :--- |
-| **app** | `node:22-alpine` | `3001:3000` | `node:24-alpine` (Active LTS) / `node:22-alpine` (Maintenance) | Update auf Node 24 LTS empfohlen, vorab Build- und Modul-Kompatibilität testen. |
+| Dienst | Image / Basis | Port (Host:Container) |
+| :--- | :--- | :--- |
+| **app** | `node:22-alpine` | `3001:3000` |
 
-## Kerntechnologien & Frameworks
+### Kerntechnologien & Frameworks
 
-| Technologie | Aktuelle Version | Letzte Stable-Version | Quelle | Update-Hinweise |
-| :--- | :--- | :--- | :--- | :--- |
-| **Node.js** | 22-alpine (v22.x) | 24.x LTS | `Dockerfile` | Testlauf für native Module empfohlen; v22 wird weiterhin gewartet. |
-| **Next.js** | 16.3.8 | 16.3.8 | `package.json` | Bereits aktuell (kein Update erforderlich). |
-| **React** | 19.2.8 | 19.3.0 | `package.json` | Minor-Update, ohne Breaking Changes direkt möglich. |
-| **React DOM** | 19.2.8 | 19.3.0 | `package.json` | Minor-Update, zusammen mit React aktualisieren. |
+| Technologie | Version | Quelle |
+| :--- | :--- | :--- |
+| **Node.js** | 22-alpine | `Dockerfile` |
+| **Next.js** | 16.4.2 | `package.json` |
+| **React** | 19.3.1 | `package.json` |
+| **React DOM** | 19.3.1 | `package.json` |
 
-## Datenbank & ORM
+### Datenbank & ORM
 
-| Technologie | Aktuelle Version | Letzte Stable-Version | Beschreibung | Update-Hinweise |
-| :--- | :--- | :--- | :--- | :--- |
-| **Prisma (CLI & Client)** | ^5.22.0 | 7.10.0 | ORM für die Datenbankanbindung | Vorsicht: Breaking Changes zwischen v5 und v7. Offizielle Migration Guides beachten. |
-| **SQLite** | - | - | Lokale, dateibasierte Datenbank (via Prisma `dev.db`) | Wird über Prisma bzw. Systemtreiber verwaltet, kein manuelles Update nötig. |
+| Technologie | Version | Beschreibung |
+| :--- | :--- | :--- |
+| **Prisma (CLI & Client)** | 6.19.3 | ORM für die Datenbankanbindung |
+| **SQLite** | 3.x | Lokale, dateibasierte Datenbank (via Prisma `dev.db`) |
 
-## Weitere wichtige Abhängigkeiten
+### Weitere wichtige Abhängigkeiten
 
-| Paket | Aktuelle Version | Letzte Stable-Version | Funktion / Bereich | Update-Hinweise |
-| :--- | :--- | :--- | :--- | :--- |
-| **@google/genai** | ^2.25.0 | 2.27.0 | KI-Services (z. B. Bildanalyse) | Reibungslos möglich (abwärtskompatible Minor-Releases). |
-| **Tailwind CSS** | ^4.x | 4.x | Styling | Minor-/Patch-Updates innerhalb v4 unkritisch. |
-| **Lucide React** | ^1.49.0 | 1.49.0+ | UI-Icons | Reibungslos möglich. |
-| **Chart.js** | ^4.5.1 | 4.5.x | Diagramme und Visualisierungen | Reibungslos möglich innerhalb der Major-Version. |
-| **react-chartjs-2** | ^5.3.1 | 5.3.x | React-Wrapper für Chart.js | Reibungslos möglich. |
-| **Zod** | ^4.6.5 | 4.6.5 | Schema-Validierung | Bereits auf aktuellem Stand. |
-| **Framer Motion** | ^14.0.0 | 14.0.0 | Animationen | Bereits auf aktuellem Stand. |
-| **@react-pdf/renderer** | ^4.9.0 | 4.9.0 | PDF-Generierung für Arbeitsblätter | Reibungslos möglich. |
+| Paket | Version | Funktion / Bereich |
+| :--- | :--- | :--- |
+| **@google/genai** | 2.25.0 | KI-Services (z. B. Bildanalyse) |
+| **Tailwind CSS** | 4.3.3 | Styling |
+| **Lucide React** | 1.49.0 | UI-Icons |
+| **Chart.js** | 4.5.1 | Diagramme und Visualisierungen |
+| **react-chartjs-2** | 5.3.1 | React-Wrapper für Chart.js |
+| **Zod** | 4.6.7 | Schema-Validierung |
+| **Framer Motion** | 14.0.0 | Animationen |
+| **@react-pdf/renderer** | 4.9.0 | PDF-Generierung für Arbeitsblätter |
+| **pdf-lib** | 1.17.1 | PDF-Modifikationen |
+| **PapaParse** | 5.7.0 | CSV-Import/Parsing |
+| **date-fns** | 4.4.0 | Datumsberechnungen für SRS |
 
 ## Home Assistant Integration (Benachrichtigungen)
 
