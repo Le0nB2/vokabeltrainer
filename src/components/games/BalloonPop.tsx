@@ -43,6 +43,7 @@ export function BalloonPop({ onComplete }: { onComplete: () => void }) {
   const [maxCombo, setMaxCombo] = useState(0)
   const [comboDisplay, setComboDisplay] = useState(0)
   const [screenShake, setScreenShake] = useState(false)
+  const [playCount, setPlayCount] = useState(1)
   const [gameKey, setGameKey] = useState(0)
   const [balloons, setBalloons] = useState<Balloon[]>([])
   const [floatingScores, setFloatingScores] = useState<FloatingScore[]>([])
@@ -54,10 +55,15 @@ export function BalloonPop({ onComplete }: { onComplete: () => void }) {
   const comboCount = useRef<number>(0)
   const poppedIds = useRef<Set<number>>(new Set())
   const timeLeftRef = useRef(timeLeft)
+  const balloonsRef = useRef(balloons)
 
   useEffect(() => {
     timeLeftRef.current = timeLeft
   }, [timeLeft])
+
+  useEffect(() => {
+    balloonsRef.current = balloons
+  }, [balloons])
 
   // Sound synthesis via Web Audio API (graceful fallback)
   const playPopSound = (type: BalloonType) => {
@@ -112,20 +118,24 @@ export function BalloonPop({ onComplete }: { onComplete: () => void }) {
     }
   }
 
-  // Create a new balloon with dynamic speed based on remaining time
+  // Create a new balloon with balanced speed and smooth drift
   const createBalloon = useCallback((timeRemaining: number): Balloon => {
     const id = nextId.current++
     const rand = Math.random()
-    const x = 8 + Math.random() * 80
-    const drift = (Math.random() - 0.5) * 26
+    const x = 10 + Math.random() * 78 // Keep comfortably away from borders
+    const drift = (Math.random() - 0.5) * 14 // Smooth and gentle sway
 
+    // Speed progression:
+    // Early (>12s): 3.0s - 3.8s base (pleasant & manageable)
+    // Mid (6s - 12s): 2.4s - 3.1s base (accelerating)
+    // Frenzy (<=6s): 1.9s - 2.5s base (fast & thrilling finale)
     let baseSpeed: number
     if (timeRemaining > 12) {
-      baseSpeed = 1.9 + Math.random() * 0.7
+      baseSpeed = 3.0 + Math.random() * 0.8
     } else if (timeRemaining > 6) {
-      baseSpeed = 1.4 + Math.random() * 0.6
+      baseSpeed = 2.4 + Math.random() * 0.7
     } else {
-      baseSpeed = 1.0 + Math.random() * 0.5
+      baseSpeed = 1.9 + Math.random() * 0.6
     }
 
     if (rand < 0.14) {
@@ -134,7 +144,7 @@ export function BalloonPop({ onComplete }: { onComplete: () => void }) {
         x,
         type: "bomb",
         color: "from-zinc-800 via-zinc-900 to-black",
-        speed: baseSpeed * 0.95,
+        speed: baseSpeed * 1.05,
         drift,
         points: -3,
         size: "md",
@@ -147,7 +157,7 @@ export function BalloonPop({ onComplete }: { onComplete: () => void }) {
         x,
         type: "golden",
         color: "from-amber-300 via-yellow-400 to-amber-500",
-        speed: baseSpeed * 0.75,
+        speed: baseSpeed * 0.88,
         drift,
         points: 5,
         size: "md",
@@ -160,7 +170,7 @@ export function BalloonPop({ onComplete }: { onComplete: () => void }) {
         x,
         type: "speedy",
         color: "from-cyan-400 via-sky-500 to-blue-600",
-        speed: baseSpeed * 0.65,
+        speed: baseSpeed * 0.8,
         drift,
         points: 2,
         size: "sm",
@@ -195,7 +205,7 @@ export function BalloonPop({ onComplete }: { onComplete: () => void }) {
     return () => clearInterval(timer)
   }, [gameKey])
 
-  // Spawner loop with dynamic intervals and frenzy multi-spawns
+  // Spawner loop with balanced intervals
   useEffect(() => {
     let timeoutId: NodeJS.Timeout
     let isRunning = true
@@ -204,25 +214,30 @@ export function BalloonPop({ onComplete }: { onComplete: () => void }) {
       if (!isRunning || timeLeftRef.current <= 0) return
 
       const currentRemaining = timeLeftRef.current
+      const currentCount = balloonsRef.current.length
 
-      let delay = 420
-      if (currentRemaining <= 6) {
-        delay = 230 + Math.random() * 110
+      // Dynamic spawn delay: if few balloons are left, replenish almost instantly so screen is never empty!
+      let delay = 450
+      if (currentCount < 3) {
+        delay = 120
+      } else if (currentRemaining <= 6) {
+        delay = 200 + Math.random() * 90 // Rapid endspurt: 200ms - 290ms
       } else if (currentRemaining <= 12) {
-        delay = 320 + Math.random() * 130
+        delay = 340 + Math.random() * 110 // Mid-game: 340ms - 450ms
       } else {
-        delay = 420 + Math.random() * 140
+        delay = 480 + Math.random() * 130 // Early: 480ms - 610ms
       }
 
       timeoutId = setTimeout(() => {
         if (!isRunning || timeLeftRef.current <= 0) return
 
         setBalloons(prev => {
-          if (prev.length >= 14) return prev
+          if (prev.length >= 12) return prev
           const b1 = createBalloon(timeLeftRef.current)
-          if (timeLeftRef.current <= 6 && Math.random() < 0.35 && prev.length < 13) {
+          // In endspurt (final 6s) or if screen has very few balloons, spawn two at once
+          if ((timeLeftRef.current <= 6 || prev.length < 3) && prev.length < 11) {
             const b2 = createBalloon(timeLeftRef.current)
-            b2.x = ((b1.x + 35) % 80) + 8
+            b2.x = ((b1.x + 36) % 76) + 10
             return [...prev, b1, b2]
           }
           return [...prev, b1]
@@ -240,13 +255,13 @@ export function BalloonPop({ onComplete }: { onComplete: () => void }) {
     }
   }, [gameKey, createBalloon])
 
-  // Reset combo display if idle for >900ms
+  // Reset combo display if idle for >1000ms
   useEffect(() => {
     if (comboDisplay <= 1) return
     const timer = setTimeout(() => {
       setComboDisplay(0)
       comboCount.current = 0
-    }, 900)
+    }, 1000)
     return () => clearTimeout(timer)
   }, [comboDisplay])
 
@@ -255,9 +270,12 @@ export function BalloonPop({ onComplete }: { onComplete: () => void }) {
     setFloatingScores(prev => [...prev.slice(-10), { id: fId, text, color, x, y }])
   }
 
-  const popBalloon = useCallback((b: Balloon, e: React.MouseEvent<HTMLDivElement>) => {
+  // Pop handler triggered immediately on pointerdown (touch or click)
+  const popBalloon = useCallback((b: Balloon, e: React.PointerEvent<HTMLDivElement> | React.MouseEvent<HTMLDivElement>) => {
     e.stopPropagation()
+    if (poppedIds.current.has(b.id)) return
     poppedIds.current.add(b.id)
+
     playPopSound(b.type)
 
     let clickX = 50
@@ -283,7 +301,7 @@ export function BalloonPop({ onComplete }: { onComplete: () => void }) {
 
     const now = Date.now()
     let currentCombo = 1
-    if (now - lastPopTime.current < 900) {
+    if (now - lastPopTime.current < 1000) {
       comboCount.current += 1
       currentCombo = comboCount.current
     } else {
@@ -318,6 +336,8 @@ export function BalloonPop({ onComplete }: { onComplete: () => void }) {
   }, [])
 
   const restartGame = () => {
+    if (playCount >= 3) return
+    setPlayCount(p => p + 1)
     setTimeLeft(20)
     setScore(0)
     setPoppedCount(0)
@@ -333,9 +353,9 @@ export function BalloonPop({ onComplete }: { onComplete: () => void }) {
   }
 
   const getRank = (sc: number) => {
-    if (sc >= 50) return { title: "Unaufhaltsam!", badge: "Legende 🏆", color: "text-amber-500" }
-    if (sc >= 35) return { title: "Ballon-Meister!", badge: "Meisterhaft 🎯", color: "text-purple-500" }
-    if (sc >= 20) return { title: "Flotte Finger!", badge: "Blitzschnell ⚡", color: "text-blue-500" }
+    if (sc >= 45) return { title: "Unaufhaltsam!", badge: "Legende 🏆", color: "text-amber-500" }
+    if (sc >= 30) return { title: "Ballon-Meister!", badge: "Meisterhaft 🎯", color: "text-purple-500" }
+    if (sc >= 18) return { title: "Flotte Finger!", badge: "Blitzschnell ⚡", color: "text-blue-500" }
     return { title: "Guter Versuch!", badge: "Aufwärmrunde 🎈", color: "text-zinc-600 dark:text-zinc-400" }
   }
 
@@ -385,13 +405,15 @@ export function BalloonPop({ onComplete }: { onComplete: () => void }) {
           </div>
 
           <div className="flex gap-3 w-full">
-            <button
-              onClick={restartGame}
-              className="flex-1 flex items-center justify-center gap-2 py-3 px-4 bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700 text-zinc-800 dark:text-zinc-200 rounded-xl font-medium transition-colors"
-            >
-              <RotateCcw className="w-4 h-4" />
-              Nochmal
-            </button>
+            {playCount < 3 && (
+              <button
+                onClick={restartGame}
+                className="flex-1 flex items-center justify-center gap-2 py-3 px-4 bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700 text-zinc-800 dark:text-zinc-200 rounded-xl font-medium transition-colors"
+              >
+                <RotateCcw className="w-4 h-4" />
+                Nochmal {playCount === 2 ? "(letzte Runde)" : `(${3 - playCount} übrig)`}
+              </button>
+            )}
             <button
               onClick={onComplete}
               className="flex-1 flex items-center justify-center gap-2 py-3 px-4 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-medium transition-colors shadow-sm"
@@ -410,8 +432,13 @@ export function BalloonPop({ onComplete }: { onComplete: () => void }) {
       {/* Top Header */}
       <div className="flex justify-between items-center mb-3 z-10 px-1">
         <div className="flex items-center gap-3">
-          <div className="text-lg font-bold text-zinc-800 dark:text-zinc-100">
-            Score: <span className="text-2xl font-black text-blue-600 dark:text-blue-400">{score}</span>
+          <div className="text-lg font-bold text-zinc-800 dark:text-zinc-100 flex items-center gap-2">
+            <span>Score: <span className="text-2xl font-black text-blue-600 dark:text-blue-400">{score}</span></span>
+            {playCount > 1 && (
+              <span className="text-xs font-semibold text-zinc-500 dark:text-zinc-400 bg-zinc-100 dark:bg-zinc-800 px-2 py-0.5 rounded-full border border-zinc-200 dark:border-zinc-700">
+                Spiel {playCount}/3
+              </span>
+            )}
           </div>
           {comboDisplay >= 2 && (
             <motion.div
@@ -476,7 +503,7 @@ export function BalloonPop({ onComplete }: { onComplete: () => void }) {
           {balloons.map(b => (
             <motion.div
               key={b.id}
-              initial={{ bottom: "-15%", scale: 0.4, opacity: 0 }}
+              initial={{ bottom: "-5%", scale: 0.6, opacity: 0 }}
               animate={{
                 bottom: "115%",
                 scale: 1,
@@ -511,41 +538,40 @@ export function BalloonPop({ onComplete }: { onComplete: () => void }) {
                   }
                 }
               }}
+              onPointerDown={(e) => popBalloon(b, e)}
               onClick={(e) => popBalloon(b, e)}
-              className="absolute cursor-pointer select-none touch-manipulation transform-gpu"
-              style={{ left: `calc(${b.x}% - 2rem)` }}
-              whileHover={{ scale: 1.08 }}
-              whileTap={{ scale: 0.88 }}
+              className="absolute cursor-pointer select-none touch-manipulation transform-gpu p-3 -translate-x-1/2"
+              style={{ left: `${b.x}%` }}
             >
               {b.type === "bomb" ? (
-                <div className="relative w-14 h-14 sm:w-16 sm:h-16 bg-gradient-to-br from-zinc-800 via-zinc-900 to-black rounded-full border-2 border-red-500/80 shadow-[0_0_15px_rgba(239,68,68,0.5)] flex items-center justify-center">
+                <div className="relative w-14 h-14 sm:w-15 sm:h-15 bg-gradient-to-br from-zinc-800 via-zinc-900 to-black rounded-full border-2 border-red-500/80 shadow-[0_0_15px_rgba(239,68,68,0.5)] flex items-center justify-center pointer-events-none">
                   <div className="absolute -top-3 left-1/2 -translate-x-1/2 flex flex-col items-center pointer-events-none">
                     <span className="w-2 h-2 rounded-full bg-amber-400 animate-ping inline-block" />
                     <span className="w-0.5 h-2 bg-amber-600 inline-block -mt-1" />
                   </div>
-                  <Bomb className="w-7 h-7 text-red-500 drop-shadow" />
+                  <Bomb className="w-7 h-7 text-red-500 drop-shadow pointer-events-none" />
                   <div className="absolute top-2 left-2.5 w-3 h-3 bg-white/20 rounded-full pointer-events-none" />
                 </div>
               ) : b.type === "golden" ? (
-                <div className="relative w-14 h-18 sm:w-16 sm:h-20 bg-gradient-to-br from-amber-300 via-yellow-400 to-amber-500 rounded-[50%_50%_50%_50%_/_42%_42%_58%_58%] border-2 border-yellow-200/90 shadow-[0_0_18px_rgba(251,191,36,0.6)] flex items-center justify-center">
+                <div className="relative w-15 h-19 sm:w-16 sm:h-20 bg-gradient-to-br from-amber-300 via-yellow-400 to-amber-500 rounded-[50%_50%_50%_50%_/_42%_42%_58%_58%] border-2 border-yellow-200/90 shadow-[0_0_18px_rgba(251,191,36,0.6)] flex items-center justify-center pointer-events-none">
                   <div className="absolute top-2 left-2.5 w-3 h-5 bg-white/60 rounded-full -rotate-30 pointer-events-none" />
-                  <Sparkles className="w-7 h-7 text-amber-900/80 drop-shadow animate-pulse" />
-                  <div className="absolute -bottom-1 left-1/2 -translate-x-1/2 w-2 h-1.5 bg-amber-600 rounded-b-sm" />
+                  <Sparkles className="w-7 h-7 text-amber-900/80 drop-shadow animate-pulse pointer-events-none" />
+                  <div className="absolute -bottom-1 left-1/2 -translate-x-1/2 w-2 h-1.5 bg-amber-600 rounded-b-sm pointer-events-none" />
                   <div className="absolute top-full left-1/2 -translate-x-1/2 w-0.5 h-7 bg-amber-600/50 pointer-events-none" />
                 </div>
               ) : b.type === "speedy" ? (
-                <div className="relative w-11 h-14 sm:w-12 sm:h-16 bg-gradient-to-br from-cyan-400 via-sky-500 to-blue-600 rounded-[50%_50%_50%_50%_/_42%_42%_58%_58%] border-2 border-cyan-200/90 shadow-[0_0_14px_rgba(6,182,212,0.6)] flex items-center justify-center">
+                <div className="relative w-13 h-17 sm:w-14 sm:h-18 bg-gradient-to-br from-cyan-400 via-sky-500 to-blue-600 rounded-[50%_50%_50%_50%_/_42%_42%_58%_58%] border-2 border-cyan-200/90 shadow-[0_0_14px_rgba(6,182,212,0.6)] flex items-center justify-center pointer-events-none">
                   <div className="absolute top-1.5 left-2 w-2.5 h-4 bg-white/60 rounded-full -rotate-30 pointer-events-none" />
-                  <Zap className="w-5 h-5 text-white fill-white drop-shadow animate-pulse" />
-                  <div className="absolute -bottom-1 left-1/2 -translate-x-1/2 w-2 h-1.5 bg-blue-700 rounded-b-sm" />
+                  <Zap className="w-5 h-5 text-white fill-white drop-shadow animate-pulse pointer-events-none" />
+                  <div className="absolute -bottom-1 left-1/2 -translate-x-1/2 w-2 h-1.5 bg-blue-700 rounded-b-sm pointer-events-none" />
                   <div className="absolute top-full left-1/2 -translate-x-1/2 w-0.5 h-6 bg-blue-500/50 pointer-events-none" />
                 </div>
               ) : (
                 <div
-                  className={`relative w-14 h-18 sm:w-16 sm:h-20 bg-gradient-to-br ${b.color} rounded-[50%_50%_50%_50%_/_42%_42%_58%_58%] shadow-[inset_-3px_-3px_8px_rgba(0,0,0,0.25),_0_6px_12px_rgba(0,0,0,0.18)] flex items-center justify-center`}
+                  className={`relative w-15 h-19 sm:w-16 sm:h-20 bg-gradient-to-br ${b.color} rounded-[50%_50%_50%_50%_/_42%_42%_58%_58%] shadow-[inset_-3px_-3px_8px_rgba(0,0,0,0.25),_0_6px_12px_rgba(0,0,0,0.18)] flex items-center justify-center pointer-events-none`}
                 >
                   <div className="absolute top-2 left-2.5 w-3 h-5 bg-white/45 rounded-full -rotate-30 pointer-events-none" />
-                  <div className="absolute -bottom-1 left-1/2 -translate-x-1/2 w-2 h-1.5 bg-black/20 rounded-b-sm" />
+                  <div className="absolute -bottom-1 left-1/2 -translate-x-1/2 w-2 h-1.5 bg-black/20 rounded-b-sm pointer-events-none" />
                   <div className="absolute top-full left-1/2 -translate-x-1/2 w-0.5 h-7 bg-zinc-400/50 dark:bg-zinc-500/50 pointer-events-none" />
                 </div>
               )}
