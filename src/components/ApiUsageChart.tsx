@@ -40,12 +40,14 @@ export function ApiUsageChart({ data }: { data: ApiStatsResult[] }) {
 
   const datasets = []
 
-  // Define colors for each API Key (Key 1, Key 2, etc.)
+  // Blue tone gradations for successful attempts, red tone gradations for errors
   const colorPalettes = [
-    { success: 'rgba(37, 99, 235, 0.8)', error: 'rgba(220, 38, 38, 0.8)' }, // Key 1: Blue / Red
-    { success: 'rgba(16, 185, 129, 0.8)', error: 'rgba(245, 158, 11, 0.8)' }, // Key 2: Green / Amber
-    { success: 'rgba(139, 92, 246, 0.8)', error: 'rgba(236, 72, 153, 0.8)' }, // Key 3: Purple / Pink
-    { success: 'rgba(249, 115, 22, 0.8)', error: 'rgba(20, 184, 166, 0.8)' }, // Key 4: Orange / Teal
+    { success: 'rgba(37, 99, 235, 0.85)', error: 'rgba(220, 38, 38, 0.85)' }, // Key 1: Royal Blue / Vivid Red
+    { success: 'rgba(14, 165, 233, 0.85)', error: 'rgba(244, 63, 94, 0.85)' }, // Key 2: Sky Blue / Coral Red
+    { success: 'rgba(30, 58, 138, 0.85)', error: 'rgba(153, 27, 27, 0.85)' }, // Key 3: Navy Blue / Dark Wine Red
+    { success: 'rgba(99, 102, 241, 0.85)', error: 'rgba(225, 29, 72, 0.85)' }, // Key 4: Indigo Blue / Rose Red
+    { success: 'rgba(2, 132, 199, 0.85)', error: 'rgba(185, 28, 28, 0.85)' },  // Key 5: Cerulean Blue / Crimson Red
+    { success: 'rgba(14, 116, 144, 0.85)', error: 'rgba(159, 18, 57, 0.85)' }, // Key 6: Deep Cyan / Burgundy Red
   ]
 
   for (let i = 0; i < uniqueKeys.length; i++) {
