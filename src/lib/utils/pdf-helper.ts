@@ -35,9 +35,37 @@ export async function generateOptimizedPdf(
     let pages = await getPdfPageCountFromBuffer(new Uint8Array(buffer));
 
     let cuts = 0;
-    while (pages > maxPages && currentExercises.translateSentences.length >= 2 && cuts < 10) {
+    // 1. If multipleChoice was set to 18 and causes Page 1 to spill, trimming to 16 restores Page 1 immediately
+    while (pages > maxPages && currentExercises.multipleChoice?.length > 16 && cuts < 5) {
+        currentExercises.multipleChoice.splice(-2, 2);
+        cuts++;
+
+        buffer = await render();
+        pages = await getPdfPageCountFromBuffer(new Uint8Array(buffer));
+    }
+
+    // 2. Trim Page 2 & 3 tasks if needed
+    while (pages > maxPages && currentExercises.translateSentences?.length >= 4 && cuts < 15) {
         currentExercises.translateSentences.splice(-2, 2);
         currentSolutions.translateSolutions.splice(-2, 2);
+        cuts++;
+
+        buffer = await render();
+        pages = await getPdfPageCountFromBuffer(new Uint8Array(buffer));
+    }
+
+    while (pages > maxPages && currentExercises.fillInTheBlank?.length >= 4 && cuts < 20) {
+        currentExercises.fillInTheBlank.splice(-1, 1);
+        currentSolutions.fillInTheBlankSolutions.splice(-1, 1);
+        cuts++;
+
+        buffer = await render();
+        pages = await getPdfPageCountFromBuffer(new Uint8Array(buffer));
+    }
+
+    // 3. Last resort fallback for multipleChoice
+    while (pages > maxPages && currentExercises.multipleChoice?.length > 14 && cuts < 25) {
+        currentExercises.multipleChoice.splice(-2, 2);
         cuts++;
 
         buffer = await render();

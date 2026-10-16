@@ -98,6 +98,9 @@ export default function WorksheetPage() {
   const handlePrint = () => {
     if (!worksheetData || !pdfInstance.url) return;
     try {
+      const fileName = `${worksheetData.worksheetId || 'Worksheet'}.pdf`;
+      const oldTitle = document.title;
+      document.title = fileName;
       const newWindow = window.open(pdfInstance.url, "_blank");
 
       if (!newWindow) {
@@ -109,6 +112,10 @@ export default function WorksheetPage() {
         a.click();
         document.body.removeChild(a);
       }
+
+      setTimeout(() => {
+        document.title = oldTitle;
+      }, 2000);
     } catch (err) {
       console.error("Print error:", err);
       alert("Es gab ein Problem beim Drucken des PDFs.\nFehler: " + (err instanceof Error ? err.message : String(err)));
@@ -119,12 +126,7 @@ export default function WorksheetPage() {
   const handleDownload = () => {
     if (!worksheetData || !pdfInstance.url) return;
     try {
-      const today = new Date();
-      const yyyy = today.getFullYear();
-      const mm = String(today.getMonth() + 1).padStart(2, '0');
-      const dd = String(today.getDate()).padStart(2, '0');
-      const formattedDate = `${yyyy}-${mm}-${dd}`;
-      const fileName = `Worksheet-${worksheetData.worksheetId}-${formattedDate}.pdf`;
+      const fileName = `${worksheetData.worksheetId || 'Worksheet'}.pdf`;
 
       const a = document.createElement("a");
       a.href = pdfInstance.url;
