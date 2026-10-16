@@ -17,19 +17,19 @@ const styles = StyleSheet.create({
     padding: 25,
     fontFamily: 'Open Sans',
     fontSize: 9,
-    lineHeight: 1.4,
+    lineHeight: 1.35,
   },
   header: {
-    paddingBottom: 5,
-    marginBottom: 20,
+    paddingBottom: 4,
+    marginBottom: 10,
     borderBottomWidth: 2,
     borderBottomColor: '#000',
   },
   title: {
-    fontSize: 24,
+    fontSize: 20,
     fontWeight: 'bold',
-    marginBottom: 10,
-    paddingTop: 10,
+    marginBottom: 4,
+    paddingTop: 2,
   },
   pageIdDate: {
     position: 'absolute',
@@ -39,17 +39,17 @@ const styles = StyleSheet.create({
     color: '#666',
   },
   section: {
-    marginBottom: 20,
+    marginBottom: 14,
   },
   sectionTitle: {
-    fontSize: 16,
+    fontSize: 15,
     fontWeight: 'bold',
-    marginBottom: 5,
+    marginBottom: 4,
   },
   sectionDesc: {
     fontStyle: 'italic',
-    fontSize: 9,
-    marginBottom: 10,
+    fontSize: 8.5,
+    marginBottom: 6,
     color: '#333',
   },
   mcGrid: {
@@ -60,26 +60,26 @@ const styles = StyleSheet.create({
   mcItem: {
     width: '48%',
     backgroundColor: '#f9fafb',
-    padding: 6,
-    borderRadius: 5,
+    padding: 5.8,
+    borderRadius: 4,
     borderWidth: 1,
     borderColor: '#e5e7eb',
-    marginBottom: 6,
+    marginBottom: 6.5,
   },
   mcQuestion: {
     fontWeight: 'bold',
-    fontSize: 9,
-    marginBottom: 4,
+    fontSize: 8.5,
+    marginBottom: 2.5,
   },
   mcOption: {
     flexDirection: 'row',
     alignItems: 'flex-start',
     marginBottom: 2,
-    fontSize: 9,
+    fontSize: 8.5,
   },
   mcBox: {
-    width: 10,
-    height: 10,
+    width: 9,
+    height: 9,
     borderWidth: 1,
     borderColor: '#000',
     marginRight: 5,
@@ -87,40 +87,40 @@ const styles = StyleSheet.create({
   },
   mcLetter: {
     fontWeight: 'bold',
-    marginRight: 5,
-    fontSize: 9,
+    marginRight: 4,
+    fontSize: 8.5,
   },
   fibItem: {
     flexDirection: 'row',
-    marginBottom: 10,
+    marginBottom: 8,
     alignItems: 'flex-end',
     flexWrap: 'wrap',
   },
   index: {
     fontWeight: 'bold',
-    marginRight: 5,
+    marginRight: 4,
   },
   gapLine: {
     borderBottomWidth: 1,
     borderBottomColor: '#000',
-    width: 100,
-    marginHorizontal: 5,
+    width: 90,
+    marginHorizontal: 4,
   },
   hint: {
-    fontSize: 9,
+    fontSize: 8.5,
     fontStyle: 'italic',
     color: '#666',
-    marginLeft: 5,
+    marginLeft: 4,
   },
   wordBoxContainer: {
-    borderWidth: 2,
+    borderWidth: 1.5,
     borderColor: '#000',
-    padding: 10,
-    marginBottom: 15,
+    padding: 8,
+    marginBottom: 12,
     flexDirection: 'row',
     flexWrap: 'wrap',
     justifyContent: 'center',
-    gap: 15,
+    gap: 12,
   },
   wordBoxItem: {
     fontWeight: 'bold',
@@ -133,19 +133,19 @@ const styles = StyleSheet.create({
   },
   transItem: {
     width: '48%',
-    marginBottom: 15,
+    marginBottom: 9,
   },
   transGerman: {
     fontWeight: 'bold',
-    marginBottom: 5,
+    marginBottom: 3,
   },
   transLineContainer: {
     flexDirection: 'row',
     alignItems: 'flex-end',
   },
   arrow: {
-    marginRight: 5,
-    fontSize: 14,
+    marginRight: 4,
+    fontSize: 12,
   },
   transLine: {
     borderBottomWidth: 1,
@@ -156,39 +156,52 @@ const styles = StyleSheet.create({
   solutionPage: {
     padding: 25,
     fontFamily: 'Open Sans',
-    fontSize: 9,
-    lineHeight: 1.4,
+    fontSize: 8.5,
+    lineHeight: 1.35,
   },
   solutionHeader: {
-    fontSize: 16,
+    fontSize: 15,
     fontWeight: 'bold',
     borderBottomWidth: 2,
     borderBottomColor: '#000',
-    paddingBottom: 5,
+    paddingBottom: 4,
     marginBottom: 10,
   },
-  solutionGrid: {
+  columnsContainer: {
     flexDirection: 'row',
     justifyContent: 'space-between',
   },
-  solutionCol: {
+  leftCol: {
     width: '48%',
   },
+  rightCol: {
+    width: '49%',
+  },
   solutionSectionTitle: {
-    fontSize: 12,
+    fontSize: 11,
     fontWeight: 'bold',
     marginBottom: 5,
+    marginTop: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: '#ddd',
+    paddingBottom: 2,
   },
-  solutionList: {
-    marginBottom: 10,
+  twoColList: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     justifyContent: 'space-between',
+    marginBottom: 6,
   },
-  solutionItem: {
-    marginBottom: 3,
+  twoColItem: {
     width: '48%',
-  }
+    marginBottom: 4,
+  },
+  singleColList: {
+    flexDirection: 'column',
+  },
+  singleColItem: {
+    marginBottom: 5,
+  },
 });
 
 interface WorksheetData {
@@ -227,11 +240,12 @@ interface WorksheetPDFProps {
   solutions: SolutionData;
   worksheetId: string;
   dateStr: string;
+  onRender?: (params: any) => void;
 }
 
-const WorksheetPDF: React.FC<WorksheetPDFProps> = ({ exercises, solutions, worksheetId, dateStr }) => {
+const WorksheetPDF: React.FC<WorksheetPDFProps> = ({ exercises, solutions, worksheetId, dateStr, onRender }) => {
   return (
-    <Document>
+    <Document title={worksheetId} onRender={onRender}>
       {/* PAGE 1: Multiple Choice */}
       <Page size="A4" style={styles.page}>
         <Text style={styles.pageIdDate} fixed>ID: {worksheetId} - {dateStr}</Text>
@@ -324,51 +338,59 @@ const WorksheetPDF: React.FC<WorksheetPDFProps> = ({ exercises, solutions, works
         <Text style={styles.pageIdDate} fixed>ID: {worksheetId} - {dateStr}</Text>
         <Text style={styles.solutionHeader}>Solution Key (Teacher&apos;s Copy)</Text>
 
-        <View wrap={false}>
-          <Text style={styles.solutionSectionTitle}>1. Multiple Choice</Text>
-          <View style={styles.solutionList}>
-            {exercises.multipleChoice?.map((task, i: number) => {
-              const letter = ['A', 'B', 'C'][task.correctIndex] || '?';
-              const answer = task.options[task.correctIndex];
-              return (
-                <Text key={i} style={styles.solutionItem}>
-                  <Text style={styles.index}>{i + 1}.</Text> {letter}) {answer}
-                </Text>
-              );
-            })}
-          </View>
-        </View>
+        <View style={styles.columnsContainer}>
+          {/* Left Column: 1. MC, 2. Words in a box, 4. Fill in the blanks */}
+          <View style={styles.leftCol}>
+            <View>
+              <Text style={styles.solutionSectionTitle}>1. Multiple Choice</Text>
+              <View style={styles.twoColList}>
+                {exercises.multipleChoice?.map((task, i: number) => {
+                  const letter = ['A', 'B', 'C'][task.correctIndex] || '?';
+                  const answer = task.options[task.correctIndex] || '';
+                  return (
+                    <Text key={i} style={styles.twoColItem}>
+                      <Text style={styles.index}>{i + 1}.</Text> {letter}) {answer}
+                    </Text>
+                  );
+                })}
+              </View>
+            </View>
 
-        <View wrap={false}>
-          <Text style={styles.solutionSectionTitle}>2. Words in a box</Text>
-          <View style={styles.solutionList}>
-            {solutions.wordBoxSolutions?.map((sol: string, i: number) => (
-              <Text key={i} style={styles.solutionItem}>
-                <Text style={styles.index}>{i + 1}.</Text> {sol}
-              </Text>
-            ))}
-          </View>
-        </View>
+            <View>
+              <Text style={styles.solutionSectionTitle}>2. Words in a box</Text>
+              <View style={styles.twoColList}>
+                {solutions.wordBoxSolutions?.map((sol: string, i: number) => (
+                  <Text key={i} style={styles.twoColItem}>
+                    <Text style={styles.index}>{i + 1}.</Text> {sol}
+                  </Text>
+                ))}
+              </View>
+            </View>
 
-        <View wrap={false}>
-          <Text style={styles.solutionSectionTitle}>3. Translation challenge</Text>
-          <View style={styles.solutionList}>
-            {solutions.translateSolutions?.map((sol: string, i: number) => (
-              <Text key={i} style={styles.solutionItem}>
-                <Text style={styles.index}>{i + 1}.</Text> {sol}
-              </Text>
-            ))}
+            <View>
+              <Text style={styles.solutionSectionTitle}>4. Fill in the blanks</Text>
+              <View style={styles.twoColList}>
+                {solutions.fillInTheBlankSolutions?.map((sol: string, i: number) => (
+                  <Text key={i} style={styles.twoColItem}>
+                    <Text style={styles.index}>{i + 1}.</Text> {sol}
+                  </Text>
+                ))}
+              </View>
+            </View>
           </View>
-        </View>
 
-        <View wrap={false}>
-          <Text style={styles.solutionSectionTitle}>4. Fill in the blanks</Text>
-          <View style={styles.solutionList}>
-            {solutions.fillInTheBlankSolutions?.map((sol: string, i: number) => (
-              <Text key={i} style={styles.solutionItem}>
-                <Text style={styles.index}>{i + 1}.</Text> {sol}
-              </Text>
-            ))}
+          {/* Right Column: 3. Translation challenge */}
+          <View style={styles.rightCol}>
+            <View>
+              <Text style={styles.solutionSectionTitle}>3. Translation challenge</Text>
+              <View style={styles.singleColList}>
+                {solutions.translateSolutions?.map((sol: string, i: number) => (
+                  <Text key={i} style={styles.singleColItem}>
+                    <Text style={styles.index}>{i + 1}.</Text> {sol}
+                  </Text>
+                ))}
+              </View>
+            </View>
           </View>
         </View>
       </Page>

@@ -64,10 +64,11 @@ export async function POST(req: NextRequest) {
     const promptText = `
 Erstelle ein Arbeitsblatt für die Klassenstufe 5-7 basierend auf den folgenden Vokabeln. Das Fach ist Englisch.
 Die Zielsprache der Vokabeln ist Englisch (front = Englisch, back = Deutsch). Generiere sehr viele Aufgaben nach dem geforderten JSON Schema, sodass diese gedruckt ca. 4 DIN-A4-Seiten füllen.
-Generiere exakt 14 Multiple-Choice-Aufgaben, exakt 16 Lückentexte, 10-15 Words in a Box-Aufgaben und exakt 26 Übersetzungsaufgaben.
+Generiere exakt 18 Multiple-Choice-Aufgaben, exakt 16 Words in a Box-Aufgaben (mit 16 Wörtern in der Word Box und 16 Lückensätzen), exakt 26 Übersetzungsaufgaben und exakt 24 Lückentexte.
 WICHTIG:
 1. Mische die Reihenfolge der Wörter in der Word Box zufällig durch!
 2. Die Lückensätze für 'Words in a box' müssen sprachlich für die Klassenstufe 5-7 (Englisch) geeignet sein. Sie müssen so formuliert sein, dass jede Vokabel aus der Box absolut eindeutig nur in genau EINEN bestimmten Satz inhaltlich und grammatikalisch passt (keine Mehrdeutigkeiten)!
+3. Die Optionen der Multiple-Choice-Aufgaben, die deutschen Sätze für 'Translation challenge' sowie die englischen Sätze für 'Fill in the blanks' und 'Words in a box' müssen für Klassenstufe 5-7 angemessen kurz und prägnant sein (ca. 4 bis 7 Wörter pro Satz), damit sie gut auf die Zeilen passen und das Arbeitsblatt optimal füllen.
 
 Hier sind die Vokabeln:
 ${JSON.stringify(selectedCards.map(c => ({ englisch: c.front, deutsch: c.back })), null, 2)}
@@ -81,7 +82,7 @@ ${JSON.stringify(selectedCards.map(c => ({ englisch: c.front, deutsch: c.back })
           properties: {
             multipleChoice: {
               type: Type.ARRAY,
-              description: "Exakt 14 Aufgaben. 'Welcher Satz ist grammatikalisch und inhaltlich richtig?'",
+              description: "Exakt 18 Aufgaben. 'Welcher Satz ist grammatikalisch und inhaltlich richtig?'",
               items: {
                 type: Type.OBJECT,
                 properties: {
@@ -98,7 +99,7 @@ ${JSON.stringify(selectedCards.map(c => ({ englisch: c.front, deutsch: c.back })
             },
             fillInTheBlank: {
               type: Type.ARRAY,
-              description: "Exakt 16 Lückentexte mit Zeile für Handschrift und deutschem Übersetzungshinweis.",
+              description: "Exakt 24 Lückentexte mit Zeile für Handschrift und deutschem Übersetzungshinweis.",
               items: {
                 type: Type.OBJECT,
                 properties: {
@@ -113,11 +114,11 @@ ${JSON.stringify(selectedCards.map(c => ({ englisch: c.front, deutsch: c.back })
             wordBoxWords: {
               type: Type.ARRAY,
               items: { type: Type.STRING },
-              description: "List of words that go into the word box for wordBoxSentences"
+              description: "Exakt 16 Wörter für die Wortbox."
             },
             wordBoxSentences: {
               type: Type.ARRAY,
-              description: "10-15 Lückensätze, deren Begriffe gesammelt in einer Wortbox (wordBoxWords) oben stehen.",
+              description: "Exakt 16 Lückensätze, deren Begriffe gesammelt in einer Wortbox (wordBoxWords) oben stehen.",
               items: {
                 type: Type.OBJECT,
                 properties: {
