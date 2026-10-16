@@ -58,18 +58,11 @@ RUN adduser --system --uid 1001 nextjs
 COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
 COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
 
-# We need the prisma CLI and its dependencies to run migrations
-# Instead of rebuilding the node_modules, copy the built prisma dependency
-# and importantly, the prisma wrapper from node_modules/.bin/prisma
-COPY --from=builder --chown=nextjs:nodejs /app/node_modules/prisma ./node_modules/prisma
+# Install prisma CLI for running migrations at startup
+RUN npm install -g prisma@6.19.3
 
-# Copy the entire .bin directory to ensure all wrapper scripts are available
-COPY --from=builder --chown=nextjs:nodejs /app/node_modules/.bin ./node_modules/.bin
-
-# Prisma needs to load some schema build wasm files, just copy all node_modules related to prisma
+# Copy Prisma schema, migrations and generated client
 COPY --from=builder --chown=nextjs:nodejs /app/node_modules/@prisma ./node_modules/@prisma
-
-# Copy the generated Prisma Client
 COPY --from=builder --chown=nextjs:nodejs /app/node_modules/.prisma ./node_modules/.prisma
 COPY --from=builder --chown=nextjs:nodejs /app/prisma ./prisma
 COPY --from=builder --chown=nextjs:nodejs /app/prisma ./prisma_static
