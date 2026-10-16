@@ -4,12 +4,12 @@ Eine moderne, lokal lauffähige Vokabeltrainer-Webanwendung, gebaut mit Next.js 
 
 
 <div align="center">
-  <img src="public/assets/screenshots/screenshot_1.png" width="16%" />
-  <img src="public/assets/screenshots/screenshot_2.png" width="16%" />
-  <img src="public/assets/screenshots/screenshot_3.png" width="16%" />
-  <img src="public/assets/screenshots/screenshot_4.png" width="16%" />
-  <img src="public/assets/screenshots/screenshot_5.png" width="16%" />
-  <img src="public/assets/screenshots/screenshot_6.png" width="16%" />
+  <img src="public/assets/screenshots/screenshot_1.webp" width="16%" />
+  <img src="public/assets/screenshots/screenshot_2.webp" width="16%" />
+  <img src="public/assets/screenshots/screenshot_3.webp" width="16%" />
+  <img src="public/assets/screenshots/screenshot_4.webp" width="16%" />
+  <img src="public/assets/screenshots/screenshot_5.webp" width="16%" />
+  <img src="public/assets/screenshots/screenshot_6.webp" width="16%" />
 </div>
 
 ## Features
