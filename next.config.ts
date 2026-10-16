@@ -4,7 +4,6 @@ const nextConfig: NextConfig = {
   /* config options here */
   output: "standalone",
   poweredByHeader: false,
-  serverExternalPackages: ["pdfjs-dist", "canvas"],
   async headers() {
     return [
       {
