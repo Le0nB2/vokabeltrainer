@@ -20,3 +20,6 @@ The project uses Prisma ORM with SQLite. When modifying the database schema (`pr
 2. **Review Migration Warnings:** When running `prisma migrate dev`, pay close attention to the output. If Prisma warns about data loss (e.g., dropping a column, making an optional field required without a default, or dropping a table), you **MUST HALT**.
 3. **User Escalation:** If a schema extension or change cannot be performed without losing the current learning progress (Decks, Cards, ReviewLogs) or other data, you must **inform the user immediately** before executing any commands that alter the database. Wait for the user's explicit confirmation or instructions on how to proceed (e.g., writing a custom data migration script or backing up data).
 4. **Mandatory Data Loss Test:** Before confirming that a schema change is safe, you must run the data loss prevention test script: `./scripts/test-migration-safety.sh`. This script seeds the database with test data, applies pending migrations, and verifies that the data remains intact. If the test fails, you must abort the change and inform the user.
+
+## Git-Branch-Konvention
+Für neue Git-Branches sind vorzugsweise **deutsche Bezeichnungen** zu verwenden (z. B. `optimierung-ballon-pop`, `feature/foto-analyse-verfeinerung`, `fix/kleinere-bugfixe`).
