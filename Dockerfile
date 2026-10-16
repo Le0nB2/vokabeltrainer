@@ -1,9 +1,6 @@
 # Stage 1: Base image 
 FROM node:22-alpine AS base
 
-# Update npm to the latest version to prevent warnings
-RUN npm install -g npm@latest
-
 # Install dependencies only when needed
 FROM base AS deps
 # Check https://github.com/nodejs/docker-node/tree/b4117f9333da4138b03a546ec926ef50a31506c3#nodealpine to understand why libc6-compat might be needed.
@@ -12,8 +9,8 @@ WORKDIR /app
 
 # Install dependencies based on the preferred package manager
 COPY package.json package-lock.json ./
-COPY prisma ./prisma
-RUN npm ci
+COPY prisma/schema.prisma ./prisma/schema.prisma
+RUN --mount=type=cache,target=/root/.npm npm ci
 
 # Stage 2: Rebuild the source code only when needed
 FROM base AS builder
@@ -43,7 +40,7 @@ RUN npx prisma generate
 ENV NEXT_TELEMETRY_DISABLED=1
 
 # Build the app
-RUN npm run build
+RUN --mount=type=cache,target=/app/.next/cache npm run build
 
 # Stage 3: Production image, copy all the files and run next
 FROM base AS runner
