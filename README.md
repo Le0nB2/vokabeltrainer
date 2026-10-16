@@ -1,4 +1,4 @@
-# Vokabeltrainer mit adaptivem Spaced Repetition (SRS) & Gemini AI
+# Englisch-Vokabeltrainer mit adaptivem Spaced Repetition (SRS) & Gemini AI
 
 Eine moderne, lokal lauffähige Vokabeltrainer-Webanwendung, gebaut mit Next.js (App Router), TypeScript, Tailwind CSS, und Prisma (SQLite).
 
