@@ -51,7 +51,7 @@ export function MinigameOverlay({
 
   const instructions: Record<string, string> = {
     speed: "Verbinde die passenden Paare (Deutsch und Englisch) so schnell wie möglich.",
-    balloon: "Klicke auf die Ballons, um sie platzen zu lassen und Punkte zu sammeln, bevor die Zeit abläuft.",
+    balloon: "Lass so viele Ballons wie möglich platzen! Schnelle & goldene Ballons bringen Extra-Punkte. Aber Vorsicht vor den Bomben-Ballons!",
     reaction: "Warte auf das grüne Signal und klicke dann so schnell du kannst.",
     word: "Fange die herabfallenden englischen Wörter, die zur deutschen Bedeutung passen."
   }
