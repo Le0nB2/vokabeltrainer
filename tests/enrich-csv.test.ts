@@ -3,8 +3,10 @@ import { describe, it, expect, vi } from "vitest";
 // A mock NextRequest object since we are outside Next.js runtime.
 class MockNextRequest {
   private body: any;
-  constructor(body: any) {
+  public headers: Headers;
+  constructor(body: any, headers = new Headers()) {
     this.body = body;
+    this.headers = headers;
   }
   async json() {
     return this.body;
@@ -95,5 +97,27 @@ describe("POST /api/enrich-csv", () => {
     expect(res.status).toBe(400);
     const data = await res.json();
     expect(data.error).toBe("Invalid input");
+  });
+
+  it("should enforce rate limiting after 10 requests (AUDIT-02)", async () => {
+    const { POST } = await import("@/app/api/enrich-csv/route");
+    process.env.GEMINI_API_KEYS = "test-key";
+
+    const reqHeaders = new Headers({ "x-real-ip": "10.0.0.99" });
+    const req = new MockNextRequest(
+      { cards: [{ id: "1", front: "hello", back: "hallo" }] },
+      reqHeaders
+    ) as any;
+
+    for (let i = 0; i < 10; i++) {
+      const res = await POST(req);
+      expect(res.status).toBe(200);
+    }
+
+    // 11th request must be blocked with 429
+    const blockedRes = await POST(req);
+    expect(blockedRes.status).toBe(429);
+    const data = await blockedRes.json();
+    expect(data.error).toContain("Zu viele Anfragen");
   });
 });

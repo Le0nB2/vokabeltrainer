@@ -5,6 +5,12 @@ import { revalidatePath } from "next/cache"
 import { requireAppAuth } from "@/lib/auth-guard"
 
 
+function sanitizeField(val: string | null | undefined, maxLen: number): string | null | undefined {
+  if (val === undefined) return undefined;
+  if (val === null) return null;
+  return val.slice(0, maxLen);
+}
+
 export async function addCard(
   deckId: string,
   front: string,
@@ -15,15 +21,24 @@ export async function addCard(
   contextSentence?: string | null
 ) {
   await requireAppAuth();
+  if (!deckId || typeof deckId !== "string" || deckId.length > 100) {
+    throw new Error("Ungültige Deck-ID");
+  }
+  const cleanFront = (front || "").trim().slice(0, 2000);
+  const cleanBack = (back || "").trim().slice(0, 2000);
+  if (!cleanFront || !cleanBack) {
+    throw new Error("Vorder- und Rückseite dürfen nicht leer sein");
+  }
+
   const card = await prisma.card.create({
     data: {
       deckId,
-      front,
-      back,
-      notes,
-      gapText,
-      mnemonic,
-      contextSentence,
+      front: cleanFront,
+      back: cleanBack,
+      notes: sanitizeField(notes, 2000),
+      gapText: sanitizeField(gapText, 2000),
+      mnemonic: sanitizeField(mnemonic, 1000),
+      contextSentence: sanitizeField(contextSentence, 2000),
     }
   });
   revalidatePath(`/decks/${deckId}`);
@@ -43,18 +58,35 @@ export async function addCardsBulk(
   }[]
 ) {
   await requireAppAuth();
+  if (!deckId || typeof deckId !== "string" || deckId.length > 100) {
+    throw new Error("Ungültige Deck-ID");
+  }
+  if (!Array.isArray(cards) || cards.length === 0) {
+    throw new Error("Mindestens eine Karte erforderlich");
+  }
+
+  const maxBulkCards = 500;
+  const limitedCards = cards.slice(0, maxBulkCards);
+
   const created = await prisma.card.createMany({
-    data: cards.map(c => ({
-      deckId,
-      front: c.front,
-      back: c.back,
-      notes: c.phonetic ? (c.notes ? `${c.phonetic}\n${c.notes}` : c.phonetic) : c.notes,
-      gapText: c.gapText,
-      mnemonic: c.mnemonic,
-      contextSentence: c.contextSentence,
-      box: 1,
-      dueDate: new Date(),
-    }))
+    data: limitedCards
+      .map(c => {
+        const cleanFront = (c.front || "").trim().slice(0, 2000);
+        const cleanBack = (c.back || "").trim().slice(0, 2000);
+        const rawNotes = c.phonetic ? (c.notes ? `${c.phonetic}\n${c.notes}` : c.phonetic) : c.notes;
+        return {
+          deckId,
+          front: cleanFront,
+          back: cleanBack,
+          notes: sanitizeField(rawNotes, 2000),
+          gapText: sanitizeField(c.gapText, 2000),
+          mnemonic: sanitizeField(c.mnemonic, 1000),
+          contextSentence: sanitizeField(c.contextSentence, 2000),
+          box: 1,
+          dueDate: new Date(),
+        };
+      })
+      .filter(c => c.front && c.back)
   });
   revalidatePath(`/decks/${deckId}`);
   return created;
@@ -149,15 +181,24 @@ export async function updateCardDetails(
   contextSentence?: string | null
 ) {
   await requireAppAuth();
+  if (!cardId || typeof cardId !== "string" || cardId.length > 100) {
+    throw new Error("Ungültige Card-ID");
+  }
+  const cleanFront = (front || "").trim().slice(0, 2000);
+  const cleanBack = (back || "").trim().slice(0, 2000);
+  if (!cleanFront || !cleanBack) {
+    throw new Error("Vorder- und Rückseite dürfen nicht leer sein");
+  }
+
   const updated = await prisma.card.update({
     where: { id: cardId },
     data: {
-      front,
-      back,
-      notes,
-      gapText,
-      mnemonic,
-      contextSentence,
+      front: cleanFront,
+      back: cleanBack,
+      notes: sanitizeField(notes, 2000),
+      gapText: sanitizeField(gapText, 2000),
+      mnemonic: sanitizeField(mnemonic, 1000),
+      contextSentence: sanitizeField(contextSentence, 2000),
     }
   });
   revalidatePath(`/decks/${deckId}`);
@@ -174,13 +215,17 @@ export async function updateCardsEnrichmentBulk(
   }[]
 ) {
   await requireAppAuth();
-  for (const update of updates) {
+  if (!Array.isArray(updates) || updates.length === 0) return;
+  const limitedUpdates = updates.slice(0, 500);
+
+  for (const update of limitedUpdates) {
+    if (!update.id || typeof update.id !== "string") continue;
     await prisma.card.update({
       where: { id: update.id },
       data: {
-        ...(update.gapText !== undefined && { gapText: update.gapText }),
-        ...(update.mnemonic !== undefined && { mnemonic: update.mnemonic }),
-        ...(update.contextSentence !== undefined && { contextSentence: update.contextSentence }),
+        ...(update.gapText !== undefined && { gapText: sanitizeField(update.gapText, 2000) }),
+        ...(update.mnemonic !== undefined && { mnemonic: sanitizeField(update.mnemonic, 1000) }),
+        ...(update.contextSentence !== undefined && { contextSentence: sanitizeField(update.contextSentence, 2000) }),
       },
     });
   }

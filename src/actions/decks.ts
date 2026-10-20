@@ -46,10 +46,15 @@ export async function getDeckById(id: string) {
 
 export async function createDeck(title: string, description?: string) {
   await requireAppAuth();
+  const cleanTitle = (title || "").trim().slice(0, 200);
+  if (!cleanTitle) {
+    throw new Error("Titel darf nicht leer sein");
+  }
+  const cleanDescription = description ? description.trim().slice(0, 2000) : null;
   const deck = await prisma.deck.create({
     data: {
-      title,
-      description
+      title: cleanTitle,
+      description: cleanDescription
     }
   });
   revalidatePath("/");

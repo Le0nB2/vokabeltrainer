@@ -1,10 +1,36 @@
 import { NextRequest, NextResponse } from "next/server";
 import { GoogleGenAI, Type } from "@google/genai";
 import prisma from "@/lib/prisma";
-
+import { requireAppAuth, UnauthorizedError } from "@/lib/auth-guard";
+import { consumeRateLimit, formatRetryDuration, getClientIpFromHeaders } from "@/lib/rate-limit";
 
 export async function POST(req: NextRequest) {
   try {
+    try {
+      await requireAppAuth();
+    } catch (error) {
+      if (error instanceof UnauthorizedError) {
+        return NextResponse.json({ error: "Nicht autorisiert. Bitte melde dich an." }, { status: 401 });
+      }
+      throw error;
+    }
+
+    const clientIp = getClientIpFromHeaders(req.headers);
+    const limit = consumeRateLimit(`scan-image:${clientIp}`, {
+      maxAttempts: 5,
+      windowMs: 60 * 1000,
+      blockDurationMs: 60 * 1000,
+    });
+
+    if (limit.isBlocked) {
+      return NextResponse.json(
+        {
+          error: `Zu viele Anfragen zur Bildanalyse. Bitte warte ${formatRetryDuration(limit.retryAfterSeconds)}.`,
+        },
+        { status: 429 }
+      );
+    }
+
     const formData = await req.formData();
     const file = formData.get("image") as File;
 

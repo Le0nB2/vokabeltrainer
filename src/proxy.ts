@@ -5,6 +5,8 @@ import {
   getAppAuthCredentials,
   getAppSecret,
   verifyAppSessionToken,
+  extractTokenFromRequest,
+  verifyNotificationToken,
 } from "./lib/auth-utils";
 import { getSafeRedirectUrl } from "./lib/utils/url";
 
@@ -53,6 +55,14 @@ export async function proxy(req: NextRequest) {
       return NextResponse.redirect(targetUrl);
     }
     return NextResponse.next();
+  }
+
+  // Home Assistant / Notification API token access
+  if (pathname === "/api/notifications/due-count") {
+    const token = extractTokenFromRequest(req.headers, url.searchParams);
+    if (verifyNotificationToken(token)) {
+      return NextResponse.next();
+    }
   }
 
   // Unauthenticated user:

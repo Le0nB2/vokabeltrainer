@@ -12,6 +12,7 @@ interface RateLimitEntry {
 const DEFAULT_MAX_ATTEMPTS = 5
 const DEFAULT_WINDOW_MS = 15 * 60 * 1000 // 15 minutes
 const DEFAULT_BLOCK_DURATION_MS = 15 * 60 * 1000 // 15 minutes
+const MAX_STORE_ENTRIES = 5000
 
 declare const globalThis: {
   __rateLimiterStore?: Map<string, RateLimitEntry>
@@ -41,6 +42,34 @@ export class RateLimiter {
     entry.timestamps = entry.timestamps.filter((ts) => ts > now - windowMs)
   }
 
+  /**
+   * Prune expired entries to prevent memory leaks from unbounded IP storage.
+   */
+  public prune(now = Date.now()): void {
+    for (const [key, entry] of this.store.entries()) {
+      this.cleanOldEntries(entry, now, this.defaultWindowMs)
+      if (entry.timestamps.length === 0 && (!entry.blockedUntil || entry.blockedUntil <= now)) {
+        this.store.delete(key)
+      }
+    }
+  }
+
+  private ensureStoreBounds(now: number): void {
+    if (this.store.size > MAX_STORE_ENTRIES) {
+      this.prune(now)
+      // If still over capacity after pruning expired items, drop the oldest 20% of entries
+      if (this.store.size > MAX_STORE_ENTRIES) {
+        const toRemove = Math.floor(this.store.size * 0.2)
+        let removed = 0
+        for (const key of this.store.keys()) {
+          this.store.delete(key)
+          removed++
+          if (removed >= toRemove) break
+        }
+      }
+    }
+  }
+
   check(
     key: string,
     options?: RateLimiterOptions
@@ -67,6 +96,12 @@ export class RateLimiter {
 
     this.cleanOldEntries(entry, now, windowMs)
 
+    // Clean up empty entry from store
+    if (entry.timestamps.length === 0 && !entry.blockedUntil) {
+      this.store.delete(key)
+      return { isBlocked: false, retryAfterSeconds: 0, remainingAttempts: maxAttempts }
+    }
+
     if (entry.timestamps.length >= maxAttempts) {
       entry.blockedUntil = now + blockDurationMs
       const retryAfterSeconds = Math.max(1, Math.ceil(blockDurationMs / 1000))
@@ -85,6 +120,8 @@ export class RateLimiter {
     const windowMs = options?.windowMs ?? this.defaultWindowMs
     const blockDurationMs = options?.blockDurationMs ?? this.defaultBlockDurationMs
     const now = Date.now()
+
+    this.ensureStoreBounds(now)
 
     let entry = this.store.get(key)
     if (!entry) {
@@ -113,6 +150,8 @@ export class RateLimiter {
     const windowMs = options?.windowMs ?? this.defaultWindowMs
     const blockDurationMs = options?.blockDurationMs ?? this.defaultBlockDurationMs
     const now = Date.now()
+
+    this.ensureStoreBounds(now)
 
     let entry = this.store.get(key)
     if (!entry) {
@@ -149,6 +188,10 @@ export class RateLimiter {
   clear(): void {
     this.store.clear()
   }
+
+  size(): number {
+    return this.store.size
+  }
 }
 
 export const defaultRateLimiter = new RateLimiter()
@@ -173,19 +216,35 @@ export function resetAllRateLimits() {
   defaultRateLimiter.clear()
 }
 
+function sanitizeIp(ip: string): string {
+  const cleaned = ip.replace(/:[0-9]+$/, "").trim()
+  if (cleaned.length > 45 || !/^[0-9a-fA-F:.]+$/.test(cleaned)) {
+    return "127.0.0.1"
+  }
+  return cleaned
+}
+
 export function getClientIpFromHeaders(headersObj?: { get(name: string): string | null }): string {
   try {
     if (!headersObj) return "127.0.0.1"
+
+    // 1. Prioritize trusted reverse proxy headers that cannot be arbitrarily forged by client
+    const cfConnectingIp = headersObj.get("cf-connecting-ip")?.trim()
+    if (cfConnectingIp) {
+      return sanitizeIp(cfConnectingIp)
+    }
+
+    const realIp = headersObj.get("x-real-ip")?.trim()
+    if (realIp) {
+      return sanitizeIp(realIp)
+    }
+
+    // 2. Fall back to X-Forwarded-For
     const forwardedFor = headersObj.get("x-forwarded-for")
     if (forwardedFor) {
       const first = forwardedFor.split(",")[0].trim()
-      if (first) return first
+      if (first) return sanitizeIp(first)
     }
-    const realIp = headersObj.get("x-real-ip")?.trim()
-    if (realIp) return realIp
-
-    const cfConnectingIp = headersObj.get("cf-connecting-ip")?.trim()
-    if (cfConnectingIp) return cfConnectingIp
   } catch {
     // fallback
   }

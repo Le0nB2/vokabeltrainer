@@ -27,4 +27,6 @@ services:
         sync: false
       - key: AUTH_SECRET
         generateValue: true
+      - key: NOTIFICATION_API_TOKEN
+        generateValue: true
 
