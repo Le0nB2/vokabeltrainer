@@ -3,6 +3,7 @@ import { UnauthorizedError, requireAppAuth, isAppAuthenticated } from '../src/li
 import {
   AUTH_COOKIE_NAME,
   createAppSessionToken,
+  createSettingsSessionToken,
   getAppSecret,
 } from '../src/lib/auth-utils'
 import { getDecks, getDeckById, createDeck, deleteDeck, saveDeckResult } from '../src/actions/decks'
@@ -305,6 +306,84 @@ describe('SEC-02: Server Actions Authentication Protection', () => {
       const res = await importData(JSON.stringify([{ title: 'Deck' }]))
       expect(res.success).toBe(false)
       expect(res.error).toContain('Nicht autorisiert')
+    })
+
+    it('blocks importData when payload exceeds 5 MB (SEC-05)', async () => {
+      setValidSessionCookie()
+      const hugeString = 'x'.repeat(5 * 1024 * 1024 + 1)
+      const res = await importData(hugeString)
+      expect(res.success).toBe(false)
+      expect(res.error).toContain('Importdatei ist zu groß (maximal 5 MB erlaubt)')
+    })
+
+    it('blocks importData when JSON syntax is malformed (SEC-05)', async () => {
+      setValidSessionCookie()
+      const res = await importData('{ malformed: json :::')
+      expect(res.success).toBe(false)
+      expect(res.error).toContain('Ungültiges JSON-Format')
+    })
+
+    it('blocks importData when payload violates Zod schema (SEC-05)', async () => {
+      setValidSessionCookie()
+      const res = await importData(JSON.stringify([{ title: '' }]))
+      expect(res.success).toBe(false)
+      expect(res.error).toContain('Ungültige Daten in der Importdatei')
+      expect(res.error).toContain('Deck-Titel darf nicht leer sein')
+    })
+
+    it('blocks importData when settings password is set but cookie is missing (SEC-05)', async () => {
+      setValidSessionCookie()
+      process.env.SETTINGS_PASSWORD = 'super-secret-settings'
+      const res = await importData(JSON.stringify([{ title: 'Mein Deck' }]))
+      expect(res.success).toBe(false)
+      expect(res.error).toContain('Einstellungspasswort')
+    })
+
+    it('allows importData when fully authenticated and processes v2 payload (SEC-05)', async () => {
+      setValidSessionCookie()
+      process.env.SETTINGS_PASSWORD = 'super-secret-settings'
+      const settingsToken = createSettingsSessionToken('super-secret-settings')
+      mockCookies.set('settings_auth', { value: settingsToken })
+
+      const payload = {
+        version: 2,
+        settings: { minigamesEnabled: false },
+        decks: [
+          {
+            title: 'Latein',
+            description: 'Lektion 1-5',
+            cards: [
+              {
+                front: 'amare',
+                back: 'lieben',
+                box: 2,
+                reviewLogs: [{ isCorrect: true }],
+              },
+            ],
+          },
+        ],
+      }
+
+      const res = await importData(JSON.stringify(payload))
+      expect(res.success).toBe(true)
+      expect(mockPrisma.$transaction).toHaveBeenCalled()
+      expect(mockPrisma.deck.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({ title: 'Latein', description: 'Lektion 1-5' }),
+        })
+      )
+      expect(mockPrisma.card.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({ front: 'amare', back: 'lieben', box: 2 }),
+        })
+      )
+      expect(mockPrisma.reviewLog.createMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.arrayContaining([
+            expect.objectContaining({ isCorrect: true }),
+          ]),
+        })
+      )
     })
 
     it('blocks getApiStats when unauthenticated', async () => {

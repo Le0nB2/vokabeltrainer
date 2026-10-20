@@ -14,7 +14,7 @@ Die Schwachstellen sind nach Schweregrad (**Kritisch / Hoch**, **Mittel**, **Nie
 | **SEC-02** | ~~Fehlende Authentifizierung in Server Actions (Bypass via `/login`)~~ | Broken Access Control | ✅ **Erledigt** | `src/lib/auth-guard.ts`, `src/actions/` |
 | **SEC-03** | ~~Fehlendes Rate-Limiting gegen Brute-Force auf Login~~ | Identification & Auth | ✅ **Erledigt** | `src/lib/rate-limit.ts`, `src/actions/auth.ts` |
 | **SEC-04** | ~~Statischer, nie ablaufender Session-Token für Einstellungen~~ | Cryptographic / Session | ✅ **Erledigt** | `src/lib/auth-utils.ts`, `settings/layout.tsx` |
-| **SEC-05** | Unvalidierter JSON-Import & DoS-Risiko (bis zu 50 MB) | DoS / Validation | 🟡 **Mittel** | `src/actions/settings.ts` (`importData`) |
+| **SEC-05** | ~~Unvalidierter JSON-Import & DoS-Risiko (bis zu 50 MB)~~ | DoS / Validation | ✅ **Erledigt** | `src/actions/settings.ts` (`importData`) |
 | **SEC-06** | Unbeschränkte Payload-Größen & DoS bei KI-Endpunkten | Resource Exhaustion | 🟡 **Mittel** | `/api/enrich-csv`, `/api/worksheet` |
 | **SEC-07** | Backup-Export ohne Auth bei fehlendem `SETTINGS_PASSWORD` | Data Exposure | 🟡 **Mittel** | `src/app/api/export/route.ts` |
 | **SEC-08** | Fehlende HTTP-Sicherheitsheader (CSP, HSTS, Permissions-Policy) | Security Misconfiguration | 🟢 **Niedrig** | `next.config.ts` |
@@ -110,7 +110,15 @@ Die Schwachstellen sind nach Schweregrad (**Kritisch / Hoch**, **Mittel**, **Nie
 ---
 
 #### SEC-05: Unvalidierter JSON-Import & DoS-Risiko (bis zu 50 MB)
-- **Datei**: [src/actions/settings.ts](file:///home/bbuch/vokabel-trainer-docker/vokabeltrainer/src/actions/settings.ts#L22-L104)
+- **Status**: ✅ **Erledigt** (Branch `sicherheitsanpassungen`)
+- **Datei**: [src/actions/settings.ts](file:///home/bbuch/vokabel-trainer-docker/vokabeltrainer/src/actions/settings.ts#L22-L104) & [src/lib/validations/import.ts](file:///home/bbuch/vokabel-trainer-docker/vokabeltrainer/src/lib/validations/import.ts)
+- **Umsetzung**:
+  - `MAX_IMPORT_SIZE_BYTES` von 50 MB auf 5 MB reduziert (in Server Action `importData` und Client-Komponente `ImportExport.tsx`).
+  - Robuste Zod-Validierung in `src/lib/validations/import.ts` (`validateBackupData`) für v2- und Legacy-Backup-Formate.
+  - Strenge Längenbeschränkungen (Titel max. 200 Zeichen, Kartentexte max. 2000 Zeichen), Wertebereiche (Box 0-50, Ease-Factor 1.0-5.0) und Mengenlimits (max. 100 Decks, max. 2000 Karten pro Deck, max. 1000 Logs pro Karte).
+  - Unbekannte Eigenschaften werden verworfen (Stripping), um Prototype-Pollution oder unerwünschte Spaltenübernahme zu verhindern.
+  - Aussagekräftige deutsche Fehlermeldungen mit Pfadangaben bei Schemaverletzungen.
+  - 14 neue Unit-Tests in `tests/import-validation.test.ts` und 5 erweiterte Integrationstests in `tests/server-actions-auth.test.ts`.
 - **Problem**:
   1. `importData` akzeptiert JSON-Strings bis zu 50 MB und führt synchron `JSON.parse()` aus. Ein 50 MB großes JSON blockiert die Node.js-Event-Loop spürbar.
   2. Der Inhalt wird ohne Zod-Schema direkt per Schleife in die Datenbank geschrieben. Es gibt keine Begrenzung der Anzahl an Decks/Karten.
@@ -205,7 +213,7 @@ flowchart TD
     subgraph "Schritt 2: Missbrauchsschutz (Medium Risk)"
         S3["SEC-03: Rate Limiting Login (✅ Erledigt)"]
         S4["SEC-04: Expirations für Settings-Cookie (✅ Erledigt)"]
-        S5["SEC-05: Backup Import/Export absichern & Zod"]
+        S5["SEC-05: Backup Import absichern & Zod (✅ Erledigt)"]
         S6["SEC-06: KI-Endpunkte Payload-Limits"]
     end
 

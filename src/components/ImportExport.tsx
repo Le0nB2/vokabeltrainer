@@ -14,6 +14,12 @@ export function ImportExport() {
     const file = e.target.files?.[0]
     if (!file) return
 
+    if (file.size > 5 * 1024 * 1024) {
+      setMessage({ type: 'error', text: 'Die Datei ist zu groß (maximal 5 MB erlaubt).' })
+      e.target.value = ''
+      return
+    }
+
     setIsImporting(true)
     setMessage(null)
 
