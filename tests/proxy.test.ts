@@ -48,7 +48,6 @@ describe('proxy middleware session auth', () => {
   const originalEnv = process.env
 
   beforeEach(() => {
-    vi.resetModules()
     process.env = { ...originalEnv }
     process.env.AUTH_USER = 'testuser'
     process.env.AUTH_PASSWORD = 'testpassword123'

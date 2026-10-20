@@ -4,8 +4,10 @@ import {
   formatRetryDuration,
   checkRateLimit,
   recordRateLimitFailure,
+  consumeRateLimit,
   resetRateLimit,
   resetAllRateLimits,
+  getClientIpFromHeaders,
 } from '../src/lib/rate-limit'
 
 describe('RateLimiter utility', () => {
@@ -107,15 +109,46 @@ describe('RateLimiter utility', () => {
     })
   })
 
-  describe('exported helper functions', () => {
-    it('works with checkRateLimit, recordRateLimitFailure, and resetRateLimit', () => {
-      expect(checkRateLimit('helper-key', { maxAttempts: 2 }).isBlocked).toBe(false)
-      recordRateLimitFailure('helper-key', { maxAttempts: 2 })
-      recordRateLimitFailure('helper-key', { maxAttempts: 2 })
-      expect(checkRateLimit('helper-key', { maxAttempts: 2 }).isBlocked).toBe(true)
+  describe('consumeRateLimit', () => {
+    it('allows requests up to maxAttempts and blocks subsequent requests', () => {
+      const opts = { maxAttempts: 3, windowMs: 10000, blockDurationMs: 10000 }
+      const res1 = consumeRateLimit('consume-user', opts)
+      expect(res1.isBlocked).toBe(false)
+      expect(res1.remainingAttempts).toBe(2)
 
-      resetRateLimit('helper-key')
-      expect(checkRateLimit('helper-key', { maxAttempts: 2 }).isBlocked).toBe(false)
+      const res2 = consumeRateLimit('consume-user', opts)
+      expect(res2.isBlocked).toBe(false)
+      expect(res2.remainingAttempts).toBe(1)
+
+      const res3 = consumeRateLimit('consume-user', opts)
+      expect(res3.isBlocked).toBe(false)
+      expect(res3.remainingAttempts).toBe(0)
+
+      const res4 = consumeRateLimit('consume-user', opts)
+      expect(res4.isBlocked).toBe(true)
+      expect(res4.retryAfterSeconds).toBeGreaterThan(0)
+    })
+  })
+
+  describe('getClientIpFromHeaders', () => {
+    it('extracts IP from x-forwarded-for first entry', () => {
+      const headers = new Headers({ 'x-forwarded-for': '203.0.113.195, 70.41.3.18' })
+      expect(getClientIpFromHeaders(headers)).toBe('203.0.113.195')
+    })
+
+    it('falls back to x-real-ip if x-forwarded-for is missing', () => {
+      const headers = new Headers({ 'x-real-ip': '198.51.100.1' })
+      expect(getClientIpFromHeaders(headers)).toBe('198.51.100.1')
+    })
+
+    it('falls back to cf-connecting-ip if others are missing', () => {
+      const headers = new Headers({ 'cf-connecting-ip': '192.0.2.1' })
+      expect(getClientIpFromHeaders(headers)).toBe('192.0.2.1')
+    })
+
+    it('falls back to 127.0.0.1 when no headers are provided', () => {
+      expect(getClientIpFromHeaders()).toBe('127.0.0.1')
+      expect(getClientIpFromHeaders(new Headers())).toBe('127.0.0.1')
     })
   })
 })

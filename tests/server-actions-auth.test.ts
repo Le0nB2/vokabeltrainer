@@ -20,7 +20,8 @@ import { getSettings, updateSettings, importData } from '../src/actions/settings
 import { getApiStats } from '../src/actions/api-stats'
 
 const { mockCookies, mockPrisma } = vi.hoisted(() => {
-  const cookies = new Map<string, any>()
+  if (!globalThis.__mockCookies) globalThis.__mockCookies = new Map()
+  const cookies = globalThis.__mockCookies
   const prismaMock: any = {
     deck: {
       findMany: vi.fn().mockResolvedValue([]),
@@ -100,6 +101,7 @@ describe('SEC-02: Server Actions Authentication Protection', () => {
     process.env.AUTH_PASSWORD = 'password123'
     delete process.env.BASIC_AUTH_USER
     delete process.env.BASIC_AUTH_PASSWORD
+    delete process.env.SETTINGS_PASSWORD
     mockCookies.clear()
     vi.clearAllMocks()
   })

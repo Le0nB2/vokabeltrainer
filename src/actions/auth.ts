@@ -15,6 +15,7 @@ import {
   recordRateLimitFailure,
   resetRateLimit,
   formatRetryDuration,
+  getClientIpFromHeaders,
 } from "@/lib/rate-limit"
 
 import { cookies, headers } from "next/headers"
@@ -24,16 +25,7 @@ import { createHash, timingSafeEqual } from "crypto"
 async function getClientIp(): Promise<string> {
   try {
     const headersList = await headers()
-    const forwardedFor = headersList.get("x-forwarded-for")
-    if (forwardedFor) {
-      const first = forwardedFor.split(",")[0].trim()
-      if (first) return first
-    }
-    const realIp = headersList.get("x-real-ip")?.trim()
-    if (realIp) return realIp
-
-    const cfConnectingIp = headersList.get("cf-connecting-ip")?.trim()
-    if (cfConnectingIp) return cfConnectingIp
+    return getClientIpFromHeaders(headersList)
   } catch {
     // headers() might not be available in certain contexts
   }

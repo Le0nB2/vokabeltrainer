@@ -15,7 +15,7 @@ Die Schwachstellen sind nach Schweregrad (**Kritisch / Hoch**, **Mittel**, **Nie
 | **SEC-03** | ~~Fehlendes Rate-Limiting gegen Brute-Force auf Login~~ | Identification & Auth | ✅ **Erledigt** | `src/lib/rate-limit.ts`, `src/actions/auth.ts` |
 | **SEC-04** | ~~Statischer, nie ablaufender Session-Token für Einstellungen~~ | Cryptographic / Session | ✅ **Erledigt** | `src/lib/auth-utils.ts`, `settings/layout.tsx` |
 | **SEC-05** | ~~Unvalidierter JSON-Import & DoS-Risiko (bis zu 50 MB)~~ | DoS / Validation | ✅ **Erledigt** | `src/actions/settings.ts` (`importData`) |
-| **SEC-06** | Unbeschränkte Payload-Größen & DoS bei KI-Endpunkten | Resource Exhaustion | 🟡 **Mittel** | `/api/enrich-csv`, `/api/worksheet` |
+| **SEC-06** | ~~Unbeschränkte Payload-Größen & DoS bei KI-Endpunkten~~ | Resource Exhaustion | ✅ **Erledigt** | `/api/enrich-csv`, `/api/worksheet` |
 | **SEC-07** | Backup-Export ohne Auth bei fehlendem `SETTINGS_PASSWORD` | Data Exposure | 🟡 **Mittel** | `src/app/api/export/route.ts` |
 | **SEC-08** | Fehlende HTTP-Sicherheitsheader (CSP, HSTS, Permissions-Policy) | Security Misconfiguration | 🟢 **Niedrig** | `next.config.ts` |
 | **SEC-09** | Fest codierter Fallback-Geheimschlüssel (`vokabeltrainer-session-secret`) | Cryptographic Failure | 🟢 **Niedrig** | `src/lib/auth-utils.ts` |
@@ -130,7 +130,14 @@ Die Schwachstellen sind nach Schweregrad (**Kritisch / Hoch**, **Mittel**, **Nie
 ---
 
 #### SEC-06: Unbegrenzte Payload-Größen bei KI-Endpunkten (`/api/enrich-csv`, `/api/worksheet`)
-- **Datei**: [src/app/api/enrich-csv/route.ts](file:///home/bbuch/vokabel-trainer-docker/vokabeltrainer/src/app/api/enrich-csv/route.ts#L12-L14) & [src/app/api/worksheet/route.ts](file:///home/bbuch/vokabel-trainer-docker/vokabeltrainer/src/app/api/worksheet/route.ts)
+- **Status**: ✅ **Erledigt** (Branch `sicherheitsanpassungen`)
+- **Datei**: [src/app/api/enrich-csv/route.ts](file:///home/bbuch/vokabel-trainer-docker/vokabeltrainer/src/app/api/enrich-csv/route.ts) & [src/app/api/worksheet/route.ts](file:///home/bbuch/vokabel-trainer-docker/vokabeltrainer/src/app/api/worksheet/route.ts)
+- **Umsetzung**:
+  - `/api/enrich-csv`: Zod-Validierung mit maximal 50 Karten pro Anfrage (`.max(50)`), Textlängenbegrenzung für Vokabeln auf max. 500 Zeichen (`front`/`back`), ID max. 100 Zeichen.
+  - `/api/worksheet`: Eingabevalidierung für `deckId` (max. 100 Zeichen) und IP-basiertes Rate-Limiting gegen DoS (max. 3 Anfragen pro Minute pro IP).
+  - Maximale DIN-A4-Seitenausnutzung bleibt unverändert zu 100 % erhalten (präzises Zuschneiden bei minimalem Überlauf).
+  - Defense-in-Depth: Beide Endpunkte sichern sich serverseitig via `requireAppAuth()` ab (401 bei fehlender Authentifizierung).
+  - Umfassende Tests in `tests/enrich-csv.test.ts`, `tests/worksheet-route.test.ts` und `tests/rate-limit.test.ts`.
 - **Problem**:
   `/api/enrich-csv` prüft zwar mit Zod, erlaubt aber eine unbegrenzte Anzahl von Karten (`cards.min(1)` ohne `.max(...)`) und beliebig lange Texte.
   `/api/worksheet` rendert bei Bedarf in einer Schleife bis zu 25-mal synchron ein PDF (`generateOptimizedPdf`), was bei parallelen Aufrufen die CPU blockiert.
@@ -214,7 +221,7 @@ flowchart TD
         S3["SEC-03: Rate Limiting Login (✅ Erledigt)"]
         S4["SEC-04: Expirations für Settings-Cookie (✅ Erledigt)"]
         S5["SEC-05: Backup Import absichern & Zod (✅ Erledigt)"]
-        S6["SEC-06: KI-Endpunkte Payload-Limits"]
+        S6["SEC-06: KI-Endpunkte Payload-Limits (✅ Erledigt)"]
     end
 
     subgraph "Schritt 3: Hardening & Aufräumen (Low Risk)"

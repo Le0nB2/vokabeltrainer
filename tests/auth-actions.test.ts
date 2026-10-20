@@ -9,8 +9,10 @@ import {
 } from '../src/lib/auth-utils'
 import { resetAllRateLimits } from '../src/lib/rate-limit'
 
-const mockCookies = new Map<string, any>()
-const mockHeaders = new Map<string, string>()
+if (!globalThis.__mockCookies) globalThis.__mockCookies = new Map()
+if (!globalThis.__mockHeaders) globalThis.__mockHeaders = new Map()
+const mockCookies = globalThis.__mockCookies
+const mockHeaders = globalThis.__mockHeaders
 
 vi.mock('next/headers', () => {
   return {
@@ -45,7 +47,6 @@ describe('auth server actions', () => {
   const originalEnv = process.env
 
   beforeEach(() => {
-    vi.resetModules()
     resetAllRateLimits()
     process.env = { ...originalEnv }
     process.env.AUTH_USER = 'admin'

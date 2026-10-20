@@ -105,6 +105,43 @@ export class RateLimiter {
     return { isBlocked: false, retryAfterSeconds: 0, remainingAttempts }
   }
 
+  consume(
+    key: string,
+    options?: RateLimiterOptions
+  ): { isBlocked: boolean; retryAfterSeconds: number; remainingAttempts: number } {
+    const maxAttempts = options?.maxAttempts ?? this.defaultMaxAttempts
+    const windowMs = options?.windowMs ?? this.defaultWindowMs
+    const blockDurationMs = options?.blockDurationMs ?? this.defaultBlockDurationMs
+    const now = Date.now()
+
+    let entry = this.store.get(key)
+    if (!entry) {
+      entry = { timestamps: [] }
+      this.store.set(key, entry)
+    }
+
+    if (entry.blockedUntil && now < entry.blockedUntil) {
+      const retryAfterSeconds = Math.max(1, Math.ceil((entry.blockedUntil - now) / 1000))
+      return { isBlocked: true, retryAfterSeconds, remainingAttempts: 0 }
+    }
+
+    if (entry.blockedUntil && now >= entry.blockedUntil) {
+      delete entry.blockedUntil
+    }
+
+    this.cleanOldEntries(entry, now, windowMs)
+
+    if (entry.timestamps.length >= maxAttempts) {
+      entry.blockedUntil = now + blockDurationMs
+      const retryAfterSeconds = Math.max(1, Math.ceil(blockDurationMs / 1000))
+      return { isBlocked: true, retryAfterSeconds, remainingAttempts: 0 }
+    }
+
+    entry.timestamps.push(now)
+    const remainingAttempts = Math.max(0, maxAttempts - entry.timestamps.length)
+    return { isBlocked: false, retryAfterSeconds: 0, remainingAttempts }
+  }
+
   reset(key: string): void {
     this.store.delete(key)
   }
@@ -124,12 +161,35 @@ export function recordRateLimitFailure(key: string, options?: RateLimiterOptions
   return defaultRateLimiter.recordFailure(key, options)
 }
 
+export function consumeRateLimit(key: string, options?: RateLimiterOptions) {
+  return defaultRateLimiter.consume(key, options)
+}
+
 export function resetRateLimit(key: string) {
   defaultRateLimiter.reset(key)
 }
 
 export function resetAllRateLimits() {
   defaultRateLimiter.clear()
+}
+
+export function getClientIpFromHeaders(headersObj?: { get(name: string): string | null }): string {
+  try {
+    if (!headersObj) return "127.0.0.1"
+    const forwardedFor = headersObj.get("x-forwarded-for")
+    if (forwardedFor) {
+      const first = forwardedFor.split(",")[0].trim()
+      if (first) return first
+    }
+    const realIp = headersObj.get("x-real-ip")?.trim()
+    if (realIp) return realIp
+
+    const cfConnectingIp = headersObj.get("cf-connecting-ip")?.trim()
+    if (cfConnectingIp) return cfConnectingIp
+  } catch {
+    // fallback
+  }
+  return "127.0.0.1"
 }
 
 export function formatRetryDuration(seconds: number): string {
