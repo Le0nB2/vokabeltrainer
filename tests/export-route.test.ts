@@ -77,17 +77,14 @@ describe('SEC-07: Backup-Export Route Protection (/api/export)', () => {
   }
 
   describe('Single-User / Local Mode (no credentials in .env)', () => {
-    it('allows GET export without any login or cookies', async () => {
+    it('rejects GET export with 405 Method Not Allowed (AUDIT-05 CSRF protection)', async () => {
       const { GET } = await import('@/app/api/export/route')
       const response = await GET()
 
-      expect(response.status).toBe(200)
+      expect(response.status).toBe(405)
       const data = await response.json()
-      expect(data.version).toBe(2)
-      expect(data.settings).toEqual({ id: 'default', minigamesEnabled: true })
-      expect(data.decks).toHaveLength(1)
-      expect(response.headers.get('Content-Type')).toBe('application/json')
-      expect(response.headers.get('Content-Disposition')).toContain('vokabeltrainer_export.json')
+      expect(data.error).toContain('Method Not Allowed')
+      expect(response.headers.get('Allow')).toBe('POST')
     })
 
     it('allows POST export without any login or cookies', async () => {
@@ -98,6 +95,8 @@ describe('SEC-07: Backup-Export Route Protection (/api/export)', () => {
       const data = await response.json()
       expect(data.version).toBe(2)
       expect(data.decks[0].name).toBe('Englisch')
+      expect(response.headers.get('Content-Type')).toBe('application/json')
+      expect(response.headers.get('Content-Disposition')).toContain('vokabeltrainer_export.json')
     })
   })
 
@@ -107,13 +106,13 @@ describe('SEC-07: Backup-Export Route Protection (/api/export)', () => {
       process.env.AUTH_PASSWORD = 'supersecretpassword'
     })
 
-    it('rejects GET export with 401 when no auth cookie is present', async () => {
+    it('rejects GET export with 405 Method Not Allowed (AUDIT-05 CSRF protection)', async () => {
       const { GET } = await import('@/app/api/export/route')
       const response = await GET()
 
-      expect(response.status).toBe(401)
+      expect(response.status).toBe(405)
       const data = await response.json()
-      expect(data.error).toBe('Unauthorized')
+      expect(data.error).toContain('Method Not Allowed')
     })
 
     it('rejects POST export with 401 when no auth cookie is present', async () => {

@@ -203,6 +203,7 @@ Damit der Endpunkt echte Daten liefert, muss in der Web-App unter **Einstellunge
 ### 1. REST Sensor (in `configuration.yaml`)
 Erstellt einen Sensor, der die fälligen Vokabeln von der App abfragt. (Ersetze die IP mit der deines Docker-Hosts).
 
+**Ohne App-Authentifizierung (Standard):**
 ```yaml
 sensor:
   - platform: rest
@@ -211,6 +212,24 @@ sensor:
     method: GET
     value_template: "{{ value_json.dueCount }}"
     unit_of_measurement: "Vokabeln"
+```
+
+**Mit geschütztem App-Login (`AUTH_USER` / `AUTH_PASSWORD`):**
+Vergib in deiner `.env` oder `docker-compose.yml` das Token `NOTIFICATION_API_TOKEN=mein-geheimer-ha-token` und konfiguriere Home Assistant mit Authentifizierungs-Header:
+```yaml
+sensor:
+  - platform: rest
+    name: "Vokabeln faellig"
+    resource: "http://192.168.1.xxx:3001/api/notifications/due-count"
+    method: GET
+    headers:
+      Authorization: "Bearer mein-geheimer-ha-token"
+    value_template: "{{ value_json.dueCount }}"
+    unit_of_measurement: "Vokabeln"
+```
+*Alternativ als URL-Parameter:*
+```yaml
+    resource: "http://192.168.1.xxx:3001/api/notifications/due-count?token=mein-geheimer-ha-token"
 ```
 
 ### 2. Automatisierung (in `automations.yaml` oder via UI)

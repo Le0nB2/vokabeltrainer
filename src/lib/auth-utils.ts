@@ -230,3 +230,46 @@ export function verifySettingsSessionToken(
 export const getSessionCookieValue = createSettingsSessionToken
 export const verifySessionCookie = verifySettingsSessionToken
 
+export const NOTIFICATION_TOKEN_ENV = "NOTIFICATION_API_TOKEN"
+
+/**
+ * Retrieve configured Home Assistant / Notification API token from environment.
+ */
+export function getNotificationToken(): string | undefined {
+  return process.env.NOTIFICATION_API_TOKEN?.trim()
+}
+
+/**
+ * Verify whether an extracted token matches the configured NOTIFICATION_API_TOKEN.
+ */
+export function verifyNotificationToken(token: string | null | undefined): boolean {
+  const configuredToken = getNotificationToken()
+  if (!configuredToken) return false
+  if (!token || typeof token !== "string") return false
+  return secureCompare(token.trim(), configuredToken)
+}
+
+/**
+ * Extract Bearer token from Authorization header or 'token' query param.
+ */
+export function extractTokenFromRequest(
+  headersList?: { get(name: string): string | null } | Headers | null,
+  searchParams?: URLSearchParams | null
+): string | null {
+  if (headersList) {
+    const authHeader = headersList.get("authorization")
+    if (authHeader) {
+      const parts = authHeader.split(" ")
+      if (parts.length === 2 && parts[0].toLowerCase() === "bearer") {
+        return parts[1]
+      }
+    }
+  }
+  if (searchParams) {
+    const queryToken = searchParams.get("token")
+    if (queryToken) return queryToken
+  }
+  return null
+}
+
+

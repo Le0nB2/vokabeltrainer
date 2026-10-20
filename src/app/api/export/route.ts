@@ -62,7 +62,10 @@ async function handleExport() {
 }
 
 export async function GET() {
-  return handleExport()
+  return NextResponse.json(
+    { error: "Method Not Allowed. Verwende POST zum Exportieren." },
+    { status: 405, headers: { Allow: "POST" } }
+  )
 }
 
 export async function POST() {

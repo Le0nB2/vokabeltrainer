@@ -240,4 +240,56 @@ describe('proxy middleware session auth', () => {
     const result = await proxy(req)
     expect(result).toEqual({ status: 200, type: 'next' })
   })
+
+  describe('Notification API Token for Home Assistant', () => {
+    beforeEach(() => {
+      process.env.NOTIFICATION_API_TOKEN = 'secret-ha-token'
+    })
+
+    it('allows /api/notifications/due-count with valid Bearer token', async () => {
+      const url = new URL('/api/notifications/due-count', 'http://localhost:3000')
+      const req = {
+        url: url.toString(),
+        nextUrl: url,
+        headers: {
+          get: (name: string) => name.toLowerCase() === 'authorization' ? 'Bearer secret-ha-token' : null,
+        },
+        cookies: { get: () => undefined },
+      } as unknown as NextRequest
+
+      const result = await proxy(req)
+      expect(result).toEqual({ status: 200, type: 'next' })
+    })
+
+    it('allows /api/notifications/due-count with valid ?token= query parameter', async () => {
+      const url = new URL('/api/notifications/due-count?token=secret-ha-token', 'http://localhost:3000')
+      const req = {
+        url: url.toString(),
+        nextUrl: url,
+        headers: {
+          get: () => null,
+        },
+        cookies: { get: () => undefined },
+      } as unknown as NextRequest
+
+      const result = await proxy(req)
+      expect(result).toEqual({ status: 200, type: 'next' })
+    })
+
+    it('rejects /api/notifications/due-count with 401 when token is invalid', async () => {
+      const url = new URL('/api/notifications/due-count?token=wrong-token', 'http://localhost:3000')
+      const req = {
+        url: url.toString(),
+        nextUrl: url,
+        headers: {
+          get: () => null,
+        },
+        cookies: { get: () => undefined },
+      } as unknown as NextRequest
+
+      const result: any = await proxy(req)
+      expect(result.status).toBe(401)
+      expect(result.type).toBe('json')
+    })
+  })
 })

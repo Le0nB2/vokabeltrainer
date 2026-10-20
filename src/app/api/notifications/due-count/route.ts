@@ -1,8 +1,26 @@
-import { NextResponse } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
 import prisma from '@/lib/prisma'
+import { requireAppAuth, UnauthorizedError } from '@/lib/auth-guard'
+import { extractTokenFromRequest, verifyNotificationToken } from '@/lib/auth-utils'
 
-export async function GET() {
+export async function GET(req: NextRequest) {
   try {
+    // 1. Check for valid Home Assistant / Notification API Token
+    const token = extractTokenFromRequest(req.headers, req.nextUrl?.searchParams)
+    const isTokenValid = verifyNotificationToken(token)
+
+    // 2. If token is not valid, require App Session Auth (bypassed if auth is not configured)
+    if (!isTokenValid) {
+      try {
+        await requireAppAuth()
+      } catch (error) {
+        if (error instanceof UnauthorizedError) {
+          return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+        }
+        throw error
+      }
+    }
+
     const settings = await prisma.settings.findUnique({
       where: { id: "default" }
     })

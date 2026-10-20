@@ -5,8 +5,8 @@ const cspHeader = `
   script-src 'self' 'unsafe-eval' 'unsafe-inline';
   style-src 'self' 'unsafe-inline';
   img-src 'self' blob: data:;
-  font-src 'self' data:;
-  connect-src 'self';
+  font-src 'self' data: https://cdn.jsdelivr.net;
+  connect-src 'self' https://cdn.jsdelivr.net;
   object-src 'none';
   base-uri 'self';
   form-action 'self';

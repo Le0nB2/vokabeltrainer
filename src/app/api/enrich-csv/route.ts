@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { enrichCards, QuotaExceededError } from "@/lib/services/ai-enrichment";
 import { requireAppAuth, UnauthorizedError } from "@/lib/auth-guard";
+import { consumeRateLimit, formatRetryDuration, getClientIpFromHeaders } from "@/lib/rate-limit";
 
 export const MAX_CARDS_PER_ENRICH_REQUEST = 50;
 export const MAX_TEXT_LENGTH_PER_CARD = 500;
@@ -36,6 +37,22 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ error: "Nicht autorisiert. Bitte melde dich an." }, { status: 401 });
       }
       throw error;
+    }
+
+    const clientIp = getClientIpFromHeaders(req.headers);
+    const limit = consumeRateLimit(`enrich-csv:${clientIp}`, {
+      maxAttempts: 10,
+      windowMs: 60 * 1000,
+      blockDurationMs: 60 * 1000,
+    });
+
+    if (limit.isBlocked) {
+      return NextResponse.json(
+        {
+          error: `Zu viele Anfragen zur KI-Anreicherung. Bitte warte ${formatRetryDuration(limit.retryAfterSeconds)}.`,
+        },
+        { status: 429 }
+      );
     }
 
     const body = await req.json();

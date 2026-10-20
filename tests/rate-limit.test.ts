@@ -131,24 +131,71 @@ describe('RateLimiter utility', () => {
   })
 
   describe('getClientIpFromHeaders', () => {
-    it('extracts IP from x-forwarded-for first entry', () => {
+    it('prioritizes cf-connecting-ip over x-forwarded-for and x-real-ip to prevent spoofing', () => {
+      const headers = new Headers({
+        'cf-connecting-ip': '192.0.2.1',
+        'x-real-ip': '198.51.100.1',
+        'x-forwarded-for': '203.0.113.195, 70.41.3.18',
+      })
+      expect(getClientIpFromHeaders(headers)).toBe('192.0.2.1')
+    })
+
+    it('prioritizes x-real-ip over x-forwarded-for when cf-connecting-ip is missing', () => {
+      const headers = new Headers({
+        'x-real-ip': '198.51.100.1',
+        'x-forwarded-for': '203.0.113.195, 70.41.3.18',
+      })
+      expect(getClientIpFromHeaders(headers)).toBe('198.51.100.1')
+    })
+
+    it('extracts IP from x-forwarded-for first entry when trusted headers are missing', () => {
       const headers = new Headers({ 'x-forwarded-for': '203.0.113.195, 70.41.3.18' })
       expect(getClientIpFromHeaders(headers)).toBe('203.0.113.195')
     })
 
-    it('falls back to x-real-ip if x-forwarded-for is missing', () => {
-      const headers = new Headers({ 'x-real-ip': '198.51.100.1' })
+    it('sanitizes IP address with port', () => {
+      const headers = new Headers({ 'x-real-ip': '198.51.100.1:443' })
       expect(getClientIpFromHeaders(headers)).toBe('198.51.100.1')
     })
 
-    it('falls back to cf-connecting-ip if others are missing', () => {
-      const headers = new Headers({ 'cf-connecting-ip': '192.0.2.1' })
-      expect(getClientIpFromHeaders(headers)).toBe('192.0.2.1')
-    })
-
-    it('falls back to 127.0.0.1 when no headers are provided', () => {
+    it('falls back to 127.0.0.1 when no headers are provided or input is invalid', () => {
       expect(getClientIpFromHeaders()).toBe('127.0.0.1')
       expect(getClientIpFromHeaders(new Headers())).toBe('127.0.0.1')
+      expect(getClientIpFromHeaders(new Headers({ 'x-real-ip': 'invalid$ip;drop' }))).toBe('127.0.0.1')
+    })
+  })
+
+  describe('Memory management & Pruning (AUDIT-04)', () => {
+    it('cleans up expired entries on check', () => {
+      vi.useFakeTimers()
+      const now = Date.now()
+      vi.setSystemTime(now)
+
+      const limiter = new RateLimiter({ maxAttempts: 3, windowMs: 5000, blockDurationMs: 5000 })
+      limiter.recordFailure('temp-ip')
+      expect(limiter.size()).toBe(1)
+
+      // Advance time beyond window
+      vi.setSystemTime(now + 6000)
+      const res = limiter.check('temp-ip')
+      expect(res.isBlocked).toBe(false)
+      // Entry should have been deleted from store
+      expect(limiter.size()).toBe(0)
+    })
+
+    it('prunes multiple expired keys', () => {
+      vi.useFakeTimers()
+      const now = Date.now()
+      vi.setSystemTime(now)
+
+      const limiter = new RateLimiter({ maxAttempts: 3, windowMs: 5000, blockDurationMs: 5000 })
+      limiter.recordFailure('ip-1')
+      limiter.recordFailure('ip-2')
+      expect(limiter.size()).toBe(2)
+
+      vi.setSystemTime(now + 6000)
+      limiter.prune()
+      expect(limiter.size()).toBe(0)
     })
   })
 })
