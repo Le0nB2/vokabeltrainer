@@ -11,7 +11,7 @@ Die Schwachstellen sind nach Schweregrad (**Kritisch / Hoch**, **Mittel**, **Nie
 | ID | Schwachstelle | Kategorie | Schweregrad | Betroffene Komponente |
 |---|---|---|---|---|
 | **SEC-01** | ~~Open Redirect via protokoll-relative URLs (`//evil.com`)~~ | Broken Access Control | ✅ **Erledigt** | `src/proxy.ts`, `LoginForm.tsx` |
-| **SEC-02** | Fehlende Authentifizierung in Server Actions (Bypass via `/login`) | Broken Access Control | 🔴 **Hoch** | `src/actions/cards.ts`, `decks.ts` |
+| **SEC-02** | ~~Fehlende Authentifizierung in Server Actions (Bypass via `/login`)~~ | Broken Access Control | ✅ **Erledigt** | `src/lib/auth-guard.ts`, `src/actions/` |
 | **SEC-03** | Fehlendes Rate-Limiting gegen Brute-Force auf Login | Identification & Auth | 🟡 **Mittel** | `src/actions/auth.ts` |
 | **SEC-04** | Statischer, nie ablaufender Session-Token für Einstellungen | Cryptographic / Session | 🟡 **Mittel** | `src/lib/auth-utils.ts`, `settings/layout.tsx` |
 | **SEC-05** | Unvalidierter JSON-Import & DoS-Risiko (bis zu 50 MB) | DoS / Validation | 🟡 **Mittel** | `src/actions/settings.ts` (`importData`) |
@@ -53,10 +53,16 @@ Die Schwachstellen sind nach Schweregrad (**Kritisch / Hoch**, **Mittel**, **Nie
 ---
 
 #### SEC-02: Fehlende Authentifizierung innerhalb von Server Actions (Defense-in-Depth)
-- **Datei**: [src/actions/cards.ts](file:///home/bbuch/vokabel-trainer-docker/vokabeltrainer/src/actions/cards.ts) & [src/actions/decks.ts](file:///home/bbuch/vokabel-trainer-docker/vokabeltrainer/src/actions/decks.ts)
+- **Status**: ✅ **Erledigt** (Branch `sicherheitsanpassungen`)
+- **Datei**: [src/lib/auth-guard.ts](file:///home/bbuch/vokabel-trainer-docker/vokabeltrainer/src/lib/auth-guard.ts), [src/actions/cards.ts](file:///home/bbuch/vokabel-trainer-docker/vokabeltrainer/src/actions/cards.ts), [src/actions/decks.ts](file:///home/bbuch/vokabel-trainer-docker/vokabeltrainer/src/actions/decks.ts), [src/actions/settings.ts](file:///home/bbuch/vokabel-trainer-docker/vokabeltrainer/src/actions/settings.ts), [src/actions/api-stats.ts](file:///home/bbuch/vokabel-trainer-docker/vokabeltrainer/src/actions/api-stats.ts)
+- **Umsetzung**:
+  - `requireAppAuth()` und `isAppAuthenticated()` in `src/lib/auth-guard.ts` implementiert.
+  - Server Actions für Decks, Karten, Einstellungen und API-Statistiken mit `await requireAppAuth()` geschützt.
+  - Wirft `UnauthorizedError` bei fehlender oder ungültiger Session (sofern Login-Zugangsdaten in der Umgebung konfiguriert sind; Test- und Lokalumgebungen ohne Passwörter funktionieren nahtlos weiter).
+  - Umfassend abgesichert mit 37 Unit-Tests in [tests/server-actions-auth.test.ts](file:///home/bbuch/vokabel-trainer-docker/vokabeltrainer/tests/server-actions-auth.test.ts).
 - **Problem**:
-  Funktionen wie `deleteDeck(id)`, `deleteCard(id)`, `addCard(...)` prüfen **nicht**, ob der aufrufende Benutzer eine gültige Session besitzt. Sie verlassen sich ausschließlich auf `src/proxy.ts`.
-  In Next.js werden Server Actions über POST-Anfragen mit dem Header `Next-Action` aufgerufen. Da `/login` in `proxy.ts` eine öffentliche Route ohne Authentifizierung ist, kann ein Angreifer eine POST-Anfrage an `/login` mit dem `Next-Action`-Header senden. Next.js führt die Action aus, ohne dass `proxy.ts` sie blockiert.
+  Funktionen wie `deleteDeck(id)`, `deleteCard(id)`, `addCard(...)` prüfen **nicht**, ob der aufrufende Benutzer eine gültige Session besitzt. Sie verließen sich ausschließlich auf `src/proxy.ts`.
+  In Next.js werden Server Actions über POST-Anfragen mit dem Header `Next-Action` aufgerufen. Da `/login` in `proxy.ts` eine öffentliche Route ohne Authentifizierung ist, konnte ein Angreifer eine POST-Anfrage an `/login` mit dem `Next-Action`-Header senden. Next.js führte die Action aus, ohne dass `proxy.ts` sie blockierte.
 - **Gefahr**:
   Nicht autorisiertes Löschen oder Verändern von Decks und Vokabeln ohne Login.
 - **Empfohlene Behebung**:
@@ -180,7 +186,7 @@ flowchart TD
 
     subgraph "Schritt 1: Sofort-Fixes (High Risk)"
         S1["SEC-01: Open Redirect absichern (✅ Erledigt)"]
-        S2["SEC-02: Server Actions Auth-Prüfung"]
+        S2["SEC-02: Server Actions Auth-Prüfung (✅ Erledigt)"]
     end
 
     subgraph "Schritt 2: Missbrauchsschutz (Medium Risk)"

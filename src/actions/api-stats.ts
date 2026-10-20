@@ -2,6 +2,7 @@
 
 import prisma from "@/lib/prisma"
 import { subDays, startOfDay, endOfDay, format } from "date-fns"
+import { requireAppAuth } from "@/lib/auth-guard"
 
 export type ApiStatsResult = {
   dateStr: string
@@ -11,6 +12,7 @@ export type ApiStatsResult = {
 }
 
 export async function getApiStats(): Promise<ApiStatsResult[]> {
+  await requireAppAuth()
   const today = new Date()
 
   // We want the last 3 days including today

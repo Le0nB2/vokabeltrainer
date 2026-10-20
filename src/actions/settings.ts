@@ -4,6 +4,7 @@ import prisma from "@/lib/prisma"
 import { revalidatePath } from "next/cache"
 import { cookies } from "next/headers"
 import { verifySessionCookie } from "@/lib/auth-utils"
+import { requireAppAuth, UnauthorizedError } from "@/lib/auth-guard"
 
 async function checkSettingsAuth(): Promise<boolean> {
   const envPassword = process.env.SETTINGS_PASSWORD
@@ -14,6 +15,7 @@ async function checkSettingsAuth(): Promise<boolean> {
 
 export async function importData(jsonData: string) {
   try {
+    await requireAppAuth()
     const isAuth = await checkSettingsAuth()
     if (!isAuth) {
       return { success: false, error: "Nicht autorisiert. Bitte melde dich mit dem Einstellungspasswort an." }
@@ -107,12 +109,16 @@ export async function importData(jsonData: string) {
     revalidatePath("/settings")
     return { success: true }
   } catch (error) {
+    if (error instanceof UnauthorizedError) {
+      return { success: false, error: "Nicht autorisiert. Bitte melde dich an." }
+    }
     console.error("Import failed:", error)
     return { success: false, error: "Beim Import ist ein Fehler aufgetreten. Bitte überprüfe die Datei." }
   }
 }
 
 export async function getSettings() {
+  await requireAppAuth()
   const settings = await prisma.settings.findUnique({
     where: { id: "default" }
   })
@@ -135,6 +141,7 @@ export async function updateSettings(data: {
   notificationsEnabled?: boolean;
   speechLanguage?: string;
 }) {
+  await requireAppAuth()
   const isAuth = await checkSettingsAuth()
   if (!isAuth) {
     throw new Error("Nicht autorisiert. Bitte melde dich mit dem Einstellungspasswort an.")
