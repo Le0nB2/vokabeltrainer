@@ -168,9 +168,19 @@ Die Schwachstellen sind nach Schweregrad (**Kritisch / Hoch**, **Mittel**, **Nie
 ### 🟢 3. Niedrige Priorität / Hardening
 
 #### SEC-08: Fehlende Security-Header in `next.config.ts`
+- **Status**: ✅ **Erledigt** (Branch `sicherheitsanpassungen`)
 - **Datei**: [next.config.ts](file:///home/bbuch/vokabel-trainer-docker/vokabeltrainer/next.config.ts)
+- **Umsetzung**:
+  - Konfiguration einer praxistauglichen `Content-Security-Policy` (`default-src 'self'`, `img-src 'self' blob: data:`, `font-src 'self' data:`, `object-src 'none'`, `frame-ancestors 'none'`, `base-uri 'self'`, `form-action 'self'`, `connect-src 'self'`) – ohne `upgrade-insecure-requests` zur Erhaltung voller lokaler HTTP-Kompatibilität.
+  - Aktivierung von `Strict-Transport-Security` (`max-age=63072000; includeSubDomains; preload`).
+  - Hinzufügen von `Permissions-Policy` (`camera=(self), microphone=(), geolocation=(), browsing-topics=()`).
+  - Hinzufügen von `X-DNS-Prefetch-Control: on`.
+  - Bestehende Header (`X-Content-Type-Options: nosniff`, `X-Frame-Options: DENY`, `Referrer-Policy: strict-origin-when-cross-origin`, `poweredByHeader: false`) beibehalten.
+  - Testsuite in `tests/security-headers.test.ts`.
 - **Problem**:
-  Es fehlen Header wie `Content-Security-Policy` (CSP), `Strict-Transport-Security` (HSTS) und `Permissions-Policy`.
+  Es fehlten Header wie `Content-Security-Policy` (CSP), `Strict-Transport-Security` (HSTS) und `Permissions-Policy`.
+- **Gefahr**:
+  Geringerer Schutz gegen XSS, SSL-Stripping und unberechtigte Browser-Funktionszugriffe.
 - **Empfohlene Behebung**:
   Ergänzung von HSTS (`max-age=63072000; includeSubDomains; preload`) und einer sauberen CSP.
 
