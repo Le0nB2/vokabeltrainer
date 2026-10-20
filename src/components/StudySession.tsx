@@ -21,7 +21,13 @@ export function StudySession({ deck, dueCards, settings }: { deck: { id: string,
   const [studyMode, setStudyMode] = useState<'smart' | 'classic'>('smart')
   const [typingInput, setTypingInput] = useState('')
   const [typingFeedback, setTypingFeedback] = useState<{ status: string, message: string, input?: string, rating: 'again' | 'hard' | 'good' | 'easy' } | null>(null)
-  const [backCardCache, setBackCardCache] = useState<any>(null)
+  const [backCardCache, setBackCardCache] = useState<{
+    card: any
+    isEnglishQuestion: boolean
+    askDirection: 'en-de' | 'de-en'
+    showGapText: boolean
+    typingFeedback?: { status: string, message: string, input?: string, rating: 'again' | 'hard' | 'good' | 'easy' } | null
+  } | null>(null)
   const isGlobal = deck.id === 'global';
 
 
@@ -82,6 +88,7 @@ export function StudySession({ deck, dueCards, settings }: { deck: { id: string,
 
 
     setIsFlipped(false)
+    setTypingInput('')
     if (currentIndex + 1 < cards.length) {
       setCurrentIndex(curr => curr + 1)
       // state will be updated by useEffect
@@ -101,12 +108,14 @@ export function StudySession({ deck, dueCards, settings }: { deck: { id: string,
       }
       setIsTransitioning(false);
       setBackCardCache(null);
-    }, 400) // Wait for flip animation to mostly finish
+      setTypingFeedback(null);
+      setTypingInput('');
+    }, 500) // Wait for flip animation to finish
   }
 
   // Keyboard navigation
   const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (sessionCompleted) return
+    if (sessionCompleted || isTransitioning) return
 
     if (e.key === ' ' || e.key === 'Enter') {
       // Allow input field to handle its own enter/space
@@ -118,12 +127,10 @@ export function StudySession({ deck, dueCards, settings }: { deck: { id: string,
       if (!isFlipped && !isTypingMode) {
         setBackCardCache({ card: currentCard, isEnglishQuestion, askDirection, showGapText });
         setIsFlipped(true);
-      } else if (isFlipped && typingFeedback) {
-        handleAnswer(typingFeedback.rating);
-        setTypingInput('');
-        setTypingFeedback(null);
+      } else if (isFlipped && activeTypingFeedback) {
+        handleAnswer(activeTypingFeedback.rating);
       }
-    } else if (isFlipped && !typingFeedback) {
+    } else if (isFlipped && !activeTypingFeedback) {
       if (e.key === '1') {
         handleAnswer('again')
       } else if (e.key === '2') {
@@ -255,6 +262,7 @@ export function StudySession({ deck, dueCards, settings }: { deck: { id: string,
   const backIsEnglishQuestion = backCardCache ? backCardCache.isEnglishQuestion : isEnglishQuestion;
   const backAskDirection = backCardCache ? backCardCache.askDirection : askDirection;
   const backShowGapText = backCardCache ? backCardCache.showGapText : showGapText;
+  const activeTypingFeedback = typingFeedback || backCardCache?.typingFeedback;
 
   const handleTypingSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -267,8 +275,15 @@ export function StudySession({ deck, dueCards, settings }: { deck: { id: string,
     else if (result.status === 'TYPO') rating = 'hard';
     else rating = 'again';
 
-    setBackCardCache({ card: currentCard, isEnglishQuestion, askDirection, showGapText });
-    setTypingFeedback({ ...result, rating, input: typingInput });
+    const feedback = { ...result, rating, input: typingInput };
+    setBackCardCache({
+      card: currentCard,
+      isEnglishQuestion,
+      askDirection,
+      showGapText,
+      typingFeedback: feedback,
+    });
+    setTypingFeedback(feedback);
     setIsFlipped(true);
   };
 
@@ -356,7 +371,7 @@ export function StudySession({ deck, dueCards, settings }: { deck: { id: string,
             <span className="text-3xl md:text-5xl font-bold text-zinc-900 dark:text-zinc-100 [overflow-wrap:anywhere] w-full">{questionText}</span>
             <span className="mt-4 text-sm text-blue-500 font-medium">{subtitleText}</span>
             {isTypingMode ? (
-              <form onSubmit={handleTypingSubmit} className="w-full mt-8 relative" onClick={e => e.stopPropagation()}>
+              <form key={currentCard?.id || currentIndex} onSubmit={handleTypingSubmit} className="w-full mt-8 relative" onClick={e => e.stopPropagation()}>
                 <input
                   type="text"
                   value={typingInput}
@@ -406,16 +421,16 @@ export function StudySession({ deck, dueCards, settings }: { deck: { id: string,
               </div>
             )}
 
-            {typingFeedback && (
+            {activeTypingFeedback && (
               <div className={`mt-6 p-4 rounded-xl w-full font-medium ${
-                typingFeedback.status === 'CORRECT' ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400' :
-                typingFeedback.status === 'TYPO' ? 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400' :
+                activeTypingFeedback.status === 'CORRECT' ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400' :
+                activeTypingFeedback.status === 'TYPO' ? 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400' :
                 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400'
               }`}>
-                <div>{typingFeedback.message}</div>
-                {typingFeedback.status !== 'CORRECT' && typingFeedback.input && (
+                <div>{activeTypingFeedback.message}</div>
+                {activeTypingFeedback.status !== 'CORRECT' && activeTypingFeedback.input && (
                   <div className="mt-2 text-sm opacity-80 font-normal">
-                    Deine Eingabe: &quot;{typingFeedback.input}&quot;
+                    Deine Eingabe: &quot;{activeTypingFeedback.input}&quot;
                   </div>
                 )}
               </div>
@@ -433,15 +448,15 @@ export function StudySession({ deck, dueCards, settings }: { deck: { id: string,
 
       {/* Action buttons */}
       <div className={`mt-12 flex gap-2 transition-all duration-300 ${isFlipped ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4 pointer-events-none'}`}>
-        {typingFeedback ? (
+        {activeTypingFeedback ? (
           <button
             onClick={(e) => {
               e.stopPropagation();
-              handleAnswer(typingFeedback.rating);
+              handleAnswer(activeTypingFeedback.rating);
               setTypingInput('');
-              setTypingFeedback(null);
             }}
-            className="w-full max-w-sm mx-auto py-4 bg-blue-600 text-white rounded-2xl font-bold text-lg hover:bg-blue-700 active:scale-95 transition-all shadow-lg flex items-center justify-center gap-2"
+            disabled={isTransitioning}
+            className="w-full max-w-sm mx-auto py-4 bg-blue-600 text-white rounded-2xl font-bold text-lg hover:bg-blue-700 active:scale-95 transition-all shadow-lg flex items-center justify-center gap-2 disabled:opacity-50"
           >
             Weiter <ArrowLeft className="w-5 h-5 rotate-180" />
           </button>
@@ -449,7 +464,8 @@ export function StudySession({ deck, dueCards, settings }: { deck: { id: string,
           <>
             <button
               onClick={(e) => { e.stopPropagation(); handleAnswer('again'); }}
-              className="flex flex-col items-center gap-2"
+              disabled={isTransitioning}
+              className="flex flex-col items-center gap-2 disabled:opacity-50"
             >
           <div className="w-16 h-16 rounded-full bg-red-100 text-red-600 dark:bg-red-900/30 dark:text-red-500 flex items-center justify-center hover:scale-105 active:scale-95 transition-transform shadow-sm">
             <X className="w-8 h-8" />
@@ -459,7 +475,8 @@ export function StudySession({ deck, dueCards, settings }: { deck: { id: string,
 
         <button
           onClick={(e) => { e.stopPropagation(); handleAnswer('hard'); }}
-          className="flex flex-col items-center gap-2"
+          disabled={isTransitioning}
+          className="flex flex-col items-center gap-2 disabled:opacity-50"
         >
           <div className="w-16 h-16 rounded-full bg-orange-100 text-orange-600 dark:bg-orange-900/30 dark:text-orange-500 flex items-center justify-center hover:scale-105 active:scale-95 transition-transform shadow-sm">
             <Brain className="w-8 h-8" />
@@ -469,7 +486,8 @@ export function StudySession({ deck, dueCards, settings }: { deck: { id: string,
 
         <button
           onClick={(e) => { e.stopPropagation(); handleAnswer('good'); }}
-          className="flex flex-col items-center gap-2"
+          disabled={isTransitioning}
+          className="flex flex-col items-center gap-2 disabled:opacity-50"
         >
           <div className="w-16 h-16 rounded-full bg-green-100 text-green-600 dark:bg-green-900/30 dark:text-green-500 flex items-center justify-center hover:scale-105 active:scale-95 transition-transform shadow-sm">
             <Check className="w-8 h-8" />
@@ -479,7 +497,8 @@ export function StudySession({ deck, dueCards, settings }: { deck: { id: string,
 
         <button
           onClick={(e) => { e.stopPropagation(); handleAnswer('easy'); }}
-          className="flex flex-col items-center gap-2"
+          disabled={isTransitioning}
+          className="flex flex-col items-center gap-2 disabled:opacity-50"
         >
           <div className="w-16 h-16 rounded-full bg-blue-100 text-blue-600 dark:bg-blue-900/30 dark:text-blue-500 flex items-center justify-center hover:scale-105 active:scale-95 transition-transform shadow-sm">
             <Zap className="w-8 h-8" />
