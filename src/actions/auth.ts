@@ -8,10 +8,35 @@ import {
   getSessionCookieValue,
   secureCompare,
 } from "@/lib/auth-utils"
+import {
+  checkRateLimit,
+  recordRateLimitFailure,
+  resetRateLimit,
+  formatRetryDuration,
+} from "@/lib/rate-limit"
 
 import { cookies, headers } from "next/headers"
 import { revalidatePath } from "next/cache"
 import { createHash, timingSafeEqual } from "crypto"
+
+async function getClientIp(): Promise<string> {
+  try {
+    const headersList = await headers()
+    const forwardedFor = headersList.get("x-forwarded-for")
+    if (forwardedFor) {
+      const first = forwardedFor.split(",")[0].trim()
+      if (first) return first
+    }
+    const realIp = headersList.get("x-real-ip")?.trim()
+    if (realIp) return realIp
+
+    const cfConnectingIp = headersList.get("cf-connecting-ip")?.trim()
+    if (cfConnectingIp) return cfConnectingIp
+  } catch {
+    // headers() might not be available in certain contexts
+  }
+  return "127.0.0.1"
+}
 
 export async function checkPassword(password: string) {
   const envPassword = process.env.SETTINGS_PASSWORD
@@ -20,11 +45,22 @@ export async function checkPassword(password: string) {
     return { success: true }
   }
 
+  const clientIp = await getClientIp()
+  const rateLimitKey = `settings:${clientIp}`
+  const rateLimit = checkRateLimit(rateLimitKey)
+  if (rateLimit.isBlocked) {
+    return {
+      success: false,
+      error: `Zu viele Fehlversuche. Bitte versuche es in ${formatRetryDuration(rateLimit.retryAfterSeconds)} erneut.`,
+    }
+  }
+
   const hashInput = createHash("sha256").update(password).digest()
   const hashEnv = createHash("sha256").update(envPassword).digest()
   const isMatch = timingSafeEqual(hashInput, hashEnv)
 
   if (isMatch) {
+    resetRateLimit(rateLimitKey)
     const headersList = await headers()
     const isHttps = headersList.get("x-forwarded-proto") === "https"
     const cookieStore = await cookies()
@@ -39,6 +75,8 @@ export async function checkPassword(password: string) {
     return { success: true }
   }
 
+  recordRateLimitFailure(rateLimitKey)
+
   // Add slight delay to mitigate high-speed brute-force attacks
   await new Promise((resolve) => setTimeout(resolve, 500))
   return { success: false, error: "Falsches Passwort" }
@@ -51,6 +89,16 @@ export async function loginApp(credentials: { username?: string; password?: stri
     return { success: true }
   }
 
+  const clientIp = await getClientIp()
+  const rateLimitKey = `login:${clientIp}`
+  const rateLimit = checkRateLimit(rateLimitKey)
+  if (rateLimit.isBlocked) {
+    return {
+      success: false,
+      error: `Zu viele Fehlversuche. Bitte versuche es in ${formatRetryDuration(rateLimit.retryAfterSeconds)} erneut.`,
+    }
+  }
+
   const username = (credentials.username || "").trim()
   const password = credentials.password || ""
 
@@ -58,6 +106,7 @@ export async function loginApp(credentials: { username?: string; password?: stri
   const isPasswordValid = envPassword ? secureCompare(password, envPassword) : false
 
   if (isUserValid && isPasswordValid) {
+    resetRateLimit(rateLimitKey)
     const headersList = await headers()
     const isHttps = headersList.get("x-forwarded-proto") === "https"
     const cookieStore = await cookies()
@@ -74,6 +123,8 @@ export async function loginApp(credentials: { username?: string; password?: stri
 
     return { success: true }
   }
+
+  recordRateLimitFailure(rateLimitKey)
 
   // Delay to mitigate brute force
   await new Promise((resolve) => setTimeout(resolve, 500))

@@ -12,7 +12,7 @@ Die Schwachstellen sind nach Schweregrad (**Kritisch / Hoch**, **Mittel**, **Nie
 |---|---|---|---|---|
 | **SEC-01** | ~~Open Redirect via protokoll-relative URLs (`//evil.com`)~~ | Broken Access Control | ✅ **Erledigt** | `src/proxy.ts`, `LoginForm.tsx` |
 | **SEC-02** | ~~Fehlende Authentifizierung in Server Actions (Bypass via `/login`)~~ | Broken Access Control | ✅ **Erledigt** | `src/lib/auth-guard.ts`, `src/actions/` |
-| **SEC-03** | Fehlendes Rate-Limiting gegen Brute-Force auf Login | Identification & Auth | 🟡 **Mittel** | `src/actions/auth.ts` |
+| **SEC-03** | ~~Fehlendes Rate-Limiting gegen Brute-Force auf Login~~ | Identification & Auth | ✅ **Erledigt** | `src/lib/rate-limit.ts`, `src/actions/auth.ts` |
 | **SEC-04** | Statischer, nie ablaufender Session-Token für Einstellungen | Cryptographic / Session | 🟡 **Mittel** | `src/lib/auth-utils.ts`, `settings/layout.tsx` |
 | **SEC-05** | Unvalidierter JSON-Import & DoS-Risiko (bis zu 50 MB) | DoS / Validation | 🟡 **Mittel** | `src/actions/settings.ts` (`importData`) |
 | **SEC-06** | Unbeschränkte Payload-Größen & DoS bei KI-Endpunkten | Resource Exhaustion | 🟡 **Mittel** | `/api/enrich-csv`, `/api/worksheet` |
@@ -74,9 +74,15 @@ Die Schwachstellen sind nach Schweregrad (**Kritisch / Hoch**, **Mittel**, **Nie
 ### 🟡 2. Mittlere Priorität
 
 #### SEC-03: Fehlendes Rate-Limiting gegen Brute-Force auf den Login
-- **Datei**: [src/actions/auth.ts](file:///home/bbuch/vokabel-trainer-docker/vokabeltrainer/src/actions/auth.ts#L42-L44)
+- **Status**: ✅ **Erledigt** (Branch `sicherheitsanpassungen`)
+- **Datei**: [src/lib/rate-limit.ts](file:///home/bbuch/vokabel-trainer-docker/vokabeltrainer/src/lib/rate-limit.ts), [src/actions/auth.ts](file:///home/bbuch/vokabel-trainer-docker/vokabeltrainer/src/actions/auth.ts)
+- **Umsetzung**:
+  - `RateLimiter`-Klasse und Store in `src/lib/rate-limit.ts` implementiert (gleitendes Zeitfenster, Standard: 5 Fehlversuche pro IP in 15 Minuten).
+  - In `src/actions/auth.ts` für `loginApp` und `checkPassword` integriert (inklusive automatischer IP-Erkennung über `x-forwarded-for`, `x-real-ip` und `cf-connecting-ip`).
+  - Erfolgreiche Anmeldungen setzen den Fehlversuch-Zähler für die jeweilige IP sofort zurück.
+  - Ausführlich getestet mit 11 Unit-Tests in `tests/rate-limit.test.ts` und 3 Integrationstests in `tests/auth-actions.test.ts`.
 - **Problem**:
-  Bei falschem Passwort gibt es nur ein kurzes `setTimeout(..., 500)`. Dies bremst sequentielle Anfragen, schützt aber nicht vor parallelisierten Angriffen (z. B. 50 gleichzeitige HTTP-Requests). Es existiert keine Sperre nach $X$ Fehlversuchen und kein IP-basiertes Rate-Limiting.
+  Bei falschem Passwort gab es nur ein kurzes `setTimeout(..., 500)`. Dies bremste sequentielle Anfragen, schützte aber nicht vor parallelisierten Angriffen (z. B. 50 gleichzeitige HTTP-Requests). Es existierte keine Sperre nach $X$ Fehlversuchen und kein IP-basiertes Rate-Limiting.
 - **Gefahr**:
   Automatisierte Passwort-Raten / Wörterbuch-Angriffe auf öffentlich erreichbare Instanzen.
 - **Empfohlene Behebung**:
@@ -190,7 +196,7 @@ flowchart TD
     end
 
     subgraph "Schritt 2: Missbrauchsschutz (Medium Risk)"
-        S3["SEC-03: Rate Limiting Login"]
+        S3["SEC-03: Rate Limiting Login (✅ Erledigt)"]
         S4["SEC-04: Expirations für Settings-Cookie"]
         S5["SEC-05: Backup Import/Export absichern & Zod"]
         S6["SEC-06: KI-Endpunkte Payload-Limits"]

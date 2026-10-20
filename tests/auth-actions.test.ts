@@ -1,8 +1,10 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
-import { loginApp, logoutApp, isAppAuthRequired } from '../src/actions/auth'
+import { loginApp, logoutApp, isAppAuthRequired, checkPassword } from '../src/actions/auth'
 import { AUTH_COOKIE_NAME, verifyAppSessionToken, getAppSecret } from '../src/lib/auth-utils'
+import { resetAllRateLimits } from '../src/lib/rate-limit'
 
 const mockCookies = new Map<string, any>()
+const mockHeaders = new Map<string, string>()
 
 vi.mock('next/headers', () => {
   return {
@@ -16,7 +18,13 @@ vi.mock('next/headers', () => {
       },
     }),
     headers: async () => ({
-      get: (name: string) => (name.toLowerCase() === 'x-forwarded-proto' ? 'https' : null),
+      get: (name: string) => {
+        const lower = name.toLowerCase()
+        if (mockHeaders.has(lower)) {
+          return mockHeaders.get(lower)
+        }
+        return lower === 'x-forwarded-proto' ? 'https' : null
+      },
     }),
   }
 })
@@ -32,12 +40,15 @@ describe('auth server actions', () => {
 
   beforeEach(() => {
     vi.resetModules()
+    resetAllRateLimits()
     process.env = { ...originalEnv }
     process.env.AUTH_USER = 'admin'
     process.env.AUTH_PASSWORD = 'password123'
+    process.env.SETTINGS_PASSWORD = 'secretsettings'
     delete process.env.BASIC_AUTH_USER
     delete process.env.BASIC_AUTH_PASSWORD
     mockCookies.clear()
+    mockHeaders.clear()
     vi.clearAllMocks()
   })
 
@@ -92,6 +103,87 @@ describe('auth server actions', () => {
 
       const result = await loginApp({ username: 'any', password: 'any' })
       expect(result.success).toBe(true)
+    })
+
+    describe('rate limiting (SEC-03)', () => {
+      it('blocks IP after 5 failed login attempts', async () => {
+        mockHeaders.set('x-forwarded-for', '192.168.1.100')
+
+        // 5 failed attempts
+        for (let i = 0; i < 5; i++) {
+          const res = await loginApp({ username: 'admin', password: 'wrong' })
+          expect(res.success).toBe(false)
+          expect(res.error).toBe('Ungültiger Benutzername oder falsches Passwort')
+        }
+
+        // 6th attempt should be blocked immediately by rate limit
+        const blockedRes = await loginApp({ username: 'admin', password: 'password123' })
+        expect(blockedRes.success).toBe(false)
+        expect(blockedRes.error).toContain('Zu viele Fehlversuche')
+      })
+
+      it('isolates rate limiting between different client IPs', async () => {
+        mockHeaders.set('x-forwarded-for', '10.0.0.1')
+        for (let i = 0; i < 5; i++) {
+          await loginApp({ username: 'admin', password: 'wrong' })
+        }
+        // 10.0.0.1 is blocked
+        const blocked = await loginApp({ username: 'admin', password: 'password123' })
+        expect(blocked.success).toBe(false)
+        expect(blocked.error).toContain('Zu viele Fehlversuche')
+
+        // 10.0.0.2 is unaffected and can login
+        mockHeaders.set('x-forwarded-for', '10.0.0.2')
+        const allowed = await loginApp({ username: 'admin', password: 'password123' })
+        expect(allowed.success).toBe(true)
+      })
+
+      it('resets rate limit on successful login', async () => {
+        mockHeaders.set('x-forwarded-for', '192.168.1.200')
+
+        // 3 failed attempts
+        for (let i = 0; i < 3; i++) {
+          await loginApp({ username: 'admin', password: 'wrong' })
+        }
+
+        // Successful login
+        const loginRes = await loginApp({ username: 'admin', password: 'password123' })
+        expect(loginRes.success).toBe(true)
+
+        // User can fail again up to 5 times without being blocked immediately
+        for (let i = 0; i < 4; i++) {
+          const res = await loginApp({ username: 'admin', password: 'wrong' })
+          expect(res.error).toBe('Ungültiger Benutzername oder falsches Passwort')
+        }
+      })
+    })
+  })
+
+  describe('checkPassword', () => {
+    it('accepts correct password and sets settings_auth cookie', async () => {
+      const res = await checkPassword('secretsettings')
+      expect(res.success).toBe(true)
+      expect(mockCookies.get('settings_auth')).toBeDefined()
+    })
+
+    it('rejects wrong password', async () => {
+      const res = await checkPassword('wrongsettings')
+      expect(res.success).toBe(false)
+      expect(res.error).toBe('Falsches Passwort')
+    })
+
+    it('blocks after 5 failed password attempts', async () => {
+      mockHeaders.set('x-forwarded-for', '192.168.1.50')
+      for (let i = 0; i < 5; i++) {
+        const res = await checkPassword('wrong')
+        expect(res.success).toBe(false)
+        expect(res.error).toBe('Falsches Passwort')
+      }
+
+      // 6th attempt should be blocked
+      const blockedRes = await checkPassword('secretsettings')
+      expect(blockedRes.success).toBe(false)
+      expect(blockedRes.error).toContain('Zu viele Fehlversuche')
     })
   })
 
