@@ -223,10 +223,13 @@ Die Schwachstellen sind nach Schweregrad (**Kritisch / Hoch**, **Mittel**, **Nie
 ---
 
 #### SEC-11: Veraltete Abhängigkeiten mit DoS-Risiko (`npm audit`)
+- **Status**: ✅ **Erledigt** (Branch `sicherheitsanpassungen`)
 - **Details**:
-  `braces` (Stack-Exhaustion DoS) und `deepmerge-ts` (über Prisma).
-- **Empfohlene Behebung**:
-  Paketaktualisierungen prüfen, soweit mit Next.js 16 kompatibel.
+  - `deepmerge-ts`: In `package.json` wurde ein gezieltes `overrides: { "deepmerge-ts": "^8.0.2" }` konfiguriert. Damit wurde die transitive Abhängigkeit von `@prisma/config` auf die sichere Version 8.0.2 gehoben (behebt GHSA-ggr8-5vv4-36mx / CVE-2026-40345), ohne Breaking Changes durch ein unfertiges Prisma-7-Upgrade zu erzwingen.
+  - `braces`: GHSA-vfj7-8cjw-p6xm betrifft Versionen $\le$ 3.0.3. Installiert ist Version 3.0.3. Upstream existiert noch kein neueres Release auf npm. Die Abhängigkeit stammt ausschließlich transitiv aus `devDependencies` (`eslint-config-next` $\rightarrow$ `fast-glob` $\rightarrow$ `micromatch` $\rightarrow$ `braces`) und wird nur lokal beim Linten (`npm run lint`) genutzt; sie gelangt zu keinem Zeitpunkt in den Produktions-Build oder Docker-Container.
+- **Verifikation**:
+  - `npm audit` zeigt `deepmerge-ts` und `@prisma/config` als vollständig behoben an.
+  - Alle 187 Vitest-Tests und `./test-docker.sh` erfolgreich bestanden.
 
 ---
 
