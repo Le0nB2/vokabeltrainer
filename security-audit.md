@@ -234,11 +234,11 @@ Die Schwachstellen sind nach Schweregrad (**Kritisch / Hoch**, **Mittel**, **Nie
 ---
 
 #### SEC-12: Entwicklungsartefakt im Quellcode (`cards.ts.orig`)
-- **Datei**: [src/actions/cards.ts.orig](file:///home/bbuch/vokabel-trainer-docker/vokabeltrainer/src/actions/cards.ts.orig)
-- **Problem**:
-  Verbliebene Datei aus einem früheren Git-Merge.
-- **Empfohlene Behebung**:
-  Datei löschen und `*.orig` in die `.gitignore` aufnehmen.
+- **Status**: ✅ **Erledigt** (Branch `sicherheitsanpassungen`)
+- **Datei**: `src/actions/cards.ts.orig`
+- **Umsetzung**:
+  - Verwaiste Sicherungsdatei `src/actions/cards.ts.orig` gelöscht.
+  - Muster `*.orig` in `.gitignore` eingetragen, um unbeabsichtigtes Tracken von Merge-Artefakten in Zukunft dauerhaft zu verhindern.
 
 ---
 
@@ -246,26 +246,29 @@ Die Schwachstellen sind nach Schweregrad (**Kritisch / Hoch**, **Mittel**, **Nie
 
 ```mermaid
 flowchart TD
-    A["Schritt 1: Sofort-Fixes (High Risk)"] --> B["Schritt 2: Missbrauchsschutz (Medium Risk)"]
-    B --> C["Schritt 3: Hardening & Aufräumen (Low Risk)"]
+    A["Schritt 1: Sofort-Fixes (High Risk) ✅"] --> B["Schritt 2: Missbrauchsschutz (Medium Risk) ✅"]
+    B --> C["Schritt 3: Hardening & Aufräumen (Low Risk) ✅"]
 
-    subgraph "Schritt 1: Sofort-Fixes (High Risk)"
+    subgraph "Schritt 1: Sofort-Fixes (High Risk) ✅"
         S1["SEC-01: Open Redirect absichern (✅ Erledigt)"]
         S2["SEC-02: Server Actions Auth-Prüfung (✅ Erledigt)"]
     end
 
-    subgraph "Schritt 2: Missbrauchsschutz (Medium Risk)"
+    subgraph "Schritt 2: Missbrauchsschutz (Medium Risk) ✅"
         S3["SEC-03: Rate Limiting Login (✅ Erledigt)"]
         S4["SEC-04: Expirations für Settings-Cookie (✅ Erledigt)"]
         S5["SEC-05: Backup Import absichern & Zod (✅ Erledigt)"]
         S6["SEC-06: KI-Endpunkte Payload-Limits (✅ Erledigt)"]
+        S7["SEC-07: Backup-Export absichern (✅ Erledigt)"]
     end
 
-    subgraph "Schritt 3: Hardening & Aufräumen (Low Risk)"
-        S7["SEC-08: Security Headers (HSTS, CSP)"]
-        S8["SEC-09: Dynamischer Fallback Secret"]
-        S9["SEC-12: cards.ts.orig löschen & .gitignore"]
+    subgraph "Schritt 3: Hardening & Aufräumen (Low Risk) ✅"
+        S8["SEC-08: Security Headers CSP/HSTS (✅ Erledigt)"]
+        S9["SEC-09: Dynamischer Fallback Secret (✅ Erledigt)"]
+        S10["SEC-10: Robuste Secure-Cookie-Logik (✅ Erledigt)"]
+        S11["SEC-11: npm audit Abhängigkeiten DoS (✅ Erledigt)"]
+        S12["SEC-12: cards.ts.orig löschen & .gitignore (✅ Erledigt)"]
     end
 ```
 
-Du kannst nun entscheiden, welche Punkte umgesetzt werden sollen.
+**Status**: Alle Punkte (SEC-01 bis SEC-12) des Sicherheitsaudits wurden erfolgreich umgesetzt, getestet und auf Branch `sicherheitsanpassungen` zusammengeführt.
