@@ -1,5 +1,5 @@
 import { cookies } from "next/headers"
-import { verifySessionCookie } from "@/lib/auth-utils"
+import { verifySettingsSessionToken, SETTINGS_COOKIE_NAME } from "@/lib/auth-utils"
 import { PasswordPrompt } from "@/components/PasswordPrompt"
 
 export default async function SettingsLayout({
@@ -9,8 +9,8 @@ export default async function SettingsLayout({
 }) {
   const envPassword = process.env.SETTINGS_PASSWORD
   const cookieStore = await cookies()
-  const isAuthenticated = verifySessionCookie(
-    cookieStore.get("settings_auth")?.value,
+  const isAuthenticated = verifySettingsSessionToken(
+    cookieStore.get(SETTINGS_COOKIE_NAME)?.value,
     envPassword
   )
 

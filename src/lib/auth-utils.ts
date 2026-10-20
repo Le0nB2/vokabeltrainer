@@ -5,6 +5,9 @@ export { getSafeRedirectUrl } from "./utils/url"
 export const AUTH_COOKIE_NAME = "auth_session"
 export const AUTH_COOKIE_MAX_AGE = 30 * 24 * 60 * 60 // 30 days in seconds
 
+export const SETTINGS_COOKIE_NAME = "settings_auth"
+export const SETTINGS_COOKIE_MAX_AGE = 24 * 60 * 60 // 1 day in seconds
+
 /**
  * Constant-time string comparison resistant to timing attacks
  */
@@ -91,25 +94,61 @@ export function verifyAppSessionToken(
   }
 }
 
-// Backward compatibility helpers for /settings password layout
-export function getSessionCookieValue(password: string | undefined): string {
+/**
+ * Create a signed, time-limited session token for /settings access:
+ * <base64url(payload)>.<hmacSha256(payload, secret)>
+ */
+export function createSettingsSessionToken(
+  password: string | undefined,
+  maxAgeSeconds = SETTINGS_COOKIE_MAX_AGE
+): string {
   if (!password) return "unauthenticated"
-  return createHmac("sha256", password)
-    .update("settings_session")
-    .digest("hex")
+  const secret = getAppSecret(password)
+  const payload = JSON.stringify({
+    scope: "settings",
+    exp: Math.floor(Date.now() / 1000) + maxAgeSeconds,
+  })
+  const data = Buffer.from(payload).toString("base64url")
+  const sig = createHmac("sha256", secret).update(`settings:${data}`).digest("hex")
+  return `${data}.${sig}`
 }
 
-export function verifySessionCookie(cookieValue: string | undefined, password: string | undefined): boolean {
+/**
+ * Verify a signed session token for /settings.
+ * Returns true if password is not configured (bypass), or if token is valid, has scope "settings", and is not expired.
+ */
+export function verifySettingsSessionToken(
+  token: string | undefined | null,
+  password: string | undefined
+): boolean {
   if (!password) return true // If no password is set, authentication is bypassed
-  if (!cookieValue) return false
+  if (!token || typeof token !== "string") return false
 
-  const expectedValue = getSessionCookieValue(password)
+  const parts = token.split(".")
+  if (parts.length !== 2) return false
 
-  if (cookieValue.length !== expectedValue.length) return false
+  const [data, sig] = parts
+  if (!data || !sig) return false
 
-  return timingSafeEqual(
-    Buffer.from(cookieValue),
-    Buffer.from(expectedValue)
-  )
+  const secret = getAppSecret(password)
+  const expectedSig = createHmac("sha256", secret).update(`settings:${data}`).digest("hex")
+  if (sig.length !== expectedSig.length) return false
+  if (!timingSafeEqual(Buffer.from(sig), Buffer.from(expectedSig))) return false
+
+  try {
+    const payload = JSON.parse(Buffer.from(data, "base64url").toString("utf-8"))
+    if (typeof payload !== "object" || payload === null) return false
+    if (payload.scope !== "settings") return false
+    if (typeof payload.exp !== "number" || payload.exp < Math.floor(Date.now() / 1000)) {
+      return false
+    }
+    return true
+  } catch {
+    return false
+  }
 }
+
+// Backward compatibility helpers for /settings password layout
+export const getSessionCookieValue = createSettingsSessionToken
+export const verifySessionCookie = verifySettingsSessionToken
 

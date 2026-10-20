@@ -5,8 +5,12 @@ import {
   getAppSecret,
   createAppSessionToken,
   verifyAppSessionToken,
+  createSettingsSessionToken,
+  verifySettingsSessionToken,
   getSessionCookieValue,
   verifySessionCookie,
+  SETTINGS_COOKIE_NAME,
+  SETTINGS_COOKIE_MAX_AGE,
 } from '../src/lib/auth-utils'
 
 describe('auth-utils', () => {
@@ -124,18 +128,65 @@ describe('auth-utils', () => {
     })
   })
 
-  describe('settings backward compatibility', () => {
-    it('verifies settings session cookie correctly', () => {
-      const password = 'settings-admin-pass'
+  describe('SEC-04: Settings Session Token with Expiration', () => {
+    const password = 'settings-admin-pass'
+
+    it('exports correct cookie name and max age', () => {
+      expect(SETTINGS_COOKIE_NAME).toBe('settings_auth')
+      expect(SETTINGS_COOKIE_MAX_AGE).toBe(24 * 60 * 60)
+    })
+
+    it('creates and verifies a valid settings session token', () => {
+      const token = createSettingsSessionToken(password, 3600)
+      expect(typeof token).toBe('string')
+      expect(token).toContain('.')
+
+      const isValid = verifySettingsSessionToken(token, password)
+      expect(isValid).toBe(true)
+    })
+
+    it('rejects expired settings session token', () => {
+      const token = createSettingsSessionToken(password, -100)
+      const isValid = verifySettingsSessionToken(token, password)
+      expect(isValid).toBe(false)
+    })
+
+    it('rejects settings token with wrong password', () => {
+      const token = createSettingsSessionToken(password, 3600)
+      expect(verifySettingsSessionToken(token, 'wrong-password')).toBe(false)
+    })
+
+    it('rejects tampered settings payload', () => {
+      const token = createSettingsSessionToken(password, 3600)
+      const [payload, sig] = token.split('.')
+      const tampered = Buffer.from(
+        JSON.stringify({ scope: 'admin', exp: Math.floor(Date.now() / 1000) + 3600 })
+      ).toString('base64url')
+
+      expect(verifySettingsSessionToken(`${tampered}.${sig}`, password)).toBe(false)
+    })
+
+    it('rejects invalid or malformed settings tokens', () => {
+      expect(verifySettingsSessionToken(null, password)).toBe(false)
+      expect(verifySettingsSessionToken(undefined, password)).toBe(false)
+      expect(verifySettingsSessionToken('', password)).toBe(false)
+      expect(verifySettingsSessionToken('no-dot-here', password)).toBe(false)
+      expect(verifySettingsSessionToken('too.many.dots.here', password)).toBe(false)
+      expect(verifySettingsSessionToken('invalidbase64.invalidsig', password)).toBe(false)
+    })
+
+    it('bypasses settings auth if password is not configured', () => {
+      expect(verifySettingsSessionToken(undefined, undefined)).toBe(true)
+      expect(verifySettingsSessionToken('', undefined)).toBe(true)
+      expect(verifySettingsSessionToken('any-token', undefined)).toBe(true)
+    })
+
+    it('supports backward compatibility aliases getSessionCookieValue & verifySessionCookie', () => {
       const cookieValue = getSessionCookieValue(password)
       expect(verifySessionCookie(cookieValue, password)).toBe(true)
       expect(verifySessionCookie('wrong-cookie', password)).toBe(false)
       expect(verifySessionCookie(cookieValue, 'wrong-pass')).toBe(false)
-    })
-
-    it('bypasses settings auth if password is not configured', () => {
       expect(verifySessionCookie(undefined, undefined)).toBe(true)
-      expect(verifySessionCookie('', undefined)).toBe(true)
     })
   })
 })

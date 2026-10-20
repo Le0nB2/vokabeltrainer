@@ -1,6 +1,12 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import { loginApp, logoutApp, isAppAuthRequired, checkPassword } from '../src/actions/auth'
-import { AUTH_COOKIE_NAME, verifyAppSessionToken, getAppSecret } from '../src/lib/auth-utils'
+import {
+  AUTH_COOKIE_NAME,
+  SETTINGS_COOKIE_NAME,
+  verifyAppSessionToken,
+  verifySettingsSessionToken,
+  getAppSecret,
+} from '../src/lib/auth-utils'
 import { resetAllRateLimits } from '../src/lib/rate-limit'
 
 const mockCookies = new Map<string, any>()
@@ -163,7 +169,9 @@ describe('auth server actions', () => {
     it('accepts correct password and sets settings_auth cookie', async () => {
       const res = await checkPassword('secretsettings')
       expect(res.success).toBe(true)
-      expect(mockCookies.get('settings_auth')).toBeDefined()
+      const cookie = mockCookies.get(SETTINGS_COOKIE_NAME)
+      expect(cookie).toBeDefined()
+      expect(verifySettingsSessionToken(cookie.value, 'secretsettings')).toBe(true)
     })
 
     it('rejects wrong password', async () => {
@@ -188,14 +196,19 @@ describe('auth server actions', () => {
   })
 
   describe('logoutApp', () => {
-    it('clears session cookie', async () => {
+    it('clears auth and settings session cookies', async () => {
       mockCookies.set(AUTH_COOKIE_NAME, { value: 'existing-token' })
+      mockCookies.set(SETTINGS_COOKIE_NAME, { value: 'existing-settings-token' })
       const result = await logoutApp()
       expect(result.success).toBe(true)
 
-      const cookie = mockCookies.get(AUTH_COOKIE_NAME)
-      expect(cookie.value).toBe('')
-      expect(cookie.maxAge).toBe(0)
+      const authCookie = mockCookies.get(AUTH_COOKIE_NAME)
+      expect(authCookie.value).toBe('')
+      expect(authCookie.maxAge).toBe(0)
+
+      const settingsCookie = mockCookies.get(SETTINGS_COOKIE_NAME)
+      expect(settingsCookie.value).toBe('')
+      expect(settingsCookie.maxAge).toBe(0)
     })
   })
 })

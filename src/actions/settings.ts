@@ -3,14 +3,14 @@
 import prisma from "@/lib/prisma"
 import { revalidatePath } from "next/cache"
 import { cookies } from "next/headers"
-import { verifySessionCookie } from "@/lib/auth-utils"
+import { verifySettingsSessionToken, SETTINGS_COOKIE_NAME } from "@/lib/auth-utils"
 import { requireAppAuth, UnauthorizedError } from "@/lib/auth-guard"
 
 async function checkSettingsAuth(): Promise<boolean> {
   const envPassword = process.env.SETTINGS_PASSWORD
   if (!envPassword) return true
   const cookieStore = await cookies()
-  return verifySessionCookie(cookieStore.get("settings_auth")?.value, envPassword)
+  return verifySettingsSessionToken(cookieStore.get(SETTINGS_COOKIE_NAME)?.value, envPassword)
 }
 
 export async function importData(jsonData: string) {

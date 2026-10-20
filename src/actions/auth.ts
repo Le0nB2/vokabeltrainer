@@ -2,10 +2,12 @@
 import {
   AUTH_COOKIE_MAX_AGE,
   AUTH_COOKIE_NAME,
+  SETTINGS_COOKIE_MAX_AGE,
+  SETTINGS_COOKIE_NAME,
   createAppSessionToken,
+  createSettingsSessionToken,
   getAppAuthCredentials,
   getAppSecret,
-  getSessionCookieValue,
   secureCompare,
 } from "@/lib/auth-utils"
 import {
@@ -64,12 +66,12 @@ export async function checkPassword(password: string) {
     const headersList = await headers()
     const isHttps = headersList.get("x-forwarded-proto") === "https"
     const cookieStore = await cookies()
-    cookieStore.set("settings_auth", getSessionCookieValue(envPassword), {
+    cookieStore.set(SETTINGS_COOKIE_NAME, createSettingsSessionToken(envPassword, SETTINGS_COOKIE_MAX_AGE), {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production" && isHttps,
       path: "/",
       sameSite: "lax",
-      maxAge: 60 * 60 * 24 // 1 day
+      maxAge: SETTINGS_COOKIE_MAX_AGE,
     })
     revalidatePath("/settings")
     return { success: true }
@@ -134,6 +136,11 @@ export async function loginApp(credentials: { username?: string; password?: stri
 export async function logoutApp() {
   const cookieStore = await cookies()
   cookieStore.set(AUTH_COOKIE_NAME, "", {
+    httpOnly: true,
+    path: "/",
+    maxAge: 0,
+  })
+  cookieStore.set(SETTINGS_COOKIE_NAME, "", {
     httpOnly: true,
     path: "/",
     maxAge: 0,

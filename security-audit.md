@@ -13,7 +13,7 @@ Die Schwachstellen sind nach Schweregrad (**Kritisch / Hoch**, **Mittel**, **Nie
 | **SEC-01** | ~~Open Redirect via protokoll-relative URLs (`//evil.com`)~~ | Broken Access Control | ✅ **Erledigt** | `src/proxy.ts`, `LoginForm.tsx` |
 | **SEC-02** | ~~Fehlende Authentifizierung in Server Actions (Bypass via `/login`)~~ | Broken Access Control | ✅ **Erledigt** | `src/lib/auth-guard.ts`, `src/actions/` |
 | **SEC-03** | ~~Fehlendes Rate-Limiting gegen Brute-Force auf Login~~ | Identification & Auth | ✅ **Erledigt** | `src/lib/rate-limit.ts`, `src/actions/auth.ts` |
-| **SEC-04** | Statischer, nie ablaufender Session-Token für Einstellungen | Cryptographic / Session | 🟡 **Mittel** | `src/lib/auth-utils.ts`, `settings/layout.tsx` |
+| **SEC-04** | ~~Statischer, nie ablaufender Session-Token für Einstellungen~~ | Cryptographic / Session | ✅ **Erledigt** | `src/lib/auth-utils.ts`, `settings/layout.tsx` |
 | **SEC-05** | Unvalidierter JSON-Import & DoS-Risiko (bis zu 50 MB) | DoS / Validation | 🟡 **Mittel** | `src/actions/settings.ts` (`importData`) |
 | **SEC-06** | Unbeschränkte Payload-Größen & DoS bei KI-Endpunkten | Resource Exhaustion | 🟡 **Mittel** | `/api/enrich-csv`, `/api/worksheet` |
 | **SEC-07** | Backup-Export ohne Auth bei fehlendem `SETTINGS_PASSWORD` | Data Exposure | 🟡 **Mittel** | `src/app/api/export/route.ts` |
@@ -91,10 +91,17 @@ Die Schwachstellen sind nach Schweregrad (**Kritisch / Hoch**, **Mittel**, **Nie
 ---
 
 #### SEC-04: Statisches, nicht ablaufendes Session-Cookie für Einstellungen (`settings_auth`)
-- **Datei**: [src/lib/auth-utils.ts](file:///home/bbuch/vokabel-trainer-docker/vokabeltrainer/src/lib/auth-utils.ts#L93-L112)
+- **Status**: ✅ **Erledigt** (Branch `sicherheitsanpassungen`)
+- **Datei**: [src/lib/auth-utils.ts](file:///home/bbuch/vokabel-trainer-docker/vokabeltrainer/src/lib/auth-utils.ts), [src/actions/auth.ts](file:///home/bbuch/vokabel-trainer-docker/vokabeltrainer/src/actions/auth.ts), [src/app/settings/layout.tsx](file:///home/bbuch/vokabel-trainer-docker/vokabeltrainer/src/app/settings/layout.tsx), [src/actions/settings.ts](file:///home/bbuch/vokabel-trainer-docker/vokabeltrainer/src/actions/settings.ts), [src/app/api/export/route.ts](file:///home/bbuch/vokabel-trainer-docker/vokabeltrainer/src/app/api/export/route.ts)
+- **Umsetzung**:
+  - Umstellung auf signierte, zeitbegrenzte Tokens (`createSettingsSessionToken`, `verifySettingsSessionToken`) mit eingebettetem Ablaufzeitstempel (`exp`) und Scope (`settings`).
+  - Standard-Gültigkeit: 24 Stunden (`SETTINGS_COOKIE_MAX_AGE = 86400s`), signiert per HMAC-SHA256 mit `timingSafeEqual`.
+  - Abgelaufene oder manipulierte Tokens werden abgewiesen.
+  - Abmeldung über `logoutApp` löscht nun auch das `settings_auth`-Cookie.
+  - 8 neue Unit-Tests in `tests/auth-utils.test.ts` und erweiterte Integrationstests in `tests/auth-actions.test.ts`.
 - **Problem**:
-  Der Cookie-Wert für die Einstellungen wird via `createHmac("sha256", password).update("settings_session").digest("hex")` erzeugt.
-  Dieser Wert ist für ein gegebenes Passwort **statisch und zeitlich unbegrenzt gültig**. Er enthält keinen Zeitstempel und keine serverseitige Gültigkeitsdauer.
+  Der Cookie-Wert für die Einstellungen wurde via `createHmac("sha256", password).update("settings_session").digest("hex")` erzeugt.
+  Dieser Wert war für ein gegebenes Passwort **statisch und zeitlich unbegrenzt gültig**. Er enthielt keinen Zeitstempel und keine serverseitige Gültigkeitsdauer.
 - **Gefahr**:
   Wird der Cookie einmal abgefangen oder aus einem Browser ausgelesen, bleibt er dauerhaft gültig, solange das Passwort nicht geändert wird.
 - **Empfohlene Behebung**:
@@ -197,7 +204,7 @@ flowchart TD
 
     subgraph "Schritt 2: Missbrauchsschutz (Medium Risk)"
         S3["SEC-03: Rate Limiting Login (✅ Erledigt)"]
-        S4["SEC-04: Expirations für Settings-Cookie"]
+        S4["SEC-04: Expirations für Settings-Cookie (✅ Erledigt)"]
         S5["SEC-05: Backup Import/Export absichern & Zod"]
         S6["SEC-06: KI-Endpunkte Payload-Limits"]
     end
