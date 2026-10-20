@@ -1,0 +1,200 @@
+# Sicherheitsaudit: Vokabeltrainer Webapp
+
+Dieser Audit umfasst eine vollständige Quellcode- und Konfigurationsanalyse der Anwendung (Next.js 16, Prisma ORM, Server Actions, Proxy Middleware, API-Routen, Authentifizierung und Docker-Setup).
+
+Die Schwachstellen sind nach Schweregrad (**Kritisch / Hoch**, **Mittel**, **Niedrig / Best Practice**) und nach empfohlener Umsetzungsreihenfolge gegliedert.
+
+---
+
+## Übersicht & Risikomatrix
+
+| ID | Schwachstelle | Kategorie | Schweregrad | Betroffene Komponente |
+|---|---|---|---|---|
+| **SEC-01** | ~~Open Redirect via protokoll-relative URLs (`//evil.com`)~~ | Broken Access Control | ✅ **Erledigt** | `src/proxy.ts`, `LoginForm.tsx` |
+| **SEC-02** | Fehlende Authentifizierung in Server Actions (Bypass via `/login`) | Broken Access Control | 🔴 **Hoch** | `src/actions/cards.ts`, `decks.ts` |
+| **SEC-03** | Fehlendes Rate-Limiting gegen Brute-Force auf Login | Identification & Auth | 🟡 **Mittel** | `src/actions/auth.ts` |
+| **SEC-04** | Statischer, nie ablaufender Session-Token für Einstellungen | Cryptographic / Session | 🟡 **Mittel** | `src/lib/auth-utils.ts`, `settings/layout.tsx` |
+| **SEC-05** | Unvalidierter JSON-Import & DoS-Risiko (bis zu 50 MB) | DoS / Validation | 🟡 **Mittel** | `src/actions/settings.ts` (`importData`) |
+| **SEC-06** | Unbeschränkte Payload-Größen & DoS bei KI-Endpunkten | Resource Exhaustion | 🟡 **Mittel** | `/api/enrich-csv`, `/api/worksheet` |
+| **SEC-07** | Backup-Export ohne Auth bei fehlendem `SETTINGS_PASSWORD` | Data Exposure | 🟡 **Mittel** | `src/app/api/export/route.ts` |
+| **SEC-08** | Fehlende HTTP-Sicherheitsheader (CSP, HSTS, Permissions-Policy) | Security Misconfiguration | 🟢 **Niedrig** | `next.config.ts` |
+| **SEC-09** | Fest codierter Fallback-Geheimschlüssel (`vokabeltrainer-session-secret`) | Cryptographic Failure | 🟢 **Niedrig** | `src/lib/auth-utils.ts` |
+| **SEC-10** | Inkonsistente `Secure`-Flag-Vergabe für Session-Cookies | Sensitive Data Exposure | 🟢 **Niedrig** | `src/actions/auth.ts` |
+| **SEC-11** | Veraltete Abhängigkeiten (npm audit Warnungen) | Vulnerable Components | 🟢 **Niedrig** | `package.json` (`braces`, `deepmerge-ts`) |
+| **SEC-12** | Versionsartefakt im Quellcode (`cards.ts.orig`) | Information Disclosure | 🟢 **Info** | `src/actions/cards.ts.orig` |
+
+---
+
+## Detaillierte Analyse der Schwachstellen
+
+### 🔴 1. Kritisch / Hohe Priorität
+
+#### SEC-01: Open Redirect über protokoll-relative URLs
+- **Status**: ✅ **Erledigt** (Branch `sicherheitsanpassungen`)
+- **Datei**: [src/proxy.ts](file:///home/bbuch/vokabel-trainer-docker/vokabeltrainer/src/proxy.ts#L48-L54) & [src/components/LoginForm.tsx](file:///home/bbuch/vokabel-trainer-docker/vokabeltrainer/src/components/LoginForm.tsx#L27-L31)
+- **Umsetzung**:
+  - `getSafeRedirectUrl` in [src/lib/utils/url.ts](file:///home/bbuch/vokabel-trainer-docker/vokabeltrainer/src/lib/utils/url.ts) implementiert.
+  - Verhindert protokoll-relative URLs (`//evil.com`), Backslash-Bypasses (`/\\evil.com`), externe Schemes und nicht-lokale Origins.
+  - In `src/proxy.ts` und `src/components/LoginForm.tsx` integriert.
+  - Abgesichert durch Unit-Tests in [tests/url.test.ts](file:///home/bbuch/vokabel-trainer-docker/vokabeltrainer/tests/url.test.ts) und [tests/proxy.test.ts](file:///home/bbuch/vokabel-trainer-docker/vokabeltrainer/tests/proxy.test.ts).
+- **Problem**:
+  In `proxy.ts` und `LoginForm.tsx` wird geprüft, ob der Parameter `redirect` mit `/` beginnt:
+  ```typescript
+  const target = redirectParam && redirectParam.startsWith("/") ? redirectParam : "/"
+  window.location.href = target
+  ```
+  Im Browser und im JavaScript-URL-Standard gilt eine URL, die mit `//` beginnt (z. B. `//attacker.com`), als **protokoll-relative URL**. 
+  `new URL("//attacker.com", "http://localhost:3000")` oder `window.location.href = "//attacker.com"` leitet den Browser direkt zu `https://attacker.com` weiter.
+- **Gefahr**:
+  Phishing: Angreifer können legitime Links wie `https://meintrainer.de/login?redirect=//boese-seite.de` versenden. Nach erfolgreicher Anmeldung landet der Benutzer auf der fremden Seite.
+- **Empfohlene Behebung**:
+  Explizite Validierung: Der Pfad muss mit `/` beginnen, darf aber **nicht** mit `//` oder `/\\` beginnen.
+
+---
+
+#### SEC-02: Fehlende Authentifizierung innerhalb von Server Actions (Defense-in-Depth)
+- **Datei**: [src/actions/cards.ts](file:///home/bbuch/vokabel-trainer-docker/vokabeltrainer/src/actions/cards.ts) & [src/actions/decks.ts](file:///home/bbuch/vokabel-trainer-docker/vokabeltrainer/src/actions/decks.ts)
+- **Problem**:
+  Funktionen wie `deleteDeck(id)`, `deleteCard(id)`, `addCard(...)` prüfen **nicht**, ob der aufrufende Benutzer eine gültige Session besitzt. Sie verlassen sich ausschließlich auf `src/proxy.ts`.
+  In Next.js werden Server Actions über POST-Anfragen mit dem Header `Next-Action` aufgerufen. Da `/login` in `proxy.ts` eine öffentliche Route ohne Authentifizierung ist, kann ein Angreifer eine POST-Anfrage an `/login` mit dem `Next-Action`-Header senden. Next.js führt die Action aus, ohne dass `proxy.ts` sie blockiert.
+- **Gefahr**:
+  Nicht autorisiertes Löschen oder Verändern von Decks und Vokabeln ohne Login.
+- **Empfohlene Behebung**:
+  1. Helper-Funktion `requireAppAuth()` am Anfang jeder mutierenden Server Action aufrufen.
+  2. In `proxy.ts` sicherstellen, dass auf `/login` keine unerwarteten Server Actions ausgeführt werden dürfen (außer `loginApp`).
+
+---
+
+### 🟡 2. Mittlere Priorität
+
+#### SEC-03: Fehlendes Rate-Limiting gegen Brute-Force auf den Login
+- **Datei**: [src/actions/auth.ts](file:///home/bbuch/vokabel-trainer-docker/vokabeltrainer/src/actions/auth.ts#L42-L44)
+- **Problem**:
+  Bei falschem Passwort gibt es nur ein kurzes `setTimeout(..., 500)`. Dies bremst sequentielle Anfragen, schützt aber nicht vor parallelisierten Angriffen (z. B. 50 gleichzeitige HTTP-Requests). Es existiert keine Sperre nach $X$ Fehlversuchen und kein IP-basiertes Rate-Limiting.
+- **Gefahr**:
+  Automatisierte Passwort-Raten / Wörterbuch-Angriffe auf öffentlich erreichbare Instanzen.
+- **Empfohlene Behebung**:
+  Einfaches In-Memory- oder DB-basiertes Rate-Limiting (z. B. maximal 5 Fehlversuche pro IP in 15 Minuten).
+
+---
+
+#### SEC-04: Statisches, nicht ablaufendes Session-Cookie für Einstellungen (`settings_auth`)
+- **Datei**: [src/lib/auth-utils.ts](file:///home/bbuch/vokabel-trainer-docker/vokabeltrainer/src/lib/auth-utils.ts#L93-L112)
+- **Problem**:
+  Der Cookie-Wert für die Einstellungen wird via `createHmac("sha256", password).update("settings_session").digest("hex")` erzeugt.
+  Dieser Wert ist für ein gegebenes Passwort **statisch und zeitlich unbegrenzt gültig**. Er enthält keinen Zeitstempel und keine serverseitige Gültigkeitsdauer.
+- **Gefahr**:
+  Wird der Cookie einmal abgefangen oder aus einem Browser ausgelesen, bleibt er dauerhaft gültig, solange das Passwort nicht geändert wird.
+- **Empfohlene Behebung**:
+  Den Cookie auf dieselbe Token-Logik wie `auth_session` umstellen (mit `exp`-Ablaufzeitstempel).
+
+---
+
+#### SEC-05: Unvalidierter JSON-Import & DoS-Risiko (bis zu 50 MB)
+- **Datei**: [src/actions/settings.ts](file:///home/bbuch/vokabel-trainer-docker/vokabeltrainer/src/actions/settings.ts#L22-L104)
+- **Problem**:
+  1. `importData` akzeptiert JSON-Strings bis zu 50 MB und führt synchron `JSON.parse()` aus. Ein 50 MB großes JSON blockiert die Node.js-Event-Loop spürbar.
+  2. Der Inhalt wird ohne Zod-Schema direkt per Schleife in die Datenbank geschrieben. Es gibt keine Begrenzung der Anzahl an Decks/Karten.
+- **Gefahr**:
+  Speichererschöpfung (OOM), Denial of Service oder Datenbank-Überflutung.
+- **Empfohlene Behebung**:
+  Maximalgröße auf z. B. 5 MB begrenzen und Zod-Schema-Validierung mit Längen- und Mengengrenzen implementieren.
+
+---
+
+#### SEC-06: Unbegrenzte Payload-Größen bei KI-Endpunkten (`/api/enrich-csv`, `/api/worksheet`)
+- **Datei**: [src/app/api/enrich-csv/route.ts](file:///home/bbuch/vokabel-trainer-docker/vokabeltrainer/src/app/api/enrich-csv/route.ts#L12-L14) & [src/app/api/worksheet/route.ts](file:///home/bbuch/vokabel-trainer-docker/vokabeltrainer/src/app/api/worksheet/route.ts)
+- **Problem**:
+  `/api/enrich-csv` prüft zwar mit Zod, erlaubt aber eine unbegrenzte Anzahl von Karten (`cards.min(1)` ohne `.max(...)`) und beliebig lange Texte.
+  `/api/worksheet` rendert bei Bedarf in einer Schleife bis zu 25-mal synchron ein PDF (`generateOptimizedPdf`), was bei parallelen Aufrufen die CPU blockiert.
+- **Gefahr**:
+  Schnelles Ausschöpfen des Gemini-API-Kontingents, Kostenrisiko und CPU-Blockade.
+- **Empfohlene Behebung**:
+  Begrenzung der maximalen Kartenzahl pro Aufruf (z. B. max. 50 Karten) und String-Längenbeschränkungen.
+
+---
+
+#### SEC-07: Backup-Export ohne Auth bei fehlendem `SETTINGS_PASSWORD`
+- **Datei**: [src/app/api/export/route.ts](file:///home/bbuch/vokabel-trainer-docker/vokabeltrainer/src/app/api/export/route.ts#L8-L18)
+- **Problem**:
+  In `export/route.ts` wird nur dann eine Authentifizierung geprüft, wenn `SETTINGS_PASSWORD` in der `.env` gesetzt ist. Wenn jemand kein Einstellungspasswort vergeben hat, kann jede Person mit regulärem Zugriff (oder bei offenem Link) das komplette Datenbank-Backup via `GET` herunterladen. Zudem ist `GET` anfällig für CSRF über top-level Links.
+- **Gefahr**:
+  Ungewollter Datenabfluss aller Vokabeln und Statistiken.
+- **Empfohlene Behebung**:
+  Mindestens die Haupt-Authentifizierung (`auth_session`) voraussetzen und Umstellung auf `POST` oder Download-Token.
+
+---
+
+### 🟢 3. Niedrige Priorität / Hardening
+
+#### SEC-08: Fehlende Security-Header in `next.config.ts`
+- **Datei**: [next.config.ts](file:///home/bbuch/vokabel-trainer-docker/vokabeltrainer/next.config.ts)
+- **Problem**:
+  Es fehlen Header wie `Content-Security-Policy` (CSP), `Strict-Transport-Security` (HSTS) und `Permissions-Policy`.
+- **Empfohlene Behebung**:
+  Ergänzung von HSTS (`max-age=63072000; includeSubDomains; preload`) und einer sauberen CSP.
+
+---
+
+#### SEC-09: Fest codierter Fallback-Secret-String
+- **Datei**: [src/lib/auth-utils.ts](file:///home/bbuch/vokabel-trainer-docker/vokabeltrainer/src/lib/auth-utils.ts#L34-L41)
+- **Problem**:
+  Wenn weder `AUTH_SECRET` noch `password` gesetzt sind, fällt das System auf `"vokabeltrainer-session-secret"` zurück.
+- **Empfohlene Behebung**:
+  Falls kein Secret und kein Passwort existiert, beim Serverstart ein zufälliges kryptografisches Secret im Speicher erzeugen (`randomBytes(32)`), sodass kein bekannter Standardwert genutzt wird.
+
+---
+
+#### SEC-10: `Secure`-Flag-Logik für Cookies
+- **Datei**: [src/actions/auth.ts](file:///home/bbuch/vokabel-trainer-docker/vokabeltrainer/src/actions/auth.ts#L62-L69)
+- **Problem**:
+  `secure` wird nur gesetzt, wenn `process.env.NODE_ENV === "production" && isHttps`. Wenn ein Reverse Proxy den Header `x-forwarded-proto` nicht korrekt weiterleitet, wird das Cookie unverschlüsselt übertragen.
+- **Empfohlene Behebung**:
+  In der Produktionsumgebung standardmäßig `secure: true` erzwingen (sofern HTTPS genutzt wird).
+
+---
+
+#### SEC-11: Veraltete Abhängigkeiten mit DoS-Risiko (`npm audit`)
+- **Details**:
+  `braces` (Stack-Exhaustion DoS) und `deepmerge-ts` (über Prisma).
+- **Empfohlene Behebung**:
+  Paketaktualisierungen prüfen, soweit mit Next.js 16 kompatibel.
+
+---
+
+#### SEC-12: Entwicklungsartefakt im Quellcode (`cards.ts.orig`)
+- **Datei**: [src/actions/cards.ts.orig](file:///home/bbuch/vokabel-trainer-docker/vokabeltrainer/src/actions/cards.ts.orig)
+- **Problem**:
+  Verbliebene Datei aus einem früheren Git-Merge.
+- **Empfohlene Behebung**:
+  Datei löschen und `*.orig` in die `.gitignore` aufnehmen.
+
+---
+
+## Empfohlene Umsetzungsreihenfolge
+
+```mermaid
+flowchart TD
+    A["Schritt 1: Sofort-Fixes (High Risk)"] --> B["Schritt 2: Missbrauchsschutz (Medium Risk)"]
+    B --> C["Schritt 3: Hardening & Aufräumen (Low Risk)"]
+
+    subgraph "Schritt 1: Sofort-Fixes (High Risk)"
+        S1["SEC-01: Open Redirect absichern (✅ Erledigt)"]
+        S2["SEC-02: Server Actions Auth-Prüfung"]
+    end
+
+    subgraph "Schritt 2: Missbrauchsschutz (Medium Risk)"
+        S3["SEC-03: Rate Limiting Login"]
+        S4["SEC-04: Expirations für Settings-Cookie"]
+        S5["SEC-05: Backup Import/Export absichern & Zod"]
+        S6["SEC-06: KI-Endpunkte Payload-Limits"]
+    end
+
+    subgraph "Schritt 3: Hardening & Aufräumen (Low Risk)"
+        S7["SEC-08: Security Headers (HSTS, CSP)"]
+        S8["SEC-09: Dynamischer Fallback Secret"]
+        S9["SEC-12: cards.ts.orig löschen & .gitignore"]
+    end
+```
+
+Du kannst nun entscheiden, welche Punkte umgesetzt werden sollen.
