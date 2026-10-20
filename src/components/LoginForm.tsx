@@ -4,6 +4,7 @@ import { useState } from "react"
 import { useSearchParams } from "next/navigation"
 import { Lock, User, KeyRound, AlertCircle, Eye, EyeOff, Loader2 } from "lucide-react"
 import { loginApp } from "@/actions/auth"
+import { getSafeRedirectUrl } from "@/lib/utils/url"
 
 export function LoginForm() {
   const searchParams = useSearchParams()
@@ -24,8 +25,9 @@ export function LoginForm() {
       const result = await loginApp({ username, password })
 
       if (result.success) {
-        const target = redirectParam && redirectParam.startsWith("/") ? redirectParam : "/"
-        window.location.href = target
+        const safeTarget = getSafeRedirectUrl(redirectParam, "/")
+        const finalTarget = safeTarget === "/login" ? "/" : safeTarget
+        window.location.href = finalTarget
       } else {
         setError(result.error || "Anmeldung fehlgeschlagen")
         setIsLoading(false)

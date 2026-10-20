@@ -1,5 +1,7 @@
 import { createHash, createHmac, timingSafeEqual } from "crypto"
 
+export { getSafeRedirectUrl } from "./utils/url"
+
 export const AUTH_COOKIE_NAME = "auth_session"
 export const AUTH_COOKIE_MAX_AGE = 30 * 24 * 60 * 60 // 30 days in seconds
 
