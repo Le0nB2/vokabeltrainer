@@ -1,20 +1,42 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { enrichCards, QuotaExceededError } from "@/lib/services/ai-enrichment";
+import { requireAppAuth, UnauthorizedError } from "@/lib/auth-guard";
 
+export const MAX_CARDS_PER_ENRICH_REQUEST = 50;
+export const MAX_TEXT_LENGTH_PER_CARD = 500;
 
 const cardSchema = z.object({
-  id: z.string(),
-  front: z.string(),
-  back: z.string()
+  id: z.string().min(1, "ID darf nicht leer sein").max(100, "ID darf maximal 100 Zeichen lang sein"),
+  front: z
+    .string()
+    .trim()
+    .min(1, "Vorderseite darf nicht leer sein")
+    .max(MAX_TEXT_LENGTH_PER_CARD, `Vorderseite darf maximal ${MAX_TEXT_LENGTH_PER_CARD} Zeichen lang sein`),
+  back: z
+    .string()
+    .trim()
+    .min(1, "Rückseite darf nicht leer sein")
+    .max(MAX_TEXT_LENGTH_PER_CARD, `Rückseite darf maximal ${MAX_TEXT_LENGTH_PER_CARD} Zeichen lang sein`),
 });
 
 const requestSchema = z.object({
-  cards: z.array(cardSchema).min(1)
+  cards: z
+    .array(cardSchema)
+    .min(1, "Mindestens eine Karte erforderlich")
+    .max(MAX_CARDS_PER_ENRICH_REQUEST, `Maximal ${MAX_CARDS_PER_ENRICH_REQUEST} Karten pro Anfrage erlaubt`),
 });
 
 export async function POST(req: NextRequest) {
   try {
+    try {
+      await requireAppAuth();
+    } catch (error) {
+      if (error instanceof UnauthorizedError) {
+        return NextResponse.json({ error: "Nicht autorisiert. Bitte melde dich an." }, { status: 401 });
+      }
+      throw error;
+    }
 
     const body = await req.json();
     const parseResult = requestSchema.safeParse(body);
@@ -24,7 +46,6 @@ export async function POST(req: NextRequest) {
     }
 
     const { cards } = parseResult.data;
-
 
     const rawKeys = process.env.GEMINI_API_KEYS || process.env.GEMINI_API_KEY;
     if (!rawKeys) {

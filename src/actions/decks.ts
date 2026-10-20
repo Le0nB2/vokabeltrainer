@@ -2,8 +2,10 @@
 
 import prisma from "@/lib/prisma"
 import { revalidatePath } from "next/cache"
+import { requireAppAuth } from "@/lib/auth-guard"
 
 export async function getDecks() {
+  await requireAppAuth();
   return await prisma.deck.findMany({
     include: {
       _count: {
@@ -18,6 +20,7 @@ export async function getDecks() {
 }
 
 export async function getDeckById(id: string) {
+  await requireAppAuth();
   return await prisma.deck.findUnique({
     where: { id },
     include: {
@@ -42,6 +45,7 @@ export async function getDeckById(id: string) {
 }
 
 export async function createDeck(title: string, description?: string) {
+  await requireAppAuth();
   const deck = await prisma.deck.create({
     data: {
       title,
@@ -53,6 +57,7 @@ export async function createDeck(title: string, description?: string) {
 }
 
 export async function deleteDeck(id: string) {
+  await requireAppAuth();
   await prisma.deck.delete({
     where: { id }
   });
@@ -60,6 +65,7 @@ export async function deleteDeck(id: string) {
 }
 
 export async function saveDeckResult(id: string, correct: number, incorrect: number) {
+  await requireAppAuth();
   return await prisma.deck.update({
     where: { id },
     data: {

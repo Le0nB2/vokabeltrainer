@@ -48,7 +48,6 @@ describe('proxy middleware session auth', () => {
   const originalEnv = process.env
 
   beforeEach(() => {
-    vi.resetModules()
     process.env = { ...originalEnv }
     process.env.AUTH_USER = 'testuser'
     process.env.AUTH_PASSWORD = 'testpassword123'
@@ -168,6 +167,27 @@ describe('proxy middleware session auth', () => {
     const result: any = await proxy(req)
     expect(result.type).toBe('redirect')
     expect(result.url).toBe('http://localhost:3000/study')
+  })
+
+  it('should prevent open redirect when redirect param is an external or protocol-relative URL', async () => {
+    const secret = getAppSecret('testpassword123')
+    const validToken = createAppSessionToken('testuser', secret)
+
+    const maliciousUrls = [
+      '//evil.com',
+      '//evil.com/phishing',
+      '/\\evil.com',
+      'https://evil.com',
+      'http://evil.com',
+      '/login',
+    ]
+
+    for (const evil of maliciousUrls) {
+      const req = createMockRequest(`/login?redirect=${encodeURIComponent(evil)}`, validToken)
+      const result: any = await proxy(req)
+      expect(result.type).toBe('redirect')
+      expect(result.url).toBe('http://localhost:3000/')
+    }
   })
 
   it('should reject invalid session tokens and redirect to /login', async () => {

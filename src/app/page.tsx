@@ -121,10 +121,12 @@ export default async function Dashboard() {
           {decks.map(deck => {
             const dueCount = deck.cards.filter(c => c.dueDate <= now).length
 
-            // Calculate Box distribution
+            // Calculate Box distribution (clamp box >= 7 to Stufe 7)
             const boxes = [0, 0, 0, 0, 0, 0, 0] // 7 boxes
             deck.cards.forEach(c => {
-              if (c.box >= 1 && c.box <= 7) boxes[c.box - 1]++
+              const boxNum = Number(c.box) || 1
+              const boxIndex = Math.min(6, Math.max(0, Math.floor(boxNum) - 1))
+              boxes[boxIndex]++
             })
 
             return (

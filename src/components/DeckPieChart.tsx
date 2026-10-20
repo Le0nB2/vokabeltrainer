@@ -21,11 +21,14 @@ export function DeckPieChart({ boxes, totalCards }: DeckPieChartProps) {
   }, []);
 
   const isDark = mounted ? resolvedTheme === 'dark' : false;
+  const totalInBoxes = boxes.reduce((acc, curr) => acc + curr, 0);
 
-  if (totalCards === 0) {
+  if (totalCards === 0 || totalInBoxes === 0) {
     return (
       <div className="flex items-center justify-center h-48 bg-zinc-50 dark:bg-zinc-800/50 rounded-lg border border-dashed border-zinc-200 dark:border-zinc-700">
-        <span className="text-zinc-400 text-sm">Keine Karten</span>
+        <span className="text-zinc-400 text-sm">
+          {totalCards === 0 ? "Keine Karten" : "Keine Stufendaten"}
+        </span>
       </div>
     );
   }

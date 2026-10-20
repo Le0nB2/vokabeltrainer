@@ -2,6 +2,7 @@
 
 import prisma from "@/lib/prisma"
 import { revalidatePath } from "next/cache"
+import { requireAppAuth } from "@/lib/auth-guard"
 
 
 export async function addCard(
@@ -13,6 +14,7 @@ export async function addCard(
   mnemonic?: string | null,
   contextSentence?: string | null
 ) {
+  await requireAppAuth();
   const card = await prisma.card.create({
     data: {
       deckId,
@@ -40,6 +42,7 @@ export async function addCardsBulk(
     phonetic?: string | null;
   }[]
 ) {
+  await requireAppAuth();
   const created = await prisma.card.createMany({
     data: cards.map(c => ({
       deckId,
@@ -58,6 +61,7 @@ export async function addCardsBulk(
 }
 
 export async function deleteCard(cardId: string, deckId: string) {
+  await requireAppAuth();
   await prisma.card.delete({
     where: { id: cardId }
   });
@@ -65,6 +69,7 @@ export async function deleteCard(cardId: string, deckId: string) {
 }
 
 export async function updateCardProgress(cardId: string, deckId: string, rating: "again" | "hard" | "good" | "easy") {
+  await requireAppAuth();
   const card = await prisma.card.findUnique({ where: { id: cardId } });
   if (!card) throw new Error("Card not found");
 
@@ -120,6 +125,7 @@ export async function updateCardProgress(cardId: string, deckId: string, rating:
 }
 
 export async function getAllDueCards() {
+  await requireAppAuth();
   const now = new Date();
   const dueCards = await prisma.card.findMany({
     where: {
@@ -142,6 +148,7 @@ export async function updateCardDetails(
   mnemonic?: string | null,
   contextSentence?: string | null
 ) {
+  await requireAppAuth();
   const updated = await prisma.card.update({
     where: { id: cardId },
     data: {
@@ -166,6 +173,7 @@ export async function updateCardsEnrichmentBulk(
     contextSentence?: string | null;
   }[]
 ) {
+  await requireAppAuth();
   for (const update of updates) {
     await prisma.card.update({
       where: { id: update.id },

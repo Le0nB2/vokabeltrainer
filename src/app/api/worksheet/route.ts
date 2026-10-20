@@ -3,13 +3,40 @@ import { NextRequest, NextResponse } from "next/server";
 import { GoogleGenAI, Type, Schema } from "@google/genai";
 import prisma from "@/lib/prisma";
 import { z } from "zod";
+import { requireAppAuth, UnauthorizedError } from "@/lib/auth-guard";
+import { consumeRateLimit, formatRetryDuration, getClientIpFromHeaders } from "@/lib/rate-limit";
 
 const requestSchema = z.object({
-  deckId: z.string().min(1, "No deckId provided")
+  deckId: z.string().min(1, "No deckId provided").max(100, "deckId darf maximal 100 Zeichen lang sein")
 });
 
 export async function POST(req: NextRequest) {
   try {
+    try {
+      await requireAppAuth();
+    } catch (error) {
+      if (error instanceof UnauthorizedError) {
+        return NextResponse.json({ error: "Nicht autorisiert. Bitte melde dich an." }, { status: 401 });
+      }
+      throw error;
+    }
+
+    const clientIp = getClientIpFromHeaders(req.headers);
+    const limit = consumeRateLimit(`worksheet:${clientIp}`, {
+      maxAttempts: 3,
+      windowMs: 60 * 1000,
+      blockDurationMs: 60 * 1000,
+    });
+
+    if (limit.isBlocked) {
+      return NextResponse.json(
+        {
+          error: `Zu viele Anfragen zur Arbeitsblatt-Erstellung. Bitte warte ${formatRetryDuration(limit.retryAfterSeconds)}.`,
+        },
+        { status: 429 }
+      );
+    }
+
     const body = await req.json();
     const parseResult = requestSchema.safeParse(body);
 

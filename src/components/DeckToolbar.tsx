@@ -34,7 +34,9 @@ export function DeckToolbar({ deck }: { deck: { id: string, cards: CardType[] } 
 
   const filteredCards = deck.cards.filter((c: CardType) => {
     const matchesSearch = c.front.toLowerCase().includes(search.toLowerCase()) || c.back.toLowerCase().includes(search.toLowerCase())
-    const matchesBox = boxFilter === "all" ? true : c.box.toString() === boxFilter
+    const matchesBox = boxFilter === "all" ? true : (
+      boxFilter === "7" ? c.box >= 7 : c.box.toString() === boxFilter
+    )
     return matchesSearch && matchesBox
   })
 
@@ -111,7 +113,7 @@ export function DeckToolbar({ deck }: { deck: { id: string, cards: CardType[] } 
             {filteredCards.length > 0 ? filteredCards.map((card: CardType) => (
               <tr key={card.id} className="hover:bg-zinc-50 dark:hover:bg-zinc-800/20 transition-colors">
                 <td className="p-4">
-                  <span className={`inline-flex items-center justify-center w-6 h-6 rounded-full text-xs font-medium ${card.box === 7 ? 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400' : 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400'}`}>
+                  <span className={`inline-flex items-center justify-center w-6 h-6 rounded-full text-xs font-medium ${card.box >= 7 ? 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400' : 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400'}`}>
                     {card.box}
                   </span>
                 </td>

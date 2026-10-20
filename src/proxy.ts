@@ -6,6 +6,7 @@ import {
   getAppSecret,
   verifyAppSessionToken,
 } from "./lib/auth-utils";
+import { getSafeRedirectUrl } from "./lib/utils/url";
 
 export async function proxy(req: NextRequest) {
   const { user: authUser, password: authPassword, isConfigured } = getAppAuthCredentials();
@@ -46,8 +47,9 @@ export async function proxy(req: NextRequest) {
   if (isAuthenticated) {
     if (pathname === "/login") {
       const redirectTarget = url.searchParams.get("redirect");
-      const target = redirectTarget && redirectTarget.startsWith("/") ? redirectTarget : "/";
-      const targetUrl = new URL(target, url.origin);
+      const safeTarget = getSafeRedirectUrl(redirectTarget, "/");
+      const finalTarget = safeTarget === "/login" ? "/" : safeTarget;
+      const targetUrl = new URL(finalTarget, url.origin);
       return NextResponse.redirect(targetUrl);
     }
     return NextResponse.next();
