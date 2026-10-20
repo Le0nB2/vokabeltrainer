@@ -204,9 +204,19 @@ Die Schwachstellen sind nach Schweregrad (**Kritisch / Hoch**, **Mittel**, **Nie
 ---
 
 #### SEC-10: `Secure`-Flag-Logik für Cookies
-- **Datei**: [src/actions/auth.ts](file:///home/bbuch/vokabel-trainer-docker/vokabeltrainer/src/actions/auth.ts#L62-L69)
+- **Status**: ✅ **Erledigt** (Branch `sicherheitsanpassungen`)
+- **Datei**: [src/actions/auth.ts](file:///home/bbuch/vokabel-trainer-docker/vokabeltrainer/src/actions/auth.ts) & [src/lib/auth-utils.ts](file:///home/bbuch/vokabel-trainer-docker/vokabeltrainer/src/lib/auth-utils.ts)
+- **Umsetzung**:
+  - Neue zentrale Erkennungsfunktion `isSecureRequest()` in `src/lib/auth-utils.ts`.
+  - Unterstützt Standard-Proxy-Header (`X-Forwarded-Proto` inkl. kommagetrennter Listen), alternative Proxy-Header (`X-Forwarded-Ssl`, `Front-End-Https`, `X-Url-Scheme`) sowie `Origin`/`Referer`.
+  - Erlaubt manuelle Steuerung/Übersteuerung über die Umgebungsvariable `COOKIE_SECURE=true` (erzwingen) oder `COOKIE_SECURE=false` (lokale IP/Heimnetzwerk-Ausnahmen ohne SSL).
+  - Sichere Standard-Logik: In Produktion (`NODE_ENV === "production"`) bei HTTPS-Verbindung auf `secure: true` gesetzt; bei rein lokalem unverschlüsseltem HTTP-Betrieb auf `secure: false`, um Anmeldeabbrüche durch Browser-Cookie-Rejection zu verhindern.
+  - Auch in `logoutApp()` werden die Cookies mit passenden Sicherheitsoptionen invalidiert.
+  - Umfassende Tests in `tests/auth-utils.test.ts` (10 Tests) und `tests/auth-actions.test.ts` (6 Tests).
 - **Problem**:
-  `secure` wird nur gesetzt, wenn `process.env.NODE_ENV === "production" && isHttps`. Wenn ein Reverse Proxy den Header `x-forwarded-proto` nicht korrekt weiterleitet, wird das Cookie unverschlüsselt übertragen.
+  `secure` wurde nur gesetzt, wenn `process.env.NODE_ENV === "production" && isHttps` mit striktem String-Vergleich `x-forwarded-proto === "https"`. Wenn ein Reverse Proxy kommagetrennte Header oder alternative SSL-Header sandte, wurde das Cookie unverschlüsselt übertragen.
+- **Gefahr**:
+  Man-in-the-Middle-Angriff / Abfangen der Session-Cookies im Klartext bei unvollständiger Proxy-Header-Weiterleitung.
 - **Empfohlene Behebung**:
   In der Produktionsumgebung standardmäßig `secure: true` erzwingen (sofern HTTPS genutzt wird).
 

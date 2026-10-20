@@ -212,4 +212,61 @@ describe('auth server actions', () => {
       expect(settingsCookie.maxAge).toBe(0)
     })
   })
+
+  describe('SEC-10: Cookie Secure Flag Handling', () => {
+    beforeEach(() => {
+      delete process.env.COOKIE_SECURE
+      mockHeaders.clear()
+    })
+
+    it('sets secure: true on login when x-forwarded-proto contains https', async () => {
+      mockHeaders.set('x-forwarded-proto', 'https, http')
+      const result = await loginApp({ username: 'admin', password: 'password123' })
+      expect(result.success).toBe(true)
+      const cookie = mockCookies.get(AUTH_COOKIE_NAME)
+      expect(cookie.secure).toBe(true)
+    })
+
+    it('sets secure: false on login when request is plain http', async () => {
+      mockHeaders.set('x-forwarded-proto', 'http')
+      const result = await loginApp({ username: 'admin', password: 'password123' })
+      expect(result.success).toBe(true)
+      const cookie = mockCookies.get(AUTH_COOKIE_NAME)
+      expect(cookie.secure).toBe(false)
+    })
+
+    it('forces secure: true when COOKIE_SECURE=true is configured', async () => {
+      process.env.COOKIE_SECURE = 'true'
+      mockHeaders.set('x-forwarded-proto', 'http')
+      const result = await loginApp({ username: 'admin', password: 'password123' })
+      expect(result.success).toBe(true)
+      const cookie = mockCookies.get(AUTH_COOKIE_NAME)
+      expect(cookie.secure).toBe(true)
+    })
+
+    it('forces secure: false when COOKIE_SECURE=false is configured for local setups', async () => {
+      process.env.COOKIE_SECURE = 'false'
+      mockHeaders.set('x-forwarded-proto', 'https')
+      const result = await loginApp({ username: 'admin', password: 'password123' })
+      expect(result.success).toBe(true)
+      const cookie = mockCookies.get(AUTH_COOKIE_NAME)
+      expect(cookie.secure).toBe(false)
+    })
+
+    it('sets secure: true on checkPassword when https is detected', async () => {
+      mockHeaders.set('x-forwarded-proto', 'https')
+      const result = await checkPassword('secretsettings')
+      expect(result.success).toBe(true)
+      const cookie = mockCookies.get(SETTINGS_COOKIE_NAME)
+      expect(cookie.secure).toBe(true)
+    })
+
+    it('sets secure: false on checkPassword when plain http is detected', async () => {
+      mockHeaders.set('x-forwarded-proto', 'http')
+      const result = await checkPassword('secretsettings')
+      expect(result.success).toBe(true)
+      const cookie = mockCookies.get(SETTINGS_COOKIE_NAME)
+      expect(cookie.secure).toBe(false)
+    })
+  })
 })

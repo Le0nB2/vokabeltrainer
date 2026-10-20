@@ -47,6 +47,55 @@ export function secureCompare(a: string, b: string): boolean {
 }
 
 /**
+ * Determine whether a request is considered secure (HTTPS) for the purpose of setting Secure cookies.
+ * Checks standard and proxy headers, origin/referer, and respects COOKIE_SECURE environment override.
+ */
+export function isSecureRequest(
+  headersList?: { get(name: string): string | null } | Headers | null
+): boolean {
+  // Explicit environment override
+  const envOverride = process.env.COOKIE_SECURE?.trim().toLowerCase()
+  if (envOverride === "true" || envOverride === "1") return true
+  if (envOverride === "false" || envOverride === "0") return false
+
+  if (headersList) {
+    // 1. X-Forwarded-Proto (standard reverse proxy header; supports comma-separated proxy list)
+    const forwardedProto = headersList.get("x-forwarded-proto")
+    if (forwardedProto) {
+      const clientProto = forwardedProto.split(",")[0].trim().toLowerCase()
+      if (clientProto === "https") return true
+      if (clientProto === "http") return false
+    }
+
+    // 2. Alternative reverse proxy headers
+    const forwardedSsl = headersList.get("x-forwarded-ssl")?.trim().toLowerCase()
+    if (forwardedSsl === "on" || forwardedSsl === "1") return true
+
+    const frontEndHttps = headersList.get("front-end-https")?.trim().toLowerCase()
+    if (frontEndHttps === "on" || frontEndHttps === "yes") return true
+
+    const xUrlScheme = headersList.get("x-url-scheme")?.trim().toLowerCase()
+    if (xUrlScheme === "https") return true
+
+    // 3. Referer or Origin headers
+    const origin = headersList.get("origin")
+    if (origin) {
+      if (origin.startsWith("https://")) return true
+      if (origin.startsWith("http://")) return false
+    }
+
+    const referer = headersList.get("referer")
+    if (referer) {
+      if (referer.startsWith("https://")) return true
+      if (referer.startsWith("http://")) return false
+    }
+  }
+
+  // 4. Default: secure in production if no unencrypted indicator was found; false in dev/test
+  return process.env.NODE_ENV === "production"
+}
+
+/**
  * Retrieve configured credentials from environment variables.
  * Supports AUTH_USER / AUTH_PASSWORD with fallback to BASIC_AUTH_USER / BASIC_AUTH_PASSWORD.
  */

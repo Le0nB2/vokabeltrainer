@@ -5,6 +5,7 @@ import {
   getAppSecret,
   getFallbackSecret,
   resetFallbackSecret,
+  isSecureRequest,
   createAppSessionToken,
   verifyAppSessionToken,
   createSettingsSessionToken,
@@ -249,6 +250,75 @@ describe('auth-utils', () => {
       expect(verifySessionCookie('wrong-cookie', password)).toBe(false)
       expect(verifySessionCookie(cookieValue, 'wrong-pass')).toBe(false)
       expect(verifySessionCookie(undefined, undefined)).toBe(true)
+    })
+  })
+
+  describe('SEC-10: isSecureRequest & Cookie Security', () => {
+    function createMockHeaders(map: Record<string, string>) {
+      const lowerMap = new Map(Object.entries(map).map(([k, v]) => [k.toLowerCase(), v]))
+      return {
+        get: (key: string) => lowerMap.get(key.toLowerCase()) || null,
+      }
+    }
+
+    beforeEach(() => {
+      delete process.env.COOKIE_SECURE
+      ;(process.env as Record<string, string | undefined>).NODE_ENV = 'development'
+    })
+
+    it('identifies standard https from x-forwarded-proto', () => {
+      const headers = createMockHeaders({ 'x-forwarded-proto': 'https' })
+      expect(isSecureRequest(headers)).toBe(true)
+    })
+
+    it('identifies https from comma-separated proxy chain in x-forwarded-proto', () => {
+      const headers = createMockHeaders({ 'x-forwarded-proto': 'https, http, https' })
+      expect(isSecureRequest(headers)).toBe(true)
+    })
+
+    it('identifies plain http from comma-separated proxy chain', () => {
+      const headers = createMockHeaders({ 'x-forwarded-proto': 'http, https' })
+      expect(isSecureRequest(headers)).toBe(false)
+    })
+
+    it('identifies https from alternative proxy headers (x-forwarded-ssl, front-end-https, x-url-scheme)', () => {
+      expect(isSecureRequest(createMockHeaders({ 'x-forwarded-ssl': 'on' }))).toBe(true)
+      expect(isSecureRequest(createMockHeaders({ 'front-end-https': 'on' }))).toBe(true)
+      expect(isSecureRequest(createMockHeaders({ 'x-url-scheme': 'https' }))).toBe(true)
+    })
+
+    it('identifies https from origin and referer headers', () => {
+      expect(isSecureRequest(createMockHeaders({ origin: 'https://vokabeltrainer.example.com' }))).toBe(true)
+      expect(isSecureRequest(createMockHeaders({ referer: 'https://vokabeltrainer.example.com/login' }))).toBe(true)
+    })
+
+    it('identifies unencrypted http from origin or referer on local network', () => {
+      expect(isSecureRequest(createMockHeaders({ origin: 'http://192.168.1.50:3000' }))).toBe(false)
+      expect(isSecureRequest(createMockHeaders({ referer: 'http://192.168.1.50:3000/login' }))).toBe(false)
+    })
+
+    it('respects COOKIE_SECURE=true override regardless of headers', () => {
+      process.env.COOKIE_SECURE = 'true'
+      const headers = createMockHeaders({ 'x-forwarded-proto': 'http' })
+      expect(isSecureRequest(headers)).toBe(true)
+    })
+
+    it('respects COOKIE_SECURE=false override even if request is https', () => {
+      process.env.COOKIE_SECURE = 'false'
+      const headers = createMockHeaders({ 'x-forwarded-proto': 'https' })
+      expect(isSecureRequest(headers)).toBe(false)
+    })
+
+    it('defaults to true in production if no unencrypted indicator is present', () => {
+      ;(process.env as Record<string, string | undefined>).NODE_ENV = 'production'
+      expect(isSecureRequest(null)).toBe(true)
+      expect(isSecureRequest(createMockHeaders({}))).toBe(true)
+    })
+
+    it('defaults to false in development if no https header is present', () => {
+      ;(process.env as Record<string, string | undefined>).NODE_ENV = 'development'
+      expect(isSecureRequest(null)).toBe(false)
+      expect(isSecureRequest(createMockHeaders({}))).toBe(false)
     })
   })
 })

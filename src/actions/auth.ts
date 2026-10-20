@@ -8,6 +8,7 @@ import {
   createSettingsSessionToken,
   getAppAuthCredentials,
   getAppSecret,
+  isSecureRequest,
   secureCompare,
 } from "@/lib/auth-utils"
 import {
@@ -56,11 +57,11 @@ export async function checkPassword(password: string) {
   if (isMatch) {
     resetRateLimit(rateLimitKey)
     const headersList = await headers()
-    const isHttps = headersList.get("x-forwarded-proto") === "https"
+    const isSecure = isSecureRequest(headersList)
     const cookieStore = await cookies()
     cookieStore.set(SETTINGS_COOKIE_NAME, createSettingsSessionToken(envPassword, SETTINGS_COOKIE_MAX_AGE), {
       httpOnly: true,
-      secure: process.env.NODE_ENV === "production" && isHttps,
+      secure: isSecure,
       path: "/",
       sameSite: "lax",
       maxAge: SETTINGS_COOKIE_MAX_AGE,
@@ -102,14 +103,14 @@ export async function loginApp(credentials: { username?: string; password?: stri
   if (isUserValid && isPasswordValid) {
     resetRateLimit(rateLimitKey)
     const headersList = await headers()
-    const isHttps = headersList.get("x-forwarded-proto") === "https"
+    const isSecure = isSecureRequest(headersList)
     const cookieStore = await cookies()
     const secret = getAppSecret(envPassword)
     const token = createAppSessionToken(envUser || username, secret, AUTH_COOKIE_MAX_AGE)
 
     cookieStore.set(AUTH_COOKIE_NAME, token, {
       httpOnly: true,
-      secure: process.env.NODE_ENV === "production" && isHttps,
+      secure: isSecure,
       path: "/",
       sameSite: "lax",
       maxAge: AUTH_COOKIE_MAX_AGE,
@@ -126,14 +127,18 @@ export async function loginApp(credentials: { username?: string; password?: stri
 }
 
 export async function logoutApp() {
+  const headersList = await headers()
+  const isSecure = isSecureRequest(headersList)
   const cookieStore = await cookies()
   cookieStore.set(AUTH_COOKIE_NAME, "", {
     httpOnly: true,
+    secure: isSecure,
     path: "/",
     maxAge: 0,
   })
   cookieStore.set(SETTINGS_COOKIE_NAME, "", {
     httpOnly: true,
+    secure: isSecure,
     path: "/",
     maxAge: 0,
   })
