@@ -3,6 +3,8 @@ import {
   secureCompare,
   getAppAuthCredentials,
   getAppSecret,
+  getFallbackSecret,
+  resetFallbackSecret,
   createAppSessionToken,
   verifyAppSessionToken,
   createSettingsSessionToken,
@@ -71,6 +73,67 @@ describe('auth-utils', () => {
 
       const creds = getAppAuthCredentials()
       expect(creds.isConfigured).toBe(false)
+    })
+  })
+
+  describe('SEC-09: Fallback Secret Hardening (getAppSecret & getFallbackSecret)', () => {
+    beforeEach(() => {
+      delete process.env.AUTH_SECRET
+      delete process.env.SESSION_SECRET
+      resetFallbackSecret()
+    })
+
+    it('prefers AUTH_SECRET when configured in environment', () => {
+      process.env.AUTH_SECRET = 'explicit-auth-secret'
+      process.env.SESSION_SECRET = 'ignored-session-secret'
+      expect(getAppSecret()).toBe('explicit-auth-secret')
+    })
+
+    it('prefers SESSION_SECRET when AUTH_SECRET is not configured', () => {
+      delete process.env.AUTH_SECRET
+      process.env.SESSION_SECRET = 'explicit-session-secret'
+      expect(getAppSecret()).toBe('explicit-session-secret')
+    })
+
+    it('uses provided password when no environment secrets are set', () => {
+      delete process.env.AUTH_SECRET
+      delete process.env.SESSION_SECRET
+      expect(getAppSecret('admin-pass-123')).toBe('admin-pass-123')
+    })
+
+    it('generates a cryptographically random 256-bit hex secret and never uses the static fallback', () => {
+      delete process.env.AUTH_SECRET
+      delete process.env.SESSION_SECRET
+      const secret = getAppSecret()
+
+      // Never use the hardcoded static secret string
+      expect(secret).not.toBe('vokabeltrainer-session-secret')
+      // 32 bytes in hex = 64 characters
+      expect(secret).toHaveLength(64)
+      expect(secret).toMatch(/^[0-9a-f]{64}$/)
+    })
+
+    it('persists the in-memory fallback secret across multiple calls within the same process', () => {
+      delete process.env.AUTH_SECRET
+      delete process.env.SESSION_SECRET
+      const first = getAppSecret()
+      const second = getAppSecret()
+      const fallback = getFallbackSecret()
+
+      expect(first).toBe(second)
+      expect(second).toBe(fallback)
+    })
+
+    it('generates a new unique secret after resetFallbackSecret()', () => {
+      delete process.env.AUTH_SECRET
+      delete process.env.SESSION_SECRET
+      const first = getAppSecret()
+      resetFallbackSecret()
+      const second = getAppSecret()
+
+      expect(first).not.toBe(second)
+      expect(first).toHaveLength(64)
+      expect(second).toHaveLength(64)
     })
   })
 

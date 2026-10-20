@@ -1,4 +1,4 @@
-import { createHash, createHmac, timingSafeEqual } from "crypto"
+import { createHash, createHmac, randomBytes, timingSafeEqual } from "crypto"
 
 export { getSafeRedirectUrl } from "./utils/url"
 
@@ -7,6 +7,35 @@ export const AUTH_COOKIE_MAX_AGE = 30 * 24 * 60 * 60 // 30 days in seconds
 
 export const SETTINGS_COOKIE_NAME = "settings_auth"
 export const SETTINGS_COOKIE_MAX_AGE = 24 * 60 * 60 // 1 day in seconds
+
+declare global {
+  var __vokabeltrainer_fallback_secret: string | undefined
+  var __vokabeltrainer_warned_secret: boolean | undefined
+}
+
+/**
+ * Generate or retrieve an in-memory random 256-bit secret when no explicit secret is configured.
+ */
+export function getFallbackSecret(): string {
+  if (!globalThis.__vokabeltrainer_fallback_secret) {
+    globalThis.__vokabeltrainer_fallback_secret = randomBytes(32).toString("hex")
+    if (process.env.NODE_ENV === "production" && !globalThis.__vokabeltrainer_warned_secret) {
+      globalThis.__vokabeltrainer_warned_secret = true
+      console.warn(
+        "[Security Warning] Neither AUTH_SECRET nor SESSION_SECRET is set in the environment. A random 256-bit secret was generated in-memory. For persistent sessions across server restarts, please configure AUTH_SECRET."
+      )
+    }
+  }
+  return globalThis.__vokabeltrainer_fallback_secret
+}
+
+/**
+ * Reset in-memory fallback secret (primarily for testing purposes).
+ */
+export function resetFallbackSecret(): void {
+  delete globalThis.__vokabeltrainer_fallback_secret
+  delete globalThis.__vokabeltrainer_warned_secret
+}
 
 /**
  * Constant-time string comparison resistant to timing attacks
@@ -41,7 +70,7 @@ export function getAppSecret(password?: string): string {
     process.env.AUTH_SECRET ||
     process.env.SESSION_SECRET ||
     password ||
-    "vokabeltrainer-session-secret"
+    getFallbackSecret()
   )
 }
 

@@ -187,9 +187,17 @@ Die Schwachstellen sind nach Schweregrad (**Kritisch / Hoch**, **Mittel**, **Nie
 ---
 
 #### SEC-09: Fest codierter Fallback-Secret-String
-- **Datei**: [src/lib/auth-utils.ts](file:///home/bbuch/vokabel-trainer-docker/vokabeltrainer/src/lib/auth-utils.ts#L34-L41)
+- **Status**: ✅ **Erledigt** (Branch `sicherheitsanpassungen`)
+- **Datei**: [src/lib/auth-utils.ts](file:///home/bbuch/vokabel-trainer-docker/vokabeltrainer/src/lib/auth-utils.ts)
+- **Umsetzung**:
+  - `getAppSecret` entfernt den hardcodierten Fallback `"vokabeltrainer-session-secret"`.
+  - Wenn weder `AUTH_SECRET` noch `SESSION_SECRET` noch ein Passwort konfiguriert sind, erzeugt `getFallbackSecret()` zur Laufzeit ein kryptografisch sicheres 256-Bit-Zufalls-Secret (`crypto.randomBytes(32).toString('hex')`) im Arbeitsspeicher (`globalThis.__vokabeltrainer_fallback_secret`).
+  - In Produktionsumgebungen ohne gesetztes `AUTH_SECRET` wird eine einmalige Sicherheitswarnung geloggt.
+  - Unit-Tests in `tests/auth-utils.test.ts` (6 Tests für Priorisierung, Zufälligkeit, Persistenz im Prozess und Reset).
 - **Problem**:
-  Wenn weder `AUTH_SECRET` noch `password` gesetzt sind, fällt das System auf `"vokabeltrainer-session-secret"` zurück.
+  Wenn weder `AUTH_SECRET` noch `password` gesetzt sind, fiel das System auf `"vokabeltrainer-session-secret"` zurück.
+- **Gefahr**:
+  Bekannter Standardschlüssel im öffentlichen Quellcode ermöglicht theoretische Fälschung von HMAC-Tokens.
 - **Empfohlene Behebung**:
   Falls kein Secret und kein Passwort existiert, beim Serverstart ein zufälliges kryptografisches Secret im Speicher erzeugen (`randomBytes(32)`), sodass kein bekannter Standardwert genutzt wird.
 
