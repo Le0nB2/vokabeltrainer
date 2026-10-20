@@ -149,9 +149,15 @@ Die Schwachstellen sind nach Schweregrad (**Kritisch / Hoch**, **Mittel**, **Nie
 ---
 
 #### SEC-07: Backup-Export ohne Auth bei fehlendem `SETTINGS_PASSWORD`
-- **Datei**: [src/app/api/export/route.ts](file:///home/bbuch/vokabel-trainer-docker/vokabeltrainer/src/app/api/export/route.ts#L8-L18)
+- **Status**: ✅ **Erledigt** (Branch `sicherheitsanpassungen`)
+- **Datei**: [src/app/api/export/route.ts](file:///home/bbuch/vokabel-trainer-docker/vokabeltrainer/src/app/api/export/route.ts) & [src/components/ImportExport.tsx](file:///home/bbuch/vokabel-trainer-docker/vokabeltrainer/src/components/ImportExport.tsx)
+- **Umsetzung**:
+  - `GET` und `POST` in `/api/export` erzwingen serverseitig `requireAppAuth()` (401 bei unauthentifiziertem Aufruf; wird im lokalen Modus ohne konfigurierte Zugangsdaten automatisch durchgelassen).
+  - Falls `SETTINGS_PASSWORD` in `.env` hinterlegt ist, wird weiterhin zusätzlich die Settings-Session geprüft.
+  - Im Frontend (`ImportExport.tsx`) wurde der ungeschützte `<a href="...">`-Link durch einen interaktiven Button mit `POST`-Anfrage, Ladeanzeige (`isExporting`) und klarer UI-Fehlermeldung (z. B. bei abgelaufener Session) ersetzt.
+  - Umfassende Tests in `tests/export-route.test.ts` (10 Tests) und `tests/import-export.test.tsx` (4 Tests).
 - **Problem**:
-  In `export/route.ts` wird nur dann eine Authentifizierung geprüft, wenn `SETTINGS_PASSWORD` in der `.env` gesetzt ist. Wenn jemand kein Einstellungspasswort vergeben hat, kann jede Person mit regulärem Zugriff (oder bei offenem Link) das komplette Datenbank-Backup via `GET` herunterladen. Zudem ist `GET` anfällig für CSRF über top-level Links.
+  In `export/route.ts` wurde nur dann eine Authentifizierung geprüft, wenn `SETTINGS_PASSWORD` in der `.env` gesetzt war. Wenn jemand kein Einstellungspasswort vergeben hatte, konnte jede Person mit regulärem Zugriff (oder bei offenem Link) das komplette Datenbank-Backup via `GET` herunterladen. Zudem war `GET` anfällig für CSRF über top-level Links.
 - **Gefahr**:
   Ungewollter Datenabfluss aller Vokabeln und Statistiken.
 - **Empfohlene Behebung**:

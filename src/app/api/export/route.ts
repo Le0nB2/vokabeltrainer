@@ -2,9 +2,14 @@ import { NextResponse } from 'next/server'
 import { cookies } from 'next/headers'
 import prisma from '@/lib/prisma'
 import { verifySettingsSessionToken, SETTINGS_COOKIE_NAME } from '@/lib/auth-utils'
+import { requireAppAuth, UnauthorizedError } from '@/lib/auth-guard'
 
-export async function GET() {
+async function handleExport() {
   try {
+    // 1. Enforce App Auth (bypassed if not configured in environment)
+    await requireAppAuth()
+
+    // 2. Enforce Settings Auth if configured
     const envPassword = process.env.SETTINGS_PASSWORD
     if (envPassword) {
       const cookieStore = await cookies()
@@ -48,7 +53,19 @@ export async function GET() {
       },
     })
   } catch (error) {
+    if (error instanceof UnauthorizedError) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+    }
     console.error('Export failed:', error)
-    return new NextResponse('Export failed', { status: 500 })
+    return NextResponse.json({ error: 'Export failed' }, { status: 500 })
   }
 }
+
+export async function GET() {
+  return handleExport()
+}
+
+export async function POST() {
+  return handleExport()
+}
+

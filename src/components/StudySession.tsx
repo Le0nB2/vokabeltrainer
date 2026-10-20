@@ -146,7 +146,7 @@ export function StudySession({ deck, dueCards, settings }: { deck: { id: string,
 
   const playAudio = (text: string, e?: React.MouseEvent) => {
     if (e) e.stopPropagation();
-    if ('speechSynthesis' in window) {
+    if ('speechSynthesis' in window && typeof SpeechSynthesisUtterance !== 'undefined') {
       // Cancel any ongoing speech
       window.speechSynthesis.cancel();
       const utterance = new SpeechSynthesisUtterance(text);

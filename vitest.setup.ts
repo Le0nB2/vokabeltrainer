@@ -13,6 +13,18 @@ if (!globalThis.__mockHeaders) {
   globalThis.__mockHeaders = new Map()
 }
 
+if (typeof window !== 'undefined') {
+  if (!window.SpeechSynthesisUtterance) {
+    (window as any).SpeechSynthesisUtterance = class {
+      lang = ''
+      text = ''
+      constructor(text = '') {
+        this.text = text
+      }
+    }
+  }
+}
+
 vi.mock('next/headers', () => ({
   cookies: async () => ({
     get: (name: string) => globalThis.__mockCookies.get(name),
