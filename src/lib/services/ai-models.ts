@@ -89,6 +89,19 @@ export function isSuitableModel(id: string): boolean {
 }
 
 /**
+ * Determines whether a model is accessible on the Google AI Studio Free Tier
+ * or requires a paid pay-as-you-go billing account.
+ * In Google's official naming hierarchy, all Pro flagship models require paid billing,
+ * while Flash and Flash-Lite models have free tier quotas.
+ */
+export function getModelTier(id: string): "free" | "paid" {
+  if (id.toLowerCase().includes("pro")) {
+    return "paid";
+  }
+  return "free";
+}
+
+/**
  * Connects to Google GenAI API using configured keys,
  * retrieves all available models, filters for text/vision Gemini models,
  * and saves them into the SQLite database.

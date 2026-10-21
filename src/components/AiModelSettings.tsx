@@ -2,7 +2,7 @@
 
 import { useState } from "react"
 import { updateSettings, syncAiModelsAction } from "@/actions/settings"
-import { Sparkles, RefreshCw, AlertCircle, CheckCircle2 } from "lucide-react"
+import { Sparkles, RefreshCw, AlertCircle, CheckCircle2, CreditCard } from "lucide-react"
 import { ApiUsageChart } from "@/components/ApiUsageChart"
 import type { ApiStatsResult } from "@/actions/api-stats"
 
@@ -87,6 +87,7 @@ export function AiModelSettings({
   }
 
   const currentModelInfo = models.find((m) => m.id === selectedModel)
+  const isPaidSelected = selectedModel.toLowerCase().includes("pro")
 
   // Categorize suitable models
   const flashLiteModels = models.filter((m) => m.id.includes("lite"))
@@ -151,7 +152,7 @@ export function AiModelSettings({
             </div>
 
             <select
-              className="bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 rounded-md py-2 px-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 w-full sm:w-80"
+              className="bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 rounded-md py-2 px-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 w-full sm:w-84"
               value={selectedModel}
               onChange={(e) => handleModelChange(e.target.value)}
             >
@@ -160,36 +161,53 @@ export function AiModelSettings({
               )}
 
               {flashLiteModels.length > 0 && (
-                <optgroup label="Flash-Lite (Empfohlen – sehr schnell & sparsam)">
+                <optgroup label="Flash-Lite (Kostenlos / Free Tier)">
                   {flashLiteModels.map((m) => (
                     <option key={m.id} value={m.id}>
-                      {m.displayName}
+                      {m.displayName} [Free Tier]
                     </option>
                   ))}
                 </optgroup>
               )}
 
               {flashModels.length > 0 && (
-                <optgroup label="Flash (Allrounder für Text & Foto-Scan)">
+                <optgroup label="Flash (Kostenlos / Free Tier)">
                   {flashModels.map((m) => (
                     <option key={m.id} value={m.id}>
-                      {m.displayName}
+                      {m.displayName} [Free Tier]
                     </option>
                   ))}
                 </optgroup>
               )}
 
               {proModels.length > 0 && (
-                <optgroup label="Pro (Höchste Genauigkeit)">
+                <optgroup label="Pro (Kostenpflichtig / Paid API)">
                   {proModels.map((m) => (
                     <option key={m.id} value={m.id}>
-                      {m.displayName}
+                      {m.displayName} [Paid API]
                     </option>
                   ))}
                 </optgroup>
               )}
             </select>
           </div>
+
+          {/* Dynamic Free Tier / Paid API Status Badge */}
+          {isPaidSelected ? (
+            <div className="mt-4 flex items-start gap-2.5 p-3 rounded-lg bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-900/50 text-amber-800 dark:text-amber-300 text-xs">
+              <CreditCard className="w-4 h-4 shrink-0 mt-0.5 text-amber-600 dark:text-amber-400" />
+              <div>
+                <span className="font-semibold">Paid API erforderlich:</span> Pro-Modelle setzen ein Google AI Studio Abrechnungskonto (Pay-as-you-go) voraus. Mit einem rein kostenlosen API-Key meldet Google für Pro-Modelle einen Kontingent-Fehler (429).
+              </div>
+            </div>
+          ) : (
+            <div className="mt-4 flex items-center gap-2.5 p-2.5 rounded-lg bg-green-50 dark:bg-green-950/30 border border-green-200 dark:border-green-900/50 text-green-800 dark:text-green-300 text-xs">
+              <CheckCircle2 className="w-4 h-4 shrink-0 text-green-600 dark:text-green-400" />
+              <div>
+                <span className="font-semibold">Kostenlos (Free Tier):</span> Dieses Modell kann regulär mit dem kostenlosen Google API-Key genutzt werden.
+              </div>
+            </div>
+          )}
 
           {currentModelInfo?.description && (
             <div className="mt-3 pt-3 border-t border-zinc-200 dark:border-zinc-700/60 text-xs text-zinc-500">

@@ -5,6 +5,7 @@ import {
   getStoredAiModels,
   fetchAndPersistGoogleModels,
   isSuitableModel,
+  getModelTier,
 } from "@/lib/services/ai-models";
 
 describe("ai-models service", () => {
@@ -178,6 +179,21 @@ describe("ai-models service", () => {
       expect(isSuitableModel("gemini-4-argon")).toBe(false);
       expect(isSuitableModel("gemini-nano-banana-2.1")).toBe(false);
       expect(isSuitableModel("gemini-robotics-er-2-preview")).toBe(false);
+    });
+  });
+
+  describe("getModelTier", () => {
+    it("classifies Pro models as paid", () => {
+      expect(getModelTier("gemini-3.1-pro-preview")).toBe("paid");
+      expect(getModelTier("gemini-pro-latest")).toBe("paid");
+      expect(getModelTier("gemini-4-pro")).toBe("paid");
+    });
+
+    it("classifies Flash and Flash-Lite models as free tier", () => {
+      expect(getModelTier("gemini-3.5-flash-lite")).toBe("free");
+      expect(getModelTier("gemini-3.1-flash-lite")).toBe("free");
+      expect(getModelTier("gemini-3.8-flash")).toBe("free");
+      expect(getModelTier("gemini-flash-latest")).toBe("free");
     });
   });
 });
