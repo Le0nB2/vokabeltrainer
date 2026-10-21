@@ -62,89 +62,119 @@ export async function getStoredAiModels(): Promise<FilteredAiModel[]> {
 }
 
 /**
+ * Determines whether a model returned by Google is suitable for the Vokabeltrainer app.
+ * Suitable models must be active general-purpose Gemini models that handle vision & JSON generation
+ * (excluding legacy/deprecated 1.x/2.x models, audio/TTS, pure image generation, robotics, or experimental tools).
+ */
+export function isSuitableModel(id: string): boolean {
+  if (!id.startsWith("gemini-")) return false;
+
+  // Exclude legacy versions that Google has deprecated or discontinued
+  if (id.startsWith("gemini-1.") || id.startsWith("gemini-2.")) return false;
+
+  const unsuitableKeywords = [
+    "tts",
+    "audio",
+    "transcribe",
+    "image",
+    "computer-use",
+    "customtools",
+    "robotics",
+    "banana",
+    "omni",
+    "argon",
+  ];
+
+  return !unsuitableKeywords.some((keyword) => id.includes(keyword));
+}
+
+/**
  * Connects to Google GenAI API using configured keys,
  * retrieves all available models, filters for text/vision Gemini models,
  * and saves them into the SQLite database.
  */
-export async function fetchAndPersistGoogleModels(): Promise<{
+export async function fetchAndPersistGoogleModels(customAiClient?: any): Promise<{
   success: boolean;
   count: number;
   error?: string;
 }> {
-  const rawKeys = process.env.GEMINI_API_KEYS || process.env.GEMINI_API_KEY;
-  if (!rawKeys) {
-    return {
-      success: false,
-      count: 0,
-      error: "Kein GEMINI_API_KEY in der Konfiguration hinterlegt.",
-    };
-  }
-
-  const apiKeys = rawKeys
-    .split(",")
-    .map((k) => k.trim())
-    .filter((k) => k.length > 0);
-
-  if (apiKeys.length === 0) {
-    return {
-      success: false,
-      count: 0,
-      error: "Keine gültigen API-Keys gefunden.",
-    };
-  }
-
-  let lastError: unknown = null;
   const validModels: FilteredAiModel[] = [];
 
-  for (const apiKey of apiKeys) {
-    try {
-      const ai = new GoogleGenAI({ apiKey });
-      const pager = await ai.models.list();
+  if (customAiClient) {
+    const pager = await customAiClient.models.list();
+    for await (const m of pager) {
+      if (!m.supportedActions?.includes("generateContent")) continue;
+      const id = (m.name || "").replace(/^models\//, "");
+      if (!isSuitableModel(id)) continue;
+      validModels.push({
+        id,
+        name: m.name || `models/${id}`,
+        displayName: m.displayName || id,
+        description: m.description || null,
+      });
+    }
+  } else {
+    const rawKeys = process.env.GEMINI_API_KEYS || process.env.GEMINI_API_KEY;
+    if (!rawKeys) {
+      return {
+        success: false,
+        count: 0,
+        error: "Kein GEMINI_API_KEY in der Konfiguration hinterlegt.",
+      };
+    }
 
-      for await (const m of pager) {
-        if (!m.supportedActions?.includes("generateContent")) continue;
+    const apiKeys = rawKeys
+      .split(",")
+      .map((k) => k.trim())
+      .filter((k) => k.length > 0);
 
-        const id = (m.name || "").replace(/^models\//, "");
-        if (!id.startsWith("gemini-")) continue;
+    if (apiKeys.length === 0) {
+      return {
+        success: false,
+        count: 0,
+        error: "Keine gültigen API-Keys gefunden.",
+      };
+    }
 
-        // Exclude specialized non-text or preview variants that don't fit general LLM usage
-        if (
-          id.includes("tts") ||
-          id.includes("transcribe") ||
-          id.includes("image") ||
-          id.includes("computer-use") ||
-          id.includes("customtools") ||
-          id.includes("robotics") ||
-          id.includes("banana")
-        ) {
-          continue;
+    let lastError: unknown = null;
+
+    for (const apiKey of apiKeys) {
+      try {
+        const ai = new GoogleGenAI({ apiKey });
+        const pager = await ai.models.list();
+
+        for await (const m of pager) {
+          if (!m.supportedActions?.includes("generateContent")) continue;
+
+          const id = (m.name || "").replace(/^models\//, "");
+          if (!isSuitableModel(id)) continue;
+
+          validModels.push({
+            id,
+            name: m.name || `models/${id}`,
+            displayName: m.displayName || id,
+            description: m.description || null,
+          });
         }
 
-        validModels.push({
-          id,
-          name: m.name || `models/${id}`,
-          displayName: m.displayName || id,
-          description: m.description || null,
-        });
+        if (validModels.length > 0) {
+          break; // Successfully fetched
+        }
+      } catch (err) {
+        console.warn("Fehler beim Abrufen der Modelle mit API-Key:", err);
+        lastError = err;
       }
-
-      if (validModels.length > 0) {
-        break; // Successfully fetched
-      }
-    } catch (err) {
-      console.warn("Fehler beim Abrufen der Modelle mit API-Key:", err);
-      lastError = err;
     }
-  }
 
-  if (validModels.length === 0) {
-    const errorMsg =
-      lastError instanceof Error ? lastError.message : "Keine Modelle gefunden.";
-    return {
-      success: false,
-      count: 0,
-      error: `Fehler beim Abruf von Google: ${errorMsg}`,
-    };
+    if (validModels.length === 0) {
+      const errorMsg =
+        lastError instanceof Error ? lastError.message : "Keine Modelle gefunden.";
+      return {
+        success: false,
+        count: 0,
+        error: `Fehler beim Abruf von Google: ${errorMsg}`,
+      };
+    }
   }
 
   // Store in database

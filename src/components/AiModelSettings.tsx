@@ -3,6 +3,8 @@
 import { useState } from "react"
 import { updateSettings, syncAiModelsAction } from "@/actions/settings"
 import { Sparkles, RefreshCw, AlertCircle, CheckCircle2 } from "lucide-react"
+import { ApiUsageChart } from "@/components/ApiUsageChart"
+import type { ApiStatsResult } from "@/actions/api-stats"
 
 type ModelItem = {
   id: string
@@ -18,9 +20,11 @@ type Settings = {
 export function AiModelSettings({
   initialSettings,
   initialModels,
+  apiStats,
 }: {
   initialSettings: Settings
   initialModels: ModelItem[]
+  apiStats?: ApiStatsResult[]
 }) {
   const [selectedModel, setSelectedModel] = useState(
     initialSettings.selectedModel ?? "gemini-3.5-flash-lite"
@@ -58,9 +62,8 @@ export function AiModelSettings({
       if (res.success) {
         setFeedback({
           type: "success",
-          message: `${res.count} Modelle erfolgreich von Google abgerufen und gespeichert.`,
+          message: `${res.count} für die Anwendung geeignete Modelle von Google synchronisiert.`,
         })
-        // Fetch updated models list
         const { getAvailableAiModelsAction } = await import("@/actions/settings")
         const updated = await getAvailableAiModelsAction()
         setModels(updated)
@@ -85,12 +88,18 @@ export function AiModelSettings({
 
   const currentModelInfo = models.find((m) => m.id === selectedModel)
 
+  // Categorize suitable models
+  const flashLiteModels = models.filter((m) => m.id.includes("lite"))
+  const proModels = models.filter((m) => m.id.includes("pro"))
+  const flashModels = models.filter((m) => !m.id.includes("lite") && !m.id.includes("pro"))
+
   return (
-    <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl p-6 mt-8">
+    <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl p-6 shadow-sm mb-8">
+      {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
         <div className="flex items-center gap-2">
           <Sparkles className="w-5 h-5 text-blue-600 shrink-0" />
-          <h2 className="text-xl font-semibold">KI-Modell (Google Gemini)</h2>
+          <h2 className="text-xl font-semibold">Google Gemini API & Modell</h2>
           {isSaving && (
             <span className="text-sm text-zinc-500 font-normal ml-2">
               Speichert...
@@ -128,6 +137,7 @@ export function AiModelSettings({
         </div>
       )}
 
+      {/* Model Selection */}
       <div className="space-y-4">
         <div className="p-4 bg-zinc-50 dark:bg-zinc-800/50 rounded-lg">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
@@ -136,7 +146,7 @@ export function AiModelSettings({
                 Aktives Modell
               </div>
               <div className="text-sm text-zinc-500 mt-1">
-                Wähle das Modell, das für Scan, Eselsbrücken und Arbeitsblätter genutzt wird.
+                Wähle das Modell für Vokabel-Scan, Eselsbrücken und Arbeitsblätter.
               </div>
             </div>
 
@@ -145,15 +155,39 @@ export function AiModelSettings({
               value={selectedModel}
               onChange={(e) => handleModelChange(e.target.value)}
             >
-              {/* If selectedModel is not in models list yet, show it as selected option */}
               {!models.some((m) => m.id === selectedModel) && (
                 <option value={selectedModel}>{selectedModel}</option>
               )}
-              {models.map((model) => (
-                <option key={model.id} value={model.id}>
-                  {model.displayName} ({model.id})
-                </option>
-              ))}
+
+              {flashLiteModels.length > 0 && (
+                <optgroup label="Flash-Lite (Empfohlen – sehr schnell & sparsam)">
+                  {flashLiteModels.map((m) => (
+                    <option key={m.id} value={m.id}>
+                      {m.displayName}
+                    </option>
+                  ))}
+                </optgroup>
+              )}
+
+              {flashModels.length > 0 && (
+                <optgroup label="Flash (Allrounder für Text & Foto-Scan)">
+                  {flashModels.map((m) => (
+                    <option key={m.id} value={m.id}>
+                      {m.displayName}
+                    </option>
+                  ))}
+                </optgroup>
+              )}
+
+              {proModels.length > 0 && (
+                <optgroup label="Pro (Höchste Genauigkeit)">
+                  {proModels.map((m) => (
+                    <option key={m.id} value={m.id}>
+                      {m.displayName}
+                    </option>
+                  ))}
+                </optgroup>
+              )}
             </select>
           </div>
 
@@ -169,6 +203,13 @@ export function AiModelSettings({
           ausschließlich beim Klick auf &bdquo;Modelle jetzt abrufen&ldquo; statt, um API-Kontingente zu schonen.
         </p>
       </div>
+
+      {/* Nahtlose Verbindung zum API-Diagramm ohne Trennung */}
+      {apiStats && (
+        <div className="border-t border-zinc-200 dark:border-zinc-800 pt-6 mt-6">
+          <ApiUsageChart data={apiStats} embedded />
+        </div>
+      )}
     </div>
   )
 }

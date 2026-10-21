@@ -5,7 +5,6 @@ import { MinigameSettings } from "@/components/MinigameSettings"
 import { NotificationSettings } from "@/components/NotificationSettings"
 import { AudioSettings } from "@/components/AudioSettings"
 import { AiModelSettings } from "@/components/AiModelSettings"
-import { ApiUsageChart } from "@/components/ApiUsageChart"
 import { getSettings, getAvailableAiModelsAction } from "@/actions/settings"
 import { getApiStats } from "@/actions/api-stats"
 import { LogoutButton } from "@/components/LogoutButton"
@@ -44,8 +43,11 @@ export default async function SettingsPage() {
           )}
         </header>
 
-        <ApiUsageChart data={apiStats} />
-        <AiModelSettings initialSettings={settings} initialModels={availableModels} />
+        <AiModelSettings
+          initialSettings={settings}
+          initialModels={availableModels}
+          apiStats={apiStats}
+        />
         <NotificationSettings initialSettings={settings} />
         <AudioSettings initialSettings={settings} />
         <MinigameSettings initialSettings={settings} />

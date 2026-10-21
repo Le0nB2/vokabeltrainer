@@ -4,42 +4,17 @@ import {
   getModelHierarchy,
   getStoredAiModels,
   fetchAndPersistGoogleModels,
+  isSuitableModel,
 } from "@/lib/services/ai-models";
-
-const mockList = vi.fn();
-
-vi.mock("@google/genai", () => {
-  return {
-    GoogleGenAI: class {
-      models = {
-        list: mockList,
-      };
-    },
-  };
-});
-
-vi.mock("@/lib/prisma", () => ({
-  default: {
-    settings: {
-      findUnique: vi.fn(),
-    },
-    aiModel: {
-      findMany: vi.fn(),
-      deleteMany: vi.fn(),
-      upsert: vi.fn(),
-    },
-    $transaction: vi.fn(async (cb: any) => cb(prisma)),
-  },
-}));
 
 describe("ai-models service", () => {
   beforeEach(() => {
-    vi.clearAllMocks();
+    vi.restoreAllMocks();
   });
 
   describe("getModelHierarchy", () => {
     it("returns user selected model followed by fallbacks without duplicates", async () => {
-      vi.mocked(prisma.settings.findUnique).mockResolvedValueOnce({
+      vi.spyOn(prisma.settings, "findUnique").mockResolvedValueOnce({
         id: "default",
         selectedModel: "gemini-3.8-flash",
       } as any);
@@ -53,7 +28,7 @@ describe("ai-models service", () => {
     });
 
     it("does not duplicate if selectedModel is already a fallback", async () => {
-      vi.mocked(prisma.settings.findUnique).mockResolvedValueOnce({
+      vi.spyOn(prisma.settings, "findUnique").mockResolvedValueOnce({
         id: "default",
         selectedModel: "gemini-3.5-flash-lite",
       } as any);
@@ -66,7 +41,7 @@ describe("ai-models service", () => {
     });
 
     it("handles db errors gracefully and returns default fallbacks", async () => {
-      vi.mocked(prisma.settings.findUnique).mockRejectedValueOnce(
+      vi.spyOn(prisma.settings, "findUnique").mockRejectedValueOnce(
         new Error("DB error")
       );
 
@@ -80,7 +55,7 @@ describe("ai-models service", () => {
 
   describe("getStoredAiModels", () => {
     it("returns default fallback list when no models in DB", async () => {
-      vi.mocked(prisma.aiModel.findMany).mockResolvedValueOnce([]);
+      vi.spyOn(prisma.aiModel, "findMany").mockResolvedValueOnce([]);
 
       const models = await getStoredAiModels();
       expect(models.length).toBeGreaterThanOrEqual(1);
@@ -88,7 +63,7 @@ describe("ai-models service", () => {
     });
 
     it("returns stored models when available in DB", async () => {
-      vi.mocked(prisma.aiModel.findMany).mockResolvedValueOnce([
+      vi.spyOn(prisma.aiModel, "findMany").mockResolvedValueOnce([
         {
           id: "gemini-3.8-flash",
           name: "models/gemini-3.8-flash",
@@ -128,30 +103,38 @@ describe("ai-models service", () => {
     });
 
     it("fetches, filters, and stores valid Gemini models in database", async () => {
-      process.env.GEMINI_API_KEY = "test-api-key";
+      vi.spyOn(prisma, "$transaction").mockImplementation(async (cb: any) => {
+        return cb(prisma);
+      });
+      vi.spyOn(prisma.aiModel, "deleteMany").mockResolvedValueOnce({ count: 0 });
+      vi.spyOn(prisma.aiModel, "upsert").mockResolvedValue({ id: "gemini-3.5-flash" } as any);
 
-      mockList.mockResolvedValueOnce([
-        {
-          name: "models/gemini-3.5-flash",
-          displayName: "Gemini 3.5 Flash",
-          supportedActions: ["generateContent"],
-          description: "Fast model",
+      const mockAiClient = {
+        models: {
+          list: async function* () {
+            yield {
+              name: "models/gemini-3.5-flash",
+              displayName: "Gemini 3.5 Flash",
+              supportedActions: ["generateContent"],
+              description: "Fast model",
+            };
+            yield {
+              name: "models/gemini-3.8-flash-tts",
+              displayName: "Gemini 3.8 Flash TTS",
+              supportedActions: ["generateContent"],
+              description: "TTS model (should be filtered out)",
+            };
+            yield {
+              name: "models/text-embedding-004",
+              displayName: "Text Embedding",
+              supportedActions: ["embedContent"],
+              description: "Embedding (should be filtered out)",
+            };
+          },
         },
-        {
-          name: "models/gemini-3.8-flash-tts",
-          displayName: "Gemini 3.8 Flash TTS",
-          supportedActions: ["generateContent"],
-          description: "TTS model (should be filtered out)",
-        },
-        {
-          name: "models/text-embedding-004",
-          displayName: "Text Embedding",
-          supportedActions: ["embedContent"],
-          description: "Embedding (should be filtered out)",
-        },
-      ]);
+      };
 
-      const res = await fetchAndPersistGoogleModels();
+      const res = await fetchAndPersistGoogleModels(mockAiClient);
       expect(res.success).toBe(true);
       expect(res.count).toBe(1);
       expect(prisma.aiModel.deleteMany).toHaveBeenCalled();
@@ -169,6 +152,32 @@ describe("ai-models service", () => {
           description: "Fast model",
         },
       });
+    });
+  });
+
+  describe("isSuitableModel", () => {
+    it("accepts valid active Gemini text & vision models", () => {
+      expect(isSuitableModel("gemini-3.5-flash-lite")).toBe(true);
+      expect(isSuitableModel("gemini-3.8-flash")).toBe(true);
+      expect(isSuitableModel("gemini-3.1-pro-preview")).toBe(true);
+      expect(isSuitableModel("gemini-flash-latest")).toBe(true);
+    });
+
+    it("rejects non-gemini, deprecated, or specialized models", () => {
+      // Deprecated versions
+      expect(isSuitableModel("gemini-1.5-flash")).toBe(false);
+      expect(isSuitableModel("gemini-2.5-flash")).toBe(false);
+      expect(isSuitableModel("gemini-2.5-pro")).toBe(false);
+      // Non-gemini
+      expect(isSuitableModel("text-embedding-004")).toBe(false);
+      expect(isSuitableModel("gemma-4-31b-it")).toBe(false);
+      // Specialized non-general LLMs
+      expect(isSuitableModel("gemini-3.8-flash-tts")).toBe(false);
+      expect(isSuitableModel("gemini-3.1-flash-image")).toBe(false);
+      expect(isSuitableModel("gemini-omni-flash-preview")).toBe(false);
+      expect(isSuitableModel("gemini-4-argon")).toBe(false);
+      expect(isSuitableModel("gemini-nano-banana-2.1")).toBe(false);
+      expect(isSuitableModel("gemini-robotics-er-2-preview")).toBe(false);
     });
   });
 });
