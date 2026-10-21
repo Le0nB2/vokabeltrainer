@@ -96,138 +96,139 @@ export function AiModelSettings({
 
   return (
     <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl p-6 shadow-sm mb-8">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
-        <div className="flex items-center gap-2">
-          <Sparkles className="w-5 h-5 text-blue-600 shrink-0" />
-          <h2 className="text-xl font-semibold">Google Gemini API & Modell</h2>
-          {isSaving && (
-            <span className="text-sm text-zinc-500 font-normal ml-2">
-              Speichert...
-            </span>
-          )}
-        </div>
-
-        <button
-          type="button"
-          onClick={handleRefreshModels}
-          disabled={isRefreshing}
-          className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-zinc-700 text-sm font-medium transition-colors disabled:opacity-50 cursor-pointer disabled:cursor-not-allowed self-start sm:self-auto"
-        >
-          <RefreshCw
-            className={`w-4 h-4 ${isRefreshing ? "animate-spin text-blue-600" : ""}`}
-          />
-          {isRefreshing ? "Rufe Modelle ab..." : "Modelle jetzt abrufen"}
-        </button>
-      </div>
-
-      {feedback && (
-        <div
-          className={`flex items-start gap-3 p-3 mb-6 rounded-lg text-sm ${
-            feedback.type === "success"
-              ? "bg-green-50 dark:bg-green-950/30 border border-green-200 dark:border-green-900/50 text-green-700 dark:text-green-300"
-              : "bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-900/50 text-red-700 dark:text-red-300"
-          }`}
-        >
-          {feedback.type === "success" ? (
-            <CheckCircle2 className="w-4 h-4 mt-0.5 shrink-0" />
-          ) : (
-            <AlertCircle className="w-4 h-4 mt-0.5 shrink-0" />
-          )}
-          <span>{feedback.message}</span>
-        </div>
-      )}
-
-      {/* Model Selection */}
-      <div className="space-y-4">
-        <div className="p-4 bg-zinc-50 dark:bg-zinc-800/50 rounded-lg">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-            <div>
-              <div className="font-medium text-zinc-900 dark:text-zinc-100">
-                Aktives Modell
-              </div>
-              <div className="text-sm text-zinc-500 mt-1">
-                Wähle das Modell für Vokabel-Scan, Eselsbrücken und Arbeitsblätter.
-              </div>
-            </div>
-
-            <select
-              className="bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 rounded-md py-2 px-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 w-full sm:w-84"
-              value={selectedModel}
-              onChange={(e) => handleModelChange(e.target.value)}
-            >
-              {!models.some((m) => m.id === selectedModel) && (
-                <option value={selectedModel}>{selectedModel}</option>
-              )}
-
-              {flashLiteModels.length > 0 && (
-                <optgroup label="Flash-Lite (Kostenlos / Free Tier)">
-                  {flashLiteModels.map((m) => (
-                    <option key={m.id} value={m.id}>
-                      {m.displayName} [Free Tier]
-                    </option>
-                  ))}
-                </optgroup>
-              )}
-
-              {flashModels.length > 0 && (
-                <optgroup label="Flash (Kostenlos / Free Tier)">
-                  {flashModels.map((m) => (
-                    <option key={m.id} value={m.id}>
-                      {m.displayName} [Free Tier]
-                    </option>
-                  ))}
-                </optgroup>
-              )}
-
-              {proModels.length > 0 && (
-                <optgroup label="Pro (Kostenpflichtig / Paid API)">
-                  {proModels.map((m) => (
-                    <option key={m.id} value={m.id}>
-                      {m.displayName} [Paid API]
-                    </option>
-                  ))}
-                </optgroup>
-              )}
-            </select>
-          </div>
-
-          {/* Dynamic Free Tier / Paid API Status Badge */}
-          {isPaidSelected ? (
-            <div className="mt-4 flex items-start gap-2.5 p-3 rounded-lg bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-900/50 text-amber-800 dark:text-amber-300 text-xs">
-              <CreditCard className="w-4 h-4 shrink-0 mt-0.5 text-amber-600 dark:text-amber-400" />
-              <div>
-                <span className="font-semibold">Paid API erforderlich:</span> Pro-Modelle setzen ein Google AI Studio Abrechnungskonto (Pay-as-you-go) voraus. Mit einem rein kostenlosen API-Key meldet Google für Pro-Modelle einen Kontingent-Fehler (429).
-              </div>
-            </div>
-          ) : (
-            <div className="mt-4 flex items-center gap-2.5 p-2.5 rounded-lg bg-green-50 dark:bg-green-950/30 border border-green-200 dark:border-green-900/50 text-green-800 dark:text-green-300 text-xs">
-              <CheckCircle2 className="w-4 h-4 shrink-0 text-green-600 dark:text-green-400" />
-              <div>
-                <span className="font-semibold">Kostenlos (Free Tier):</span> Dieses Modell kann regulär mit dem kostenlosen Google API-Key genutzt werden.
-              </div>
-            </div>
-          )}
-
-          {currentModelInfo?.description && (
-            <div className="mt-3 pt-3 border-t border-zinc-200 dark:border-zinc-700/60 text-xs text-zinc-500">
-              <span className="font-medium">Beschreibung:</span> {currentModelInfo.description}
-            </div>
-          )}
-        </div>
-
-        <p className="text-xs text-zinc-500 dark:text-zinc-400">
-          Die Modelle sind in der lokalen Datenbank gespeichert. Ein Abruf bei Google findet
-          ausschließlich beim Klick auf &bdquo;Modelle jetzt abrufen&ldquo; statt, um API-Kontingente zu schonen.
-        </p>
-      </div>
-
-      {/* Nahtlose Verbindung zum API-Diagramm ohne Trennung */}
+      {/* 1. API Aufrufe & Fehler-Diagramm ganz oben */}
       {apiStats && (
-        <div className="border-t border-zinc-200 dark:border-zinc-800 pt-6 mt-6">
+        <div className="mb-6">
           <ApiUsageChart data={apiStats} embedded />
         </div>
       )}
+
+      {/* 2. Nahtlose Verbindung zu den Modell-Optionen */}
+      <div className={apiStats ? "border-t border-zinc-200 dark:border-zinc-800 pt-6" : ""}>
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
+          <div className="flex items-center gap-2">
+            <Sparkles className="w-5 h-5 text-blue-600 shrink-0" />
+            <h2 className="text-xl font-semibold">KI-Modell (Google Gemini)</h2>
+            {isSaving && (
+              <span className="text-sm text-zinc-500 font-normal ml-2">
+                Speichert...
+              </span>
+            )}
+          </div>
+
+          <button
+            type="button"
+            onClick={handleRefreshModels}
+            disabled={isRefreshing}
+            className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-zinc-700 text-sm font-medium transition-colors disabled:opacity-50 cursor-pointer disabled:cursor-not-allowed self-start sm:self-auto"
+          >
+            <RefreshCw
+              className={`w-4 h-4 ${isRefreshing ? "animate-spin text-blue-600" : ""}`}
+            />
+            {isRefreshing ? "Rufe Modelle ab..." : "Modelle jetzt abrufen"}
+          </button>
+        </div>
+
+        {feedback && (
+          <div
+            className={`flex items-start gap-3 p-3 mb-6 rounded-lg text-sm ${
+              feedback.type === "success"
+                ? "bg-green-50 dark:bg-green-950/30 border border-green-200 dark:border-green-900/50 text-green-700 dark:text-green-300"
+                : "bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-900/50 text-red-700 dark:text-red-300"
+            }`}
+          >
+            {feedback.type === "success" ? (
+              <CheckCircle2 className="w-4 h-4 mt-0.5 shrink-0" />
+            ) : (
+              <AlertCircle className="w-4 h-4 mt-0.5 shrink-0" />
+            )}
+            <span>{feedback.message}</span>
+          </div>
+        )}
+
+        <div className="space-y-4">
+          <div className="p-4 bg-zinc-50 dark:bg-zinc-800/50 rounded-lg">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <div>
+                <div className="font-medium text-zinc-900 dark:text-zinc-100">
+                  Aktives Modell
+                </div>
+                <div className="text-sm text-zinc-500 mt-1">
+                  Wähle das Modell für Vokabel-Scan, Eselsbrücken und Arbeitsblätter.
+                </div>
+              </div>
+
+              <select
+                className="bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 rounded-md py-2 px-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 w-full sm:w-84"
+                value={selectedModel}
+                onChange={(e) => handleModelChange(e.target.value)}
+              >
+                {!models.some((m) => m.id === selectedModel) && (
+                  <option value={selectedModel}>{selectedModel}</option>
+                )}
+
+                {flashLiteModels.length > 0 && (
+                  <optgroup label="Flash-Lite (Kostenlos / Free Tier)">
+                    {flashLiteModels.map((m) => (
+                      <option key={m.id} value={m.id}>
+                        {m.displayName} [Free Tier]
+                      </option>
+                    ))}
+                  </optgroup>
+                )}
+
+                {flashModels.length > 0 && (
+                  <optgroup label="Flash (Kostenlos / Free Tier)">
+                    {flashModels.map((m) => (
+                      <option key={m.id} value={m.id}>
+                        {m.displayName} [Free Tier]
+                      </option>
+                    ))}
+                  </optgroup>
+                )}
+
+                {proModels.length > 0 && (
+                  <optgroup label="Pro (Kostenpflichtig / Paid API)">
+                    {proModels.map((m) => (
+                      <option key={m.id} value={m.id}>
+                        {m.displayName} [Paid API]
+                      </option>
+                    ))}
+                  </optgroup>
+                )}
+              </select>
+            </div>
+
+            {/* Dynamic Free Tier / Paid API Status Badge */}
+            {isPaidSelected ? (
+              <div className="mt-4 flex items-start gap-2.5 p-3 rounded-lg bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-900/50 text-amber-800 dark:text-amber-300 text-xs">
+                <CreditCard className="w-4 h-4 shrink-0 mt-0.5 text-amber-600 dark:text-amber-400" />
+                <div>
+                  <span className="font-semibold">Paid API erforderlich:</span> Pro-Modelle setzen ein Google AI Studio Abrechnungskonto (Pay-as-you-go) voraus. Mit einem rein kostenlosen API-Key meldet Google für Pro-Modelle einen Kontingent-Fehler (429).
+                </div>
+              </div>
+            ) : (
+              <div className="mt-4 flex items-center gap-2.5 p-2.5 rounded-lg bg-green-50 dark:bg-green-950/30 border border-green-200 dark:border-green-900/50 text-green-800 dark:text-green-300 text-xs">
+                <CheckCircle2 className="w-4 h-4 shrink-0 text-green-600 dark:text-green-400" />
+                <div>
+                  <span className="font-semibold">Kostenlos (Free Tier):</span> Dieses Modell kann regulär mit dem kostenlosen Google API-Key genutzt werden.
+                </div>
+              </div>
+            )}
+
+            {currentModelInfo?.description && (
+              <div className="mt-3 pt-3 border-t border-zinc-200 dark:border-zinc-700/60 text-xs text-zinc-500">
+                <span className="font-medium">Beschreibung:</span> {currentModelInfo.description}
+              </div>
+            )}
+          </div>
+
+          <p className="text-xs text-zinc-500 dark:text-zinc-400">
+            Die Modelle sind in der lokalen Datenbank gespeichert. Ein Abruf bei Google findet
+            ausschließlich beim Klick auf &bdquo;Modelle jetzt abrufen&ldquo; statt, um API-Kontingente zu schonen.
+          </p>
+        </div>
+      </div>
     </div>
   )
 }
