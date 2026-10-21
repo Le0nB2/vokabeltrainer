@@ -143,6 +143,7 @@ export async function updateSettings(data: {
   wordDropEnabled?: boolean;
   notificationsEnabled?: boolean;
   speechLanguage?: string;
+  selectedModel?: string;
 }) {
   await requireAppAuth()
   const isAuth = await checkSettingsAuth()
@@ -157,4 +158,25 @@ export async function updateSettings(data: {
   revalidatePath("/settings")
   revalidatePath("/decks/[id]/study", "page")
   return updatedSettings
+}
+
+export async function getAvailableAiModelsAction() {
+  await requireAppAuth()
+  const { getStoredAiModels } = await import("@/lib/services/ai-models")
+  return await getStoredAiModels()
+}
+
+export async function syncAiModelsAction() {
+  await requireAppAuth()
+  const isAuth = await checkSettingsAuth()
+  if (!isAuth) {
+    return { success: false, count: 0, error: "Nicht autorisiert. Bitte melde dich mit dem Einstellungspasswort an." }
+  }
+
+  const { fetchAndPersistGoogleModels } = await import("@/lib/services/ai-models")
+  const result = await fetchAndPersistGoogleModels()
+  if (result.success) {
+    revalidatePath("/settings")
+  }
+  return result
 }

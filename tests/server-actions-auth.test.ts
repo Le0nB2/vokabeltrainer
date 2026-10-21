@@ -16,7 +16,7 @@ import {
   updateCardDetails,
   updateCardsEnrichmentBulk,
 } from '../src/actions/cards'
-import { getSettings, updateSettings, importData } from '../src/actions/settings'
+import { getSettings, updateSettings, importData, getAvailableAiModelsAction, syncAiModelsAction } from '../src/actions/settings'
 import { getApiStats } from '../src/actions/api-stats'
 
 const { mockCookies, mockPrisma } = vi.hoisted(() => {
@@ -57,6 +57,11 @@ const { mockCookies, mockPrisma } = vi.hoisted(() => {
     },
     apiUsageLog: {
       findMany: vi.fn().mockResolvedValue([]),
+    },
+    aiModel: {
+      findMany: vi.fn().mockResolvedValue([]),
+      deleteMany: vi.fn().mockResolvedValue({ count: 0 }),
+      upsert: vi.fn().mockResolvedValue({ id: 'dummy' }),
     },
     $transaction: vi.fn().mockImplementation((cb) => cb(prismaMock)),
   }
@@ -396,6 +401,28 @@ describe('SEC-02: Server Actions Authentication Protection', () => {
       setValidSessionCookie()
       const stats = await getApiStats()
       expect(Array.isArray(stats)).toBe(true)
+    })
+
+    it('blocks getAvailableAiModelsAction when unauthenticated', async () => {
+      await expect(getAvailableAiModelsAction()).rejects.toThrow(UnauthorizedError)
+    })
+
+    it('allows getAvailableAiModelsAction when authenticated', async () => {
+      setValidSessionCookie()
+      const models = await getAvailableAiModelsAction()
+      expect(Array.isArray(models)).toBe(true)
+    })
+
+    it('blocks syncAiModelsAction when unauthenticated', async () => {
+      await expect(syncAiModelsAction()).rejects.toThrow(UnauthorizedError)
+    })
+
+    it('blocks syncAiModelsAction when settings password is required but not provided', async () => {
+      setValidSessionCookie()
+      process.env.SETTINGS_PASSWORD = 'secret-settings-pw'
+      const res = await syncAiModelsAction()
+      expect(res.success).toBe(false)
+      expect(res.error).toContain('Einstellungspasswort')
     })
   })
 })
