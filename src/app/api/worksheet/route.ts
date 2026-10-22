@@ -5,6 +5,7 @@ import prisma from "@/lib/prisma";
 import { z } from "zod";
 import { requireAppAuth, UnauthorizedError } from "@/lib/auth-guard";
 import { consumeRateLimit, formatRetryDuration, getClientIpFromHeaders } from "@/lib/rate-limit";
+import { getModelHierarchy } from "@/lib/services/ai-models";
 
 const requestSchema = z.object({
   deckId: z.string().min(1, "No deckId provided").max(100, "deckId darf maximal 100 Zeichen lang sein")
@@ -86,7 +87,7 @@ export async function POST(req: NextRequest) {
     let success = false;
     let parsedWorksheet = null;
 
-    const models = ["gemini-3.5-flash-lite", "gemini-3.1-flash-lite"];
+    const models = await getModelHierarchy();
 
     const promptText = `
 Erstelle ein Arbeitsblatt für die Klassenstufe 5-7 basierend auf den folgenden Vokabeln. Das Fach ist Englisch.

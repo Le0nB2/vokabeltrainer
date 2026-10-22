@@ -62,6 +62,16 @@ model Settings {
   worksheetCount        Int     @default(0)
   notificationsEnabled  Boolean @default(false)
   speechLanguage        String  @default("en-GB")
+  selectedModel         String  @default("gemini-3.5-flash-lite")
+}
+
+model AiModel {
+  id          String   @id
+  name        String
+  displayName String
+  description String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 }
 
 model ApiUsageLog {

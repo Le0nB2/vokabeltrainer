@@ -4,8 +4,8 @@ import { ImportExport } from "@/components/ImportExport"
 import { MinigameSettings } from "@/components/MinigameSettings"
 import { NotificationSettings } from "@/components/NotificationSettings"
 import { AudioSettings } from "@/components/AudioSettings"
-import { ApiUsageChart } from "@/components/ApiUsageChart"
-import { getSettings } from "@/actions/settings"
+import { AiModelSettings } from "@/components/AiModelSettings"
+import { getSettings, getAvailableAiModelsAction } from "@/actions/settings"
 import { getApiStats } from "@/actions/api-stats"
 import { LogoutButton } from "@/components/LogoutButton"
 import { getAppAuthCredentials } from "@/lib/auth-utils"
@@ -17,6 +17,7 @@ export const metadata = {
 export default async function SettingsPage() {
   const settings = await getSettings()
   const apiStats = await getApiStats()
+  const availableModels = await getAvailableAiModelsAction()
   const { isConfigured: isAuthEnabled } = getAppAuthCredentials()
 
   return (
@@ -42,10 +43,14 @@ export default async function SettingsPage() {
           )}
         </header>
 
-        <ApiUsageChart data={apiStats} />
-        <NotificationSettings initialSettings={settings} />
         <AudioSettings initialSettings={settings} />
         <MinigameSettings initialSettings={settings} />
+        <NotificationSettings initialSettings={settings} />
+        <AiModelSettings
+          initialSettings={settings}
+          initialModels={availableModels}
+          apiStats={apiStats}
+        />
         <ImportExport />
       </div>
     </main>

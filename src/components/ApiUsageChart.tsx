@@ -22,8 +22,21 @@ ChartJS.register(
   Legend
 )
 
-export function ApiUsageChart({ data }: { data: ApiStatsResult[] }) {
+export function ApiUsageChart({
+  data,
+  embedded = false,
+}: {
+  data: ApiStatsResult[]
+  embedded?: boolean
+}) {
   if (!data || data.length === 0) {
+    if (embedded) {
+      return (
+        <div className="py-8 text-center text-sm text-zinc-500 dark:text-zinc-400">
+          Noch keine API-Aufrufe aufgezeichnet.
+        </div>
+      )
+    }
     return (
       <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl p-6 shadow-sm mb-8 flex flex-col items-center justify-center min-h-[250px]">
         <p className="text-zinc-500 dark:text-zinc-400 text-sm">
@@ -123,6 +136,19 @@ export function ApiUsageChart({ data }: { data: ApiStatsResult[] }) {
         grid: { color: 'rgba(113, 113, 122, 0.1)' }
       },
     },
+  }
+
+  if (embedded) {
+    return (
+      <div>
+        <h3 className="text-base font-semibold mb-4 text-zinc-900 dark:text-zinc-100">
+          Google API Aufrufe (letzte 3 Tage)
+        </h3>
+        <div className="h-[280px]">
+          <Bar data={chartData} options={options} plugins={[ChartDataLabels]} />
+        </div>
+      </div>
+    )
   }
 
   return (

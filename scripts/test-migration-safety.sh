@@ -1,6 +1,8 @@
 #!/bin/bash
 set -e
 
+export PATH="$PWD/node_modules/.bin:$PATH"
+
 echo "=== Starting Migration Safety Test ==="
 
 # Ensure typescript execution is available

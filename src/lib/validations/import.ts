@@ -99,6 +99,7 @@ export const SettingsImportSchema = z.object({
   worksheetCount: z.number().int().min(0).max(100000).optional(),
   notificationsEnabled: z.boolean().optional(),
   speechLanguage: z.string().max(20, "Sprachcode darf maximal 20 Zeichen lang sein").optional(),
+  selectedModel: z.string().max(100, "Modellname darf maximal 100 Zeichen lang sein").optional(),
 })
 export type ValidatedSettings = z.infer<typeof SettingsImportSchema>
 

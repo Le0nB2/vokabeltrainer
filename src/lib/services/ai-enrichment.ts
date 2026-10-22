@@ -1,5 +1,6 @@
 import { GoogleGenAI, Type } from "@google/genai";
 import prisma from "@/lib/prisma";
+import { getModelHierarchy } from "@/lib/services/ai-models";
 
 export class QuotaExceededError extends Error {
   constructor(message: string) {
@@ -13,7 +14,7 @@ export async function enrichCards(cards: any[], apiKeys: string[]) {
   let success = false;
   let enrichedCards = null;
 
-  const models = ["gemini-3.5-flash-lite", "gemini-3.1-flash-lite"];
+  const models = await getModelHierarchy();
 
   const promptText = `
 Du bist ein didaktischer Englischlehrer für Schüler im Alter von 11 bis 13 Jahren (5.–7. Klasse). Generiere für die folgenden Vokabelpaare zwingend eine Eselsbrücke auf Deutsch ('mnemonic') nach der Schlüsselwortmethode: 1. Finde ein deutsches Wort, das lautmalerisch an das englische Wort erinnert. 2. Verknüpfe dieses Klangwort in einer kurzen, bildhaften Szene mit der deutschen Übersetzung. Keine reinen Reime ohne Klangbezug, keine Beleidigungen, strikt jugendfrei. Erstelle auch einen einfachen, verständlichen englischen Beispielsatz ('contextSentence'). Erstelle zwingend einen Lückentext ('gapText'), der EXAKT derselbe Satz wie 'contextSentence' ist, bei dem jedoch das englische Zielwort durch '___' ersetzt wurde.

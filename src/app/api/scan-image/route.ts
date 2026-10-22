@@ -3,6 +3,7 @@ import { GoogleGenAI, Type } from "@google/genai";
 import prisma from "@/lib/prisma";
 import { requireAppAuth, UnauthorizedError } from "@/lib/auth-guard";
 import { consumeRateLimit, formatRetryDuration, getClientIpFromHeaders } from "@/lib/rate-limit";
+import { getModelHierarchy } from "@/lib/services/ai-models";
 
 export async function POST(req: NextRequest) {
   try {
@@ -71,7 +72,7 @@ export async function POST(req: NextRequest) {
     let success = false;
     let parsedCards = null;
 
-    const models = ["gemini-3.5-flash-lite", "gemini-3.1-flash-lite"];
+    const models = await getModelHierarchy();
 
     // Try keys starting from the currentKeyIndex
     for (let attemptIndex = 0; attemptIndex < apiKeys.length; attemptIndex++) {
