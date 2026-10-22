@@ -72,6 +72,8 @@ export function ApiUsageChart({
     // Dataset für erfolgreiche Aufrufe dieses Keys
     datasets.push({
       label: `API ${key} (Erfolg)`,
+      keyIndex: key,
+      isError: false,
       data: uniqueDates.map(date => {
         const item = data.find(d => d.dateStr === date && d.keyIndex === key)
         return item ? item.successCount : 0
@@ -83,6 +85,8 @@ export function ApiUsageChart({
     // Dataset für fehlerhafte Aufrufe dieses Keys
     datasets.push({
       label: `API ${key} (Fehler)`,
+      keyIndex: key,
+      isError: true,
       data: uniqueDates.map(date => {
         const item = data.find(d => d.dateStr === date && d.keyIndex === key)
         return item ? item.errorCount : 0
@@ -96,6 +100,12 @@ export function ApiUsageChart({
     labels: uniqueDates,
     datasets: datasets,
   }
+
+  // Calculate totals for error breakdown badges
+  const totalOverloaded = data.reduce((sum, d) => sum + (d.errorBreakdown?.overloaded || 0), 0)
+  const totalQuota = data.reduce((sum, d) => sum + (d.errorBreakdown?.quota || 0), 0)
+  const totalOther = data.reduce((sum, d) => sum + (d.errorBreakdown?.other || 0), 0)
+  const totalErrors = totalOverloaded + totalQuota + totalOther
 
   const options = {
     responsive: true,
@@ -112,17 +122,66 @@ export function ApiUsageChart({
       title: {
         display: false,
       },
+      tooltip: {
+        callbacks: {
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          label: function(context: any) {
+            const dataset = context.dataset
+            const val = context.raw || 0
+            if (!dataset.isError || val === 0) {
+              return ` ${dataset.label}: ${val}`
+            }
+
+            const date = uniqueDates[context.dataIndex]
+            const item = data.find(d => d.dateStr === date && d.keyIndex === dataset.keyIndex)
+            if (!item || !item.errorBreakdown) {
+              return ` ${dataset.label}: ${val}`
+            }
+
+            const { overloaded, quota, other } = item.errorBreakdown
+            const reasons: string[] = []
+            if (overloaded > 0) reasons.push(`${overloaded}x überlastet (503)`)
+            if (quota > 0) reasons.push(`${quota}x Quote erschöpft (429)`)
+            if (other > 0) reasons.push(`${other}x Sonstiger Fehler`)
+
+            const detailStr = reasons.length > 0 ? ` [${reasons.join(', ')}]` : ''
+            return ` ${dataset.label}: ${val}${detailStr}`
+          }
+        }
+      },
       datalabels: {
         color: 'white',
         font: {
           weight: 'bold' as const,
+          size: 11,
         },
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         display: function(context: { dataset: any, dataIndex: number }) {
           // Nur anzeigen, wenn der Wert > 0 ist
           return context.dataset.data[context.dataIndex] > 0;
         },
-        formatter: Math.round
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        formatter: function(value: number, context: { dataset: any, dataIndex: number }) {
+          const dataset = context.dataset
+          if (!dataset.isError || value === 0) {
+            return Math.round(value)
+          }
+
+          const date = uniqueDates[context.dataIndex]
+          const item = data.find(d => d.dateStr === date && d.keyIndex === dataset.keyIndex)
+          if (!item || !item.errorBreakdown) {
+            return Math.round(value)
+          }
+
+          const { overloaded, quota, other } = item.errorBreakdown
+          if (overloaded > 0 && quota === 0 && other === 0) {
+            return `${value} (überlastet)`
+          }
+          if (quota > 0 && overloaded === 0 && other === 0) {
+            return `${value} (Quote)`
+          }
+          return Math.round(value)
+        }
       }
     },
     scales: {
@@ -138,6 +197,30 @@ export function ApiUsageChart({
     },
   }
 
+  const renderErrorBadges = () => {
+    if (totalErrors === 0) return null
+    return (
+      <div className="mt-3 pt-3 border-t border-zinc-100 dark:border-zinc-800 flex flex-wrap items-center gap-2 text-xs">
+        <span className="text-zinc-500 font-medium">Fehlerursachen (letzte 3 Tage):</span>
+        {totalOverloaded > 0 && (
+          <span className="inline-flex items-center px-2 py-0.5 rounded-md bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300 font-medium">
+            ⚠️ {totalOverloaded}x Modell überlastet (503)
+          </span>
+        )}
+        {totalQuota > 0 && (
+          <span className="inline-flex items-center px-2 py-0.5 rounded-md bg-red-100 text-red-800 dark:bg-red-900/40 dark:text-red-300 font-medium">
+            🚫 {totalQuota}x Quote erschöpft (429)
+          </span>
+        )}
+        {totalOther > 0 && (
+          <span className="inline-flex items-center px-2 py-0.5 rounded-md bg-zinc-100 text-zinc-800 dark:bg-zinc-800 dark:text-zinc-300 font-medium">
+            ❓ {totalOther}x Sonstige Fehler
+          </span>
+        )}
+      </div>
+    )
+  }
+
   if (embedded) {
     return (
       <div>
@@ -147,6 +230,7 @@ export function ApiUsageChart({
         <div className="h-[280px]">
           <Bar data={chartData} options={options} plugins={[ChartDataLabels]} />
         </div>
+        {renderErrorBadges()}
       </div>
     )
   }
@@ -159,6 +243,7 @@ export function ApiUsageChart({
       <div className="h-[300px]">
         <Bar data={chartData} options={options} plugins={[ChartDataLabels]} />
       </div>
+      {renderErrorBadges()}
     </div>
   )
 }

@@ -79,5 +79,6 @@ model ApiUsageLog {
   apiKeyIndex Int
   isSuccess   Boolean
   endpoint    String
+  errorReason String?
   createdAt   DateTime @default(now())
 }

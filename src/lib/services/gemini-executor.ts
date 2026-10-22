@@ -102,16 +102,21 @@ export async function callGeminiWithRetry<T>({
         } catch (error: unknown) {
           lastError = error;
 
+          const isOverloaded = isOverloadedError(error);
+          const isQuota = isQuotaError(error);
+          const errorReason = isOverloaded ? "overloaded" : isQuota ? "quota" : "other";
+
           // Log failed attempt to DB
           await prisma.apiUsageLog.create({
             data: {
               apiKeyIndex: keyIndex + 1,
               isSuccess: false,
               endpoint,
+              errorReason,
             },
           }).catch((err) => console.error("DB Log Error:", err));
 
-          if (isQuotaError(error)) {
+          if (isQuota) {
             console.warn(
               `API-Key bei Index ${keyIndex} hat Kontingent erschöpft (Modell ${modelToUse}). Versuche nächsten Key falls verfügbar.`
             );

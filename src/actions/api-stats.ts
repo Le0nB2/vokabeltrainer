@@ -4,11 +4,18 @@ import prisma from "@/lib/prisma"
 import { subDays, startOfDay, endOfDay, format } from "date-fns"
 import { requireAppAuth } from "@/lib/auth-guard"
 
+export type ApiErrorBreakdown = {
+  overloaded: number
+  quota: number
+  other: number
+}
+
 export type ApiStatsResult = {
   dateStr: string
   keyIndex: number
   successCount: number
   errorCount: number
+  errorBreakdown: ApiErrorBreakdown
 }
 
 export async function getApiStats(): Promise<ApiStatsResult[]> {
@@ -40,7 +47,12 @@ export async function getApiStats(): Promise<ApiStatsResult[]> {
         dateStr,
         keyIndex,
         successCount: 0,
-        errorCount: 0
+        errorCount: 0,
+        errorBreakdown: {
+          overloaded: 0,
+          quota: 0,
+          other: 0,
+        },
       }
     }
 
@@ -48,6 +60,13 @@ export async function getApiStats(): Promise<ApiStatsResult[]> {
       acc[key].successCount++
     } else {
       acc[key].errorCount++
+      if (log.errorReason === "overloaded") {
+        acc[key].errorBreakdown.overloaded++
+      } else if (log.errorReason === "quota") {
+        acc[key].errorBreakdown.quota++
+      } else {
+        acc[key].errorBreakdown.other++
+      }
     }
 
     return acc
@@ -79,7 +98,12 @@ export async function getApiStats(): Promise<ApiStatsResult[]> {
           dateStr,
           keyIndex,
           successCount: 0,
-          errorCount: 0
+          errorCount: 0,
+          errorBreakdown: {
+            overloaded: 0,
+            quota: 0,
+            other: 0,
+          },
         })
       }
     }
