@@ -62,7 +62,7 @@ model Settings {
   worksheetCount        Int     @default(0)
   notificationsEnabled  Boolean @default(false)
   speechLanguage        String  @default("en-GB")
-  selectedModel         String  @default("gemini-3.5-flash-lite")
+  selectedModel         String  @default("gemini-3.6-flash")
 }
 
 model AiModel {
@@ -79,5 +79,6 @@ model ApiUsageLog {
   apiKeyIndex Int
   isSuccess   Boolean
   endpoint    String
+  errorReason String?
   createdAt   DateTime @default(now())
 }

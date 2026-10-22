@@ -23,21 +23,19 @@ describe("ai-models service", () => {
       const models = await getModelHierarchy();
       expect(models).toEqual([
         "gemini-3.8-flash",
-        "gemini-3.5-flash-lite",
-        "gemini-3.1-flash-lite",
+        "gemini-flash-lite-latest",
       ]);
     });
 
     it("does not duplicate if selectedModel is already a fallback", async () => {
       vi.spyOn(prisma.settings, "findUnique").mockResolvedValueOnce({
         id: "default",
-        selectedModel: "gemini-3.5-flash-lite",
+        selectedModel: "gemini-flash-lite-latest",
       } as any);
 
       const models = await getModelHierarchy();
       expect(models).toEqual([
-        "gemini-3.5-flash-lite",
-        "gemini-3.1-flash-lite",
+        "gemini-flash-lite-latest",
       ]);
     });
 
@@ -48,8 +46,8 @@ describe("ai-models service", () => {
 
       const models = await getModelHierarchy();
       expect(models).toEqual([
-        "gemini-3.5-flash-lite",
-        "gemini-3.1-flash-lite",
+        "gemini-3.6-flash",
+        "gemini-flash-lite-latest",
       ]);
     });
   });
@@ -60,7 +58,8 @@ describe("ai-models service", () => {
 
       const models = await getStoredAiModels();
       expect(models.length).toBeGreaterThanOrEqual(1);
-      expect(models[0].id).toBe("gemini-3.5-flash-lite");
+      expect(models[0].id).toBe("gemini-3.6-flash");
+      expect(models[1].id).toBe("gemini-flash-lite-latest");
     });
 
     it("returns stored models when available in DB", async () => {

@@ -27,7 +27,7 @@ export function AiModelSettings({
   apiStats?: ApiStatsResult[]
 }) {
   const [selectedModel, setSelectedModel] = useState(
-    initialSettings.selectedModel ?? "gemini-3.5-flash-lite"
+    initialSettings.selectedModel ?? "gemini-3.6-flash"
   )
   const [models, setModels] = useState<ModelItem[]>(initialModels)
   const [stats, setStats] = useState<ApiStatsResult[] | undefined>(apiStats)
