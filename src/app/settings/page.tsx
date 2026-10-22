@@ -43,14 +43,14 @@ export default async function SettingsPage() {
           )}
         </header>
 
+        <AudioSettings initialSettings={settings} />
+        <MinigameSettings initialSettings={settings} />
+        <NotificationSettings initialSettings={settings} />
         <AiModelSettings
           initialSettings={settings}
           initialModels={availableModels}
           apiStats={apiStats}
         />
-        <NotificationSettings initialSettings={settings} />
-        <AudioSettings initialSettings={settings} />
-        <MinigameSettings initialSettings={settings} />
         <ImportExport />
       </div>
     </main>

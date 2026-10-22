@@ -95,7 +95,7 @@ export function AiModelSettings({
   const flashModels = models.filter((m) => !m.id.includes("lite") && !m.id.includes("pro"))
 
   return (
-    <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl p-6 shadow-sm mb-8">
+    <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl p-6 shadow-sm mt-8">
       {/* 1. API Aufrufe & Fehler-Diagramm ganz oben */}
       {apiStats && (
         <div className="mb-6">
