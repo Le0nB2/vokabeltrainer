@@ -1,6 +1,7 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
+import { flushSync } from "react-dom"
 import { updateCardProgress } from "@/actions/cards"
 import { saveDeckResult } from "@/actions/decks"
 import Link from "next/link"
@@ -30,10 +31,31 @@ export function StudySession({ deck, dueCards, settings }: { deck: { id: string,
   } | null>(null)
   const isGlobal = deck.id === 'global';
 
+  const inputRef = useRef<HTMLInputElement>(null)
+
+  const focusTypingInput = () => {
+    if (inputRef.current) {
+      inputRef.current.focus({ preventScroll: false })
+    }
+  }
 
   const [showMinigame, setShowMinigame] = useState(false)
 
   const [nextMinigameThreshold, setNextMinigameThreshold] = useState(() => settings.minigameIntervalMin + Math.floor(Math.random() * (settings.minigameIntervalMax - settings.minigameIntervalMin + 1)))
+
+  useEffect(() => {
+    const card = cards[currentIndex]
+    const isTyping = studyMode === 'smart' && card && card.box >= 4
+    if (isTyping && !isFlipped && !sessionCompleted && !showMinigame) {
+      focusTypingInput()
+      const timeoutId = setTimeout(() => {
+        if (!isFlipped && !sessionCompleted && !showMinigame) {
+          focusTypingInput()
+        }
+      }, 50)
+      return () => clearTimeout(timeoutId)
+    }
+  }, [currentIndex, studyMode, cards, isFlipped, sessionCompleted, isTransitioning, showMinigame])
 
   useEffect(() => {
     // Use a timeout to avoid synchronous state update in effect warning
@@ -223,14 +245,30 @@ export function StudySession({ deck, dueCards, settings }: { deck: { id: string,
               if (isGlobal) {
                 window.location.href = '/study';
               } else {
-                setCards(allCards)
-                setCurrentIndex(0)
-                setStats({ correct: 0, incorrect: 0 })
-                setSessionCompleted(deck.cards.length === 0)
-                setBackCardCache(null)
-                setTypingFeedback(null)
-                setTypingInput('')
-                setIsFlipped(false)
+                try {
+                  flushSync(() => {
+                    setCards(allCards)
+                    setCurrentIndex(0)
+                    setStats({ correct: 0, incorrect: 0 })
+                    setSessionCompleted(deck.cards.length === 0)
+                    setBackCardCache(null)
+                    setTypingFeedback(null)
+                    setTypingInput('')
+                    setIsFlipped(false)
+                  })
+                } catch {
+                  setCards(allCards)
+                  setCurrentIndex(0)
+                  setStats({ correct: 0, incorrect: 0 })
+                  setSessionCompleted(deck.cards.length === 0)
+                  setBackCardCache(null)
+                  setTypingFeedback(null)
+                  setTypingInput('')
+                  setIsFlipped(false)
+                }
+                if (allCards[0]?.box >= 4 && studyMode === 'smart') {
+                  focusTypingInput()
+                }
               }
             }}
             className="block w-full py-3 bg-blue-600 text-white rounded-xl font-medium hover:bg-blue-700 transition-colors mb-3 flex items-center justify-center gap-2"
@@ -268,6 +306,8 @@ export function StudySession({ deck, dueCards, settings }: { deck: { id: string,
     e.preventDefault();
     if (!typingInput.trim()) return;
 
+    inputRef.current?.blur();
+
     const result = evaluateAnswer(typingInput, correctAnswer);
 
     let rating: 'again' | 'hard' | 'good' | 'easy' = 'again';
@@ -298,11 +338,11 @@ export function StudySession({ deck, dueCards, settings }: { deck: { id: string,
       )}
       <div
         className="flex-1 flex flex-col items-center p-4 md:p-8 outline-none"
-      tabIndex={0}
-      onKeyDown={handleKeyDown}
-      autoFocus
-    >
-      <header className="w-full max-w-3xl flex justify-between items-center mb-8">
+        tabIndex={0}
+        onKeyDown={handleKeyDown}
+        autoFocus={!isTypingMode}
+      >
+      <header className="w-full max-w-3xl flex justify-between items-center mb-4 md:mb-8">
         <div className="flex-1">
           <Link href={isGlobal ? '/' : `/decks/${deck.id}`} className="text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-100 inline-block">
             <ArrowLeft className="w-6 h-6" />
@@ -313,7 +353,19 @@ export function StudySession({ deck, dueCards, settings }: { deck: { id: string,
         </div>
         <div className="flex-1 flex justify-end">
           <button
-            onClick={() => setStudyMode(m => m === 'smart' ? 'classic' : 'smart')}
+            onClick={() => {
+              const newMode = studyMode === 'smart' ? 'classic' : 'smart';
+              try {
+                flushSync(() => {
+                  setStudyMode(newMode);
+                });
+              } catch {
+                setStudyMode(newMode);
+              }
+              if (newMode === 'smart' && currentCard?.box >= 4 && !isFlipped) {
+                focusTypingInput();
+              }
+            }}
             className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-zinc-200 dark:bg-zinc-800 text-xs font-medium text-zinc-600 dark:text-zinc-400 hover:bg-zinc-300 dark:hover:bg-zinc-700 transition-colors"
             title={studyMode === 'smart' ? 'Smart-Modus aktiv (Tippen ab Box 4)' : 'Klassisch aktiv (Immer umdrehen)'}
           >
@@ -324,7 +376,7 @@ export function StudySession({ deck, dueCards, settings }: { deck: { id: string,
       </header>
 
       {/* Progress bar */}
-      <div className="w-full max-w-3xl h-2 bg-zinc-200 dark:bg-zinc-800 rounded-full overflow-hidden mb-12">
+      <div className="w-full max-w-3xl h-2 bg-zinc-200 dark:bg-zinc-800 rounded-full overflow-hidden mb-6 md:mb-12">
         <div
           className="h-full bg-blue-500 transition-all duration-300 ease-out"
           style={{ width: `${progress}%` }}
@@ -335,9 +387,13 @@ export function StudySession({ deck, dueCards, settings }: { deck: { id: string,
       <div
         className="relative w-full max-w-2xl perspective-1000 cursor-pointer"
         onClick={() => {
-          if (!isFlipped && !isTypingMode) {
-            setBackCardCache({ card: currentCard, isEnglishQuestion, askDirection, showGapText });
-            setIsFlipped(true);
+          if (!isFlipped) {
+            if (!isTypingMode) {
+              setBackCardCache({ card: currentCard, isEnglishQuestion, askDirection, showGapText });
+              setIsFlipped(true);
+            } else {
+              focusTypingInput();
+            }
           }
         }}
       >
@@ -348,10 +404,15 @@ export function StudySession({ deck, dueCards, settings }: { deck: { id: string,
           <div className="col-start-1 row-start-1 w-full aspect-video md:aspect-[3/2] pointer-events-none invisible" />
 
           {/* Front */}
-          <div className="col-start-1 row-start-1 backface-hidden bg-white dark:bg-zinc-900 rounded-3xl shadow-lg border border-zinc-200 dark:border-zinc-800 flex flex-col items-center justify-center py-20 px-8 md:py-24 md:px-12 text-center h-full">
+          <div className="col-start-1 row-start-1 backface-hidden bg-white dark:bg-zinc-900 rounded-3xl shadow-lg border border-zinc-200 dark:border-zinc-800 flex flex-col items-center justify-center py-10 px-6 md:py-24 md:px-12 text-center h-full">
             {isEnglishQuestion && (
               <button
-                onClick={(e) => playAudio(currentCard.front, e)}
+                onClick={(e) => {
+                  playAudio(currentCard.front, e);
+                  if (isTypingMode && !isFlipped) {
+                    focusTypingInput();
+                  }
+                }}
                 className="absolute top-6 left-6 p-3 rounded-full hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-500 hover:text-blue-600 transition-colors"
                 title="Aussprache anhören"
               >
@@ -371,8 +432,9 @@ export function StudySession({ deck, dueCards, settings }: { deck: { id: string,
             <span className="text-3xl md:text-5xl font-bold text-zinc-900 dark:text-zinc-100 [overflow-wrap:anywhere] w-full">{questionText}</span>
             <span className="mt-4 text-sm text-blue-500 font-medium">{subtitleText}</span>
             {isTypingMode ? (
-              <form key={currentCard?.id || currentIndex} onSubmit={handleTypingSubmit} className="w-full mt-8 relative" onClick={e => e.stopPropagation()}>
+              <form onSubmit={handleTypingSubmit} className="w-full mt-6 md:mt-8 relative" onClick={e => e.stopPropagation()}>
                 <input
+                  ref={inputRef}
                   type="text"
                   value={typingInput}
                   onChange={e => setTypingInput(e.target.value)}
@@ -383,6 +445,8 @@ export function StudySession({ deck, dueCards, settings }: { deck: { id: string,
                   spellCheck={false}
                   autoCapitalize="off"
                   autoComplete="off"
+                  enterKeyHint="send"
+                  inputMode="text"
                 />
                 <button
                   type="submit"
@@ -400,7 +464,7 @@ export function StudySession({ deck, dueCards, settings }: { deck: { id: string,
           </div>
 
           {/* Back */}
-          <div className="col-start-1 row-start-1 backface-hidden rotate-x-180 bg-white dark:bg-zinc-900 rounded-3xl shadow-lg border border-zinc-200 dark:border-zinc-800 flex flex-col items-center justify-center py-20 px-8 md:py-24 md:px-12 text-center h-full">
+          <div className="col-start-1 row-start-1 backface-hidden rotate-x-180 bg-white dark:bg-zinc-900 rounded-3xl shadow-lg border border-zinc-200 dark:border-zinc-800 flex flex-col items-center justify-center py-10 px-6 md:py-24 md:px-12 text-center h-full">
             <button
               onClick={(e) => playAudio(backCard.front, e)}
               className="absolute top-6 left-6 p-3 rounded-full hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-500 hover:text-blue-600 transition-colors"
