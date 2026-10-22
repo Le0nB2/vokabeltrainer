@@ -114,17 +114,40 @@ export async function fetchAndPersistGoogleModels(customAiClient?: any): Promise
   const validModels: FilteredAiModel[] = [];
 
   if (customAiClient) {
-    const pager = await customAiClient.models.list();
-    for await (const m of pager) {
-      if (!m.supportedActions?.includes("generateContent")) continue;
-      const id = (m.name || "").replace(/^models\//, "");
-      if (!isSuitableModel(id)) continue;
-      validModels.push({
-        id,
-        name: m.name || `models/${id}`,
-        displayName: m.displayName || id,
+    try {
+      const pager = await customAiClient.models.list();
+      for await (const m of pager) {
+        if (!m.supportedActions?.includes("generateContent")) continue;
+        const id = (m.name || "").replace(/^models\//, "");
+        if (!isSuitableModel(id)) continue;
+        validModels.push({
+          id,
+          name: m.name || `models/${id}`,
+          displayName: m.displayName || id,
         description: m.description || null,
-      });
+        });
+      }
+
+      await prisma.apiUsageLog.create({
+        data: {
+          apiKeyIndex: 1,
+          isSuccess: true,
+          endpoint: "models",
+        },
+      }).catch((err) => console.error("DB Log Error:", err));
+    } catch (err) {
+      await prisma.apiUsageLog.create({
+        data: {
+          apiKeyIndex: 1,
+          isSuccess: false,
+          endpoint: "models",
+        },
+      }).catch((logErr) => console.error("DB Log Error:", logErr));
+      return {
+        success: false,
+        count: 0,
+        error: `Fehler beim Abruf von Google: ${err instanceof Error ? err.message : String(err)}`,
+      };
     }
   } else {
     const rawKeys = process.env.GEMINI_API_KEYS || process.env.GEMINI_API_KEY;
@@ -151,7 +174,8 @@ export async function fetchAndPersistGoogleModels(customAiClient?: any): Promise
 
     let lastError: unknown = null;
 
-    for (const apiKey of apiKeys) {
+    for (let i = 0; i < apiKeys.length; i++) {
+      const apiKey = apiKeys[i];
       try {
         const ai = new GoogleGenAI({ apiKey });
         const pager = await ai.models.list();
@@ -170,10 +194,28 @@ export async function fetchAndPersistGoogleModels(customAiClient?: any): Promise
           });
         }
 
+        // Successfully fetched from Google API
+        await prisma.apiUsageLog.create({
+          data: {
+            apiKeyIndex: i + 1,
+            isSuccess: true,
+            endpoint: "models",
+          },
+        }).catch((err) => console.error("DB Log Error:", err));
+
         if (validModels.length > 0) {
           break; // Successfully fetched
         }
       } catch (err) {
+        // Log error attempt to ApiUsageLog
+        await prisma.apiUsageLog.create({
+          data: {
+            apiKeyIndex: i + 1,
+            isSuccess: false,
+            endpoint: "models",
+          },
+        }).catch((logErr) => console.error("DB Log Error:", logErr));
+
         console.warn("Fehler beim Abrufen der Modelle mit API-Key:", err);
         lastError = err;
       }

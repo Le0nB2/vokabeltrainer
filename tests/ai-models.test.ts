@@ -109,6 +109,7 @@ describe("ai-models service", () => {
       });
       vi.spyOn(prisma.aiModel, "deleteMany").mockResolvedValueOnce({ count: 0 });
       vi.spyOn(prisma.aiModel, "upsert").mockResolvedValue({ id: "gemini-3.5-flash" } as any);
+      vi.spyOn(prisma.apiUsageLog, "create").mockResolvedValue({ id: "log-1" } as any);
 
       const mockAiClient = {
         models: {
@@ -151,6 +152,36 @@ describe("ai-models service", () => {
           name: "models/gemini-3.5-flash",
           displayName: "Gemini 3.5 Flash",
           description: "Fast model",
+        },
+      });
+      expect(prisma.apiUsageLog.create).toHaveBeenCalledWith({
+        data: {
+          apiKeyIndex: 1,
+          isSuccess: true,
+          endpoint: "models",
+        },
+      });
+    });
+
+    it("logs error to apiUsageLog when client call fails", async () => {
+      vi.spyOn(prisma.apiUsageLog, "create").mockResolvedValue({ id: "log-err" } as any);
+
+      const failingAiClient = {
+        models: {
+          list: async () => {
+            throw new Error("Quota exceeded");
+          },
+        },
+      };
+
+      const res = await fetchAndPersistGoogleModels(failingAiClient);
+      expect(res.success).toBe(false);
+      expect(res.error).toContain("Quota exceeded");
+      expect(prisma.apiUsageLog.create).toHaveBeenCalledWith({
+        data: {
+          apiKeyIndex: 1,
+          isSuccess: false,
+          endpoint: "models",
         },
       });
     });
