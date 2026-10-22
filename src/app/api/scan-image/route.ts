@@ -73,7 +73,7 @@ WICHTIGE REGELN:
 1. Trenne das englische Ausgangswort ('front') und die deutsche Übersetzung/Bedeutung ('back') exakt. Korrigiere offensichtliche Lesefehler.
    - WICHTIG: Keine Klammern in Sätzen oder Wörtern (z. B. "It's your turn" statt "(It's) your turn", "to find" statt "(to) find").
 2. Exakte Buch-Bedeutung priorisieren: Wenn das Buch für ein Wort eine spezifische Bedeutung angibt (z.B. "year" = "der Jahrgang / die Jahrgangsstufe"), muss genau diese Bedeutung für 'back' und für den Beispielsatz 'contextSentence' verwendet werden.
-3. Saubere Übernahme von Alternativen: Trennungen mit Schrägstrich aus dem Buch (z.B. "Du bist dran / an der Reihe" oder "das Sandwich, (zusammengeklapptes) belegtes Brot") sollen im Feld 'back' vollständig erhalten bleiben und nicht abgeschnitten werden.
+3. Saubere Übernahme von Alternativen: Trennungen mit Schrägstrich oder Komma/Semikolon aus dem Buch (z.B. "Du bist dran / an der Reihe") sollen im Feld 'back' erhalten bleiben. Wenn im Buch zusätzliche Erläuterungen oder Einschränkungen in Klammern stehen (z.B. "(im Haus)" oder "(Landstraße zwischen Orten)"), packe diese Erläuterungen mit in das Feld 'notes', damit 'back' prägnant und kindgerecht bleibt (z.B. 'back': "oben, nach oben", 'notes': "im Haus").
 4. Lautschrift: Falls auf dem Bild Lautschrift vorhanden ist, extrahiere sie in eckigen Klammern (z.B. [bɔːl]) in das Feld 'phonetic', sonst leer.
 5. Hinweise & Grammatik: Lese die Zusatzspalte rechts konsequent aus und schreibe sie in das Feld 'notes' (z.B. Gegenteile "new ◄► old", Fragen "How old are you, please?", Aussprache-Tipps, Signalwörter, grammatikalische Besonderheiten).
 6. Eselsbrücken ('mnemonic') nach der Schlüsselwortmethode:

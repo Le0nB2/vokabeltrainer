@@ -8,8 +8,11 @@ describe("getApiStats action", () => {
 
   beforeEach(() => {
     process.env = { ...originalEnv };
-    const user = process.env.AUTH_USER || "admin";
-    const pass = process.env.AUTH_PASSWORD || "password123";
+    process.env.AUTH_USER = "admin";
+    process.env.AUTH_PASSWORD = "password123";
+    delete process.env.AUTH_SECRET;
+    const user = "admin";
+    const pass = "password123";
     const secret = getAppSecret(pass);
     const token = createAppSessionToken(user, secret, 3600);
     if (!globalThis.__mockCookies) {
