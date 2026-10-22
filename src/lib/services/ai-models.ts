@@ -8,6 +8,9 @@ export interface FilteredAiModel {
   description: string | null;
 }
 
+export const DEFAULT_AI_MODEL = "gemini-3.6-flash";
+export const FALLBACK_AI_MODEL = "gemini-flash-lite-latest";
+
 /**
  * Returns the models configured to be used for LLM requests.
  * The user-selected model comes first, followed by safe fallbacks.
@@ -18,18 +21,18 @@ export async function getModelHierarchy(): Promise<string[]> {
       where: { id: "default" },
       select: { selectedModel: true },
     });
-    const selected = settings?.selectedModel || "gemini-3.5-flash-lite";
-    const fallbacks = ["gemini-3.5-flash-lite", "gemini-3.1-flash-lite"];
+    const selected = settings?.selectedModel || DEFAULT_AI_MODEL;
+    const fallbacks = [FALLBACK_AI_MODEL];
     return Array.from(new Set([selected, ...fallbacks]));
   } catch (error) {
     console.error("Fehler beim Laden des ausgewählten KI-Modells:", error);
-    return ["gemini-3.5-flash-lite", "gemini-3.1-flash-lite"];
+    return [DEFAULT_AI_MODEL, FALLBACK_AI_MODEL];
   }
 }
 
 /**
  * Retrieves all stored models from the database.
- * If no models have been fetched yet, returns a default list containing gemini-3.5-flash-lite.
+ * If no models have been fetched yet, returns a default list containing the standard and fallback models.
  */
 export async function getStoredAiModels(): Promise<FilteredAiModel[]> {
   const models = await prisma.aiModel.findMany({
@@ -39,15 +42,15 @@ export async function getStoredAiModels(): Promise<FilteredAiModel[]> {
   if (models.length === 0) {
     return [
       {
-        id: "gemini-3.5-flash-lite",
-        name: "models/gemini-3.5-flash-lite",
-        displayName: "Gemini 3.5 Flash Lite",
-        description: "Standardmodell (noch nicht mit Google synchronisiert)",
+        id: DEFAULT_AI_MODEL,
+        name: `models/${DEFAULT_AI_MODEL}`,
+        displayName: "Gemini 3.6 Flash",
+        description: "Standardmodell",
       },
       {
-        id: "gemini-3.1-flash-lite",
-        name: "models/gemini-3.1-flash-lite",
-        displayName: "Gemini 3.1 Flash Lite",
+        id: FALLBACK_AI_MODEL,
+        name: `models/${FALLBACK_AI_MODEL}`,
+        displayName: "Gemini Flash-Lite Latest",
         description: "Fallback-Modell",
       },
     ];

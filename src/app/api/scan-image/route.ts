@@ -1,9 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
-import { GoogleGenAI, Type } from "@google/genai";
-import prisma from "@/lib/prisma";
+import { Type } from "@google/genai";
 import { requireAppAuth, UnauthorizedError } from "@/lib/auth-guard";
 import { consumeRateLimit, formatRetryDuration, getClientIpFromHeaders } from "@/lib/rate-limit";
-import { getModelHierarchy } from "@/lib/services/ai-models";
+import { callGeminiWithRetry, QuotaExceededError } from "@/lib/services/gemini-executor";
 
 export async function POST(req: NextRequest) {
   try {
@@ -68,26 +67,7 @@ export async function POST(req: NextRequest) {
     const buffer = Buffer.from(arrayBuffer);
     const base64Image = buffer.toString("base64");
 
-    let lastError: unknown = null;
-    let success = false;
-    let parsedCards = null;
-
-    const models = await getModelHierarchy();
-
-    // Try keys starting from the currentKeyIndex
-    for (let attemptIndex = 0; attemptIndex < apiKeys.length; attemptIndex++) {
-
-      const apiKey = apiKeys[attemptIndex];
-      const ai = new GoogleGenAI({ apiKey });
-
-      for (let modelIndex = 0; modelIndex < models.length; modelIndex++) {
-        const modelToUse = models[modelIndex];
-
-        try {
-          const response = await ai.models.generateContent({
-            model: modelToUse,
-            contents: [
-              `Du bist ein didaktischer Englischlehrer für Schüler im Alter von 11 bis 13 Jahren (5.–7. Klasse). Extrahiere alle Vokabelpaare aus diesem Foto (Buchseite, Liste, Notizbuch).
+    const prompt = `Du bist ein didaktischer Englischlehrer für Schüler im Alter von 11 bis 13 Jahren (5.–7. Klasse). Extrahiere alle Vokabelpaare aus diesem Foto (Buchseite, Liste, Notizbuch).
 
 WICHTIGE REGELN:
 1. Trenne das englische Ausgangswort ('front') und die deutsche Übersetzung/Bedeutung ('back') exakt. Korrigiere offensichtliche Lesefehler.
@@ -104,138 +84,87 @@ WICHTIGE REGELN:
    - Verknüpfe dieses Klangwort in einer kurzen, bildhaften Szene mit der deutschen Übersetzung. Keine reinen Reime ohne Klangbezug, keine Beleidigungen, strikt jugendfrei.
 7. Erstelle einen einfachen englischen Beispielsatz ('contextSentence'). Dieser darf keine optionalen Klammern enthalten.
 8. Erstelle zwingend einen Lückentext ('gapText'), der EXAKT derselbe Satz wie 'contextSentence' ist, bei dem jedoch AUSSCHLIESSLICH das Zielwort oder die Kernphrase aus 'front' durch '___' ersetzt wurde.
-9. Ignoriere Seitenzahlen und Überschriften.`,
-              { inlineData: { data: base64Image, mimeType: mimeType } }
-            ],
-            config: {
-              responseMimeType: "application/json",
-              responseJsonSchema: {
-                type: Type.ARRAY,
-                items: {
-                  type: Type.OBJECT,
-                  properties: {
-                    phonetic: {
-                      type: Type.STRING,
-                      description: "Die Lautschrift in eckigen Klammern, wie auf dem Bild angegeben, z. B. [bɔːl]. Sonst leer.",
-                    },
-                    front: {
-                      type: Type.STRING,
-                      description: "Das englische Ausgangswort",
-                    },
-                    back: {
-                      type: Type.STRING,
-                      description: "Die deutsche Übersetzung oder Bedeutung. Spezifische Bedeutungen aus dem Buch priorisieren. Alternativen mit Schrägstrich oder Klammern vollständig erhalten.",
-                    },
-                    notes: {
-                      type: Type.STRING,
-                      description: "Zusatzinfos aus der dritten Spalte rechts, z.B. Gegenteile ('new ◄► old'), typische Beispielsätze/Fragen ('How old are you, please?'), Aussprache-Tipps, Signalwörter oder grammatikalische Besonderheiten. Lese diese Spalte konsequent aus. Sonst leer.",
-                    },
-                    gapText: {
-                      type: Type.STRING,
-                      description: "Exakt identisch mit contextSentence, wobei das Wort aus 'front' durch '___' ersetzt wurde.",
-                    },
-                    mnemonic: {
-                      type: Type.STRING,
-                      description: "Bildhafte Eselsbrücke nach der Schlüsselwortmethode. Das deutsche Klangwort muss ein echtes, existierendes deutsches Wort aus dem Duden sein (oder eine treffende lautmalerische Assoziation/Teilwort, falls nicht vorhanden). Z.B. 'please' -> 'Prise', 'wrong' -> 'Gong'. Verknüpft mit der Übersetzung, jugendfrei.",
-                    },
-                    contextSentence: {
-                      type: Type.STRING,
-                      description: "Ein einfacher, für 11-13-Jährige verständlicher englischer Beispielsatz.",
-                    },
+9. Ignoriere Seitenzahlen und Überschriften.`;
+
+    const parsedCards = await callGeminiWithRetry({
+      endpoint: "scan-image",
+      apiKeys,
+      execute: async (ai, modelToUse) => {
+        const response = await ai.models.generateContent({
+          model: modelToUse,
+          contents: [
+            prompt,
+            { inlineData: { data: base64Image, mimeType: mimeType } },
+          ],
+          config: {
+            responseMimeType: "application/json",
+            responseJsonSchema: {
+              type: Type.ARRAY,
+              items: {
+                type: Type.OBJECT,
+                properties: {
+                  phonetic: {
+                    type: Type.STRING,
+                    description: "Die Lautschrift in eckigen Klammern, wie auf dem Bild angegeben, z. B. [bɔːl]. Sonst leer.",
                   },
-                  required: ["front", "back", "mnemonic", "contextSentence", "gapText"],
+                  front: {
+                    type: Type.STRING,
+                    description: "Das englische Ausgangswort",
+                  },
+                  back: {
+                    type: Type.STRING,
+                    description: "Die deutsche Übersetzung oder Bedeutung. Spezifische Bedeutungen aus dem Buch priorisieren. Alternativen mit Schrägstrich oder Klammern vollständig erhalten.",
+                  },
+                  notes: {
+                    type: Type.STRING,
+                    description: "Zusatzinfos aus der dritten Spalte rechts, z.B. Gegenteile ('new ◄► old'), typische Beispielsätze/Fragen ('How old are you, please?'), Aussprache-Tipps, Signalwörter oder grammatikalische Besonderheiten. Lese diese Spalte konsequent aus. Sonst leer.",
+                  },
+                  gapText: {
+                    type: Type.STRING,
+                    description: "Exakt identisch mit contextSentence, wobei das Wort aus 'front' durch '___' ersetzt wurde.",
+                  },
+                  mnemonic: {
+                    type: Type.STRING,
+                    description: "Bildhafte Eselsbrücke nach der Schlüsselwortmethode. Das deutsche Klangwort muss ein echtes, existierendes deutsches Wort aus dem Duden sein (oder eine treffende lautmalerische Assoziation/Teilwort, falls nicht vorhanden). Z.B. 'please' -> 'Prise', 'wrong' -> 'Gong'. Verknüpft mit der Übersetzung, jugendfrei.",
+                  },
+                  contextSentence: {
+                    type: Type.STRING,
+                    description: "Ein einfacher, für 11-13-Jährige verständlicher englischer Beispielsatz.",
+                  },
                 },
+                required: ["front", "back", "mnemonic", "contextSentence", "gapText"],
               },
             },
-          });
+          },
+        });
 
-          const textResponse = response.text;
-          if (!textResponse) {
-            throw new Error("Failed to generate text from Gemini");
-          }
-
-          parsedCards = JSON.parse(textResponse);
-
-          // Cleanup step: if gapText only contains "___", set it to null
-          if (Array.isArray(parsedCards)) {
-            parsedCards = parsedCards.map((card: any) => {
-              if (card.gapText && card.gapText.trim() === "___") {
-                return { ...card, gapText: null };
-              }
-              return card;
-            });
-          }
-
-          success = true;
-
-          // Log success
-          await prisma.apiUsageLog.create({
-            data: {
-              apiKeyIndex: attemptIndex + 1,
-              isSuccess: true,
-              endpoint: "scan-image"
-            }
-          }).catch(err => console.error("DB Log Error:", err));
-
-
-          break; // Success, exit inner model loop
-        } catch (error: unknown) {
-          // Log error
-          await prisma.apiUsageLog.create({
-            data: {
-              apiKeyIndex: attemptIndex + 1,
-              isSuccess: false,
-              endpoint: "scan-image"
-            }
-          }).catch(err => console.error("DB Log Error:", err));
-
-          lastError = error;
-          const errorMessage = (error as Error).message || String(error);
-
-          // Check if it's a 503 error, try next model
-          if (errorMessage.includes("503") || errorMessage.includes("Service Unavailable")) {
-            console.warn(`Model ${modelToUse} failed with 503 on key index ${attemptIndex}. Trying next model if available.`);
-            continue;
-          }
-
-          // Check if it's a quota/429 error, break inner loop to try next key
-          if (errorMessage.includes("429") || errorMessage.includes("Quota exceeded") || errorMessage.includes("RESOURCE_EXHAUSTED")) {
-            console.warn(`API key at index ${attemptIndex} exhausted quota. Trying next key if available.`);
-
-            if (attemptIndex === apiKeys.length - 1 && modelIndex === models.length - 1) {
-              return NextResponse.json(
-                { error: "Dein kostenloses Google API-Kontingente ist aufgebraucht. Versuche es in ein paar Stunden noch einmal" },
-                { status: 429 }
-              );
-            }
-            break; // Break inner model loop, let outer key loop continue
-          } else {
-            console.error(`Non-quota error with key index ${attemptIndex} and model ${modelToUse}:`, error);
-            if (modelIndex === models.length - 1) {
-              throw error; // Only throw if all models failed with this unexpected error
-            }
-          }
+        const textResponse = response.text;
+        if (!textResponse) {
+          throw new Error("Failed to generate text from Gemini");
         }
-      }
 
-      if (success) {
-        break; // Success, exit outer key loop
-      }
-    }
+        let cards = JSON.parse(textResponse);
 
-    if (success && parsedCards) {
-      return NextResponse.json({ cards: parsedCards });
-    }
+        // Cleanup step: if gapText only contains "___", set it to null
+        if (Array.isArray(cards)) {
+          cards = cards.map((card: any) => {
+            if (card.gapText && card.gapText.trim() === "___") {
+              return { ...card, gapText: null };
+            }
+            return card;
+          });
+        }
 
-    // If we reach here without success and without returning the specific 429 error, throw the last error
-    throw lastError;
+        return cards;
+      },
+    });
 
+    return NextResponse.json({ cards: parsedCards });
   } catch (error: unknown) {
-    console.error("Scan error:", error);
-    const message = (error as Error)?.message || "";
-    if (message.includes("Google API-Kontingente ist aufgebraucht")) {
-      return NextResponse.json({ error: message }, { status: 429 });
+    if (error instanceof QuotaExceededError) {
+      return NextResponse.json({ error: error.message }, { status: 429 });
     }
+    console.error("Scan error:", error);
     return NextResponse.json({ error: "Fehler bei der Bildanalyse. Bitte versuche es erneut." }, { status: 500 });
   }
 }

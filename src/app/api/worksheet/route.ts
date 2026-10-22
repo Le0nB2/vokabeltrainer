@@ -1,11 +1,11 @@
 import { generateOptimizedPdf } from '@/lib/utils/pdf-helper';
 import { NextRequest, NextResponse } from "next/server";
-import { GoogleGenAI, Type, Schema } from "@google/genai";
+import { Type, Schema } from "@google/genai";
 import prisma from "@/lib/prisma";
 import { z } from "zod";
 import { requireAppAuth, UnauthorizedError } from "@/lib/auth-guard";
 import { consumeRateLimit, formatRetryDuration, getClientIpFromHeaders } from "@/lib/rate-limit";
-import { getModelHierarchy } from "@/lib/services/ai-models";
+import { callGeminiWithRetry, QuotaExceededError } from "@/lib/services/gemini-executor";
 
 const requestSchema = z.object({
   deckId: z.string().min(1, "No deckId provided").max(100, "deckId darf maximal 100 Zeichen lang sein")
@@ -83,11 +83,6 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "No valid API keys found" }, { status: 500 });
     }
 
-    let lastError: unknown = null;
-    let success = false;
-    let parsedWorksheet = null;
-
-    const models = await getModelHierarchy();
 
     const promptText = `
 Erstelle ein Arbeitsblatt für die Klassenstufe 5-7 basierend auf den folgenden Vokabeln. Das Fach ist Englisch.
@@ -186,107 +181,49 @@ ${JSON.stringify(selectedCards.map(c => ({ englisch: c.front, deutsch: c.back })
       required: ["exercises", "solutions"]
     };
 
-    for (let attemptIndex = 0; attemptIndex < apiKeys.length; attemptIndex++) {
+    const parsedWorksheet = await callGeminiWithRetry({
+      endpoint: "worksheet",
+      apiKeys,
+      execute: async (ai, modelToUse) => {
+        const response = await ai.models.generateContent({
+          model: modelToUse,
+          contents: [promptText],
+          config: {
+            responseMimeType: "application/json",
+            responseJsonSchema: responseSchema,
+            temperature: 0.2, // low temp for structured task
+          },
+        });
 
-      const apiKey = apiKeys[attemptIndex];
-      const ai = new GoogleGenAI({ apiKey });
-
-      for (let modelIndex = 0; modelIndex < models.length; modelIndex++) {
-        const modelToUse = models[modelIndex];
-
-        try {
-          const response = await ai.models.generateContent({
-            model: modelToUse,
-            contents: [promptText],
-            config: {
-              responseMimeType: "application/json",
-              responseJsonSchema: responseSchema,
-              temperature: 0.2, // low temp for structured task
-            },
-          });
-
-          const textResponse = response.text;
-          if (!textResponse) {
-            throw new Error("Failed to generate text from Gemini");
-          }
-
-          parsedWorksheet = JSON.parse(textResponse);
-
-          // Shuffle multiple choice options manually to ensure uniform distribution
-          if (parsedWorksheet?.exercises?.multipleChoice && Array.isArray(parsedWorksheet.exercises.multipleChoice)) {
-            parsedWorksheet.exercises.multipleChoice = parsedWorksheet.exercises.multipleChoice.map((mc: { options?: string[], correctIndex?: number }) => {
-              if (mc.options && Array.isArray(mc.options) && typeof mc.correctIndex === 'number') {
-                const correctAnswer = mc.options[mc.correctIndex];
-
-                // Fisher-Yates shuffle
-                for (let j = mc.options.length - 1; j > 0; j--) {
-                  const k = Math.floor(Math.random() * (j + 1));
-                  [mc.options[j], mc.options[k]] = [mc.options[k], mc.options[j]];
-                }
-
-                // Find new correct index
-                mc.correctIndex = mc.options.indexOf(correctAnswer);
-              }
-              return mc;
-            });
-          }
-
-          success = true;
-
-          // Log success
-          await prisma.apiUsageLog.create({
-            data: {
-              apiKeyIndex: attemptIndex + 1,
-              isSuccess: true,
-              endpoint: "worksheet"
-            }
-          }).catch(err => console.error("DB Log Error:", err));
-
-
-          break; // Success, exit inner model loop
-        } catch (error: unknown) {
-          // Log error
-          await prisma.apiUsageLog.create({
-            data: {
-              apiKeyIndex: attemptIndex + 1,
-              isSuccess: false,
-              endpoint: "worksheet"
-            }
-          }).catch(err => console.error("DB Log Error:", err));
-
-          lastError = error;
-          const errorMessage = (error as Error).message || String(error);
-
-          // Check if it's a 503 error, try next model
-          if (errorMessage.includes("503") || errorMessage.includes("Service Unavailable")) {
-            console.warn(`Model ${modelToUse} failed with 503 on key index ${attemptIndex}. Trying next model if available.`);
-            continue;
-          }
-
-          // Check if it's a quota/429 error, break inner loop to try next key
-          if (errorMessage.includes("429") || errorMessage.includes("Quota exceeded") || errorMessage.includes("RESOURCE_EXHAUSTED")) {
-            console.warn(`API key at index ${attemptIndex} exhausted quota. Trying next key if available.`);
-
-            if (attemptIndex === apiKeys.length - 1 && modelIndex === models.length - 1) {
-              return NextResponse.json(
-                { error: "Dein kostenloses Google API-Kontingente ist aufgebraucht. Versuche es in ein paar Stunden noch einmal" },
-                { status: 429 }
-              );
-            }
-            break; // Break inner model loop, let outer key loop continue
-          } else {
-            console.error(`Non-quota error with key index ${attemptIndex} and model ${modelToUse}:`, error);
-            if (modelIndex === models.length - 1) {
-              throw error; // Only throw if all models failed with this unexpected error
-            }
-          }
+        const textResponse = response.text;
+        if (!textResponse) {
+          throw new Error("Failed to generate text from Gemini");
         }
-      }
 
-      if (success) {
-        break; // Success, exit outer key loop
-      }
-    }
+        const data = JSON.parse(textResponse);
+
+        // Shuffle multiple choice options manually to ensure uniform distribution
+        if (data?.exercises?.multipleChoice && Array.isArray(data.exercises.multipleChoice)) {
+          data.exercises.multipleChoice = data.exercises.multipleChoice.map((mc: { options?: string[], correctIndex?: number }) => {
+            if (mc.options && Array.isArray(mc.options) && typeof mc.correctIndex === 'number') {
+              const correctAnswer = mc.options[mc.correctIndex];
+
+              // Fisher-Yates shuffle
+              for (let j = mc.options.length - 1; j > 0; j--) {
+                const k = Math.floor(Math.random() * (j + 1));
+                [mc.options[j], mc.options[k]] = [mc.options[k], mc.options[j]];
+              }
+
+              // Find new correct index
+              mc.correctIndex = mc.options.indexOf(correctAnswer);
+            }
+            return mc;
+          });
+        }
+
+        return data;
+      },
+    });
 
     const settings = await prisma.settings.upsert({
       where: { id: "default" },
@@ -296,10 +233,6 @@ ${JSON.stringify(selectedCards.map(c => ({ englisch: c.front, deutsch: c.back })
 
     // Compute alphabetical ID (A001 to Z999)
     const count = settings.worksheetCount;
-    // A001 starts at count 1.
-    // So for count 1: letter A, number 1
-    // For count 999: letter A, number 999
-    // For count 1000: letter B, number 1
     const letterIndex = Math.floor((count - 1) / 999);
     const letter = String.fromCharCode(65 + (letterIndex % 26)); // A-Z, wraps around
     const number = ((count - 1) % 999) + 1;
@@ -309,35 +242,29 @@ ${JSON.stringify(selectedCards.map(c => ({ englisch: c.front, deutsch: c.back })
     const today = new Date();
     const dateStr = `${today.getDate().toString().padStart(2, '0')}.${(today.getMonth() + 1).toString().padStart(2, '0')}.${today.getFullYear()}`;
 
-    if (success && parsedWorksheet) {
-      // Optimiere Worksheet, sodass es nicht mehr als 4 Seiten lang ist
-      const optimized = await generateOptimizedPdf(
-        worksheetId,
-        dateStr,
-        parsedWorksheet.exercises,
-        parsedWorksheet.solutions,
-        4
-      );
+    // Optimiere Worksheet, sodass es nicht mehr als 4 Seiten lang ist
+    const optimized = await generateOptimizedPdf(
+      worksheetId,
+      dateStr,
+      parsedWorksheet.exercises,
+      parsedWorksheet.solutions,
+      4
+    );
 
-      parsedWorksheet.exercises = optimized.finalExercises;
-      parsedWorksheet.solutions = optimized.finalSolutions;
+    parsedWorksheet.exercises = optimized.finalExercises;
+    parsedWorksheet.solutions = optimized.finalSolutions;
 
-      return NextResponse.json({
-        worksheet: parsedWorksheet,
-        worksheetId,
-        dateStr
-      });
-
-    }
-
-    throw lastError;
+    return NextResponse.json({
+      worksheet: parsedWorksheet,
+      worksheetId,
+      dateStr
+    });
 
   } catch (error: unknown) {
-    console.error("Worksheet error:", error);
-    const message = (error as Error)?.message || "";
-    if (message.includes("Google API-Kontingente ist aufgebraucht")) {
-      return NextResponse.json({ error: message }, { status: 429 });
+    if (error instanceof QuotaExceededError) {
+      return NextResponse.json({ error: error.message }, { status: 429 });
     }
+    console.error("Worksheet error:", error);
     return NextResponse.json({ error: "Fehler beim Erstellen des Arbeitsblatts. Bitte versuche es erneut." }, { status: 500 });
   }
 }
