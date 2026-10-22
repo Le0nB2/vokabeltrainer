@@ -37,7 +37,7 @@ export function StudySession({ deck, dueCards, settings }: { deck: { id: string,
   const focusTypingInput = () => {
     const input = inputRef.current
     if (input) {
-      input.focus({ preventScroll: false })
+      input.focus({ preventScroll: true })
       const len = input.value.length
       try {
         input.setSelectionRange(len, len)
@@ -55,9 +55,19 @@ export function StudySession({ deck, dueCards, settings }: { deck: { id: string,
     const card = cards[currentIndex]
     const isTyping = studyMode === 'smart' && card && card.box >= 4
     if (isTyping && !isFlipped && !sessionCompleted && !showMinigame) {
+      if (typeof window !== 'undefined') {
+        window.scrollTo(0, 0)
+        document.documentElement.scrollTop = 0
+        document.body.scrollTop = 0
+      }
       focusTypingInput()
       const timeoutId = setTimeout(() => {
         if (!isFlipped && !sessionCompleted && !showMinigame) {
+          if (typeof window !== 'undefined' && window.scrollY > 0) {
+            window.scrollTo(0, 0)
+            document.documentElement.scrollTop = 0
+            document.body.scrollTop = 0
+          }
           focusTypingInput()
         }
       }, 50)
@@ -132,6 +142,12 @@ export function StudySession({ deck, dueCards, settings }: { deck: { id: string,
       if (!isCompleted) {
         setCurrentIndex(nextIndex)
       }
+    }
+
+    if (typeof window !== 'undefined') {
+      window.scrollTo(0, 0)
+      document.documentElement.scrollTop = 0
+      document.body.scrollTop = 0
     }
 
     if (isNextTyping && !isCompleted) {
@@ -363,7 +379,7 @@ export function StudySession({ deck, dueCards, settings }: { deck: { id: string,
         />
       )}
       <div
-        className="flex-1 flex flex-col items-center p-4 md:p-8 outline-none"
+        className="flex-1 flex flex-col items-center p-3 sm:p-4 md:p-8 outline-none"
         tabIndex={0}
         onKeyDown={handleKeyDown}
         autoFocus={!isTypingMode}
@@ -373,7 +389,7 @@ export function StudySession({ deck, dueCards, settings }: { deck: { id: string,
           }
         }}
       >
-      <header className="w-full max-w-3xl flex justify-between items-center mb-4 md:mb-8">
+      <header className="w-full max-w-3xl flex justify-between items-center mb-3 sm:mb-4 md:mb-8">
         <div className="flex-1">
           <Link href={isGlobal ? '/' : `/decks/${deck.id}`} className="text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-100 inline-block">
             <ArrowLeft className="w-6 h-6" />
@@ -407,7 +423,7 @@ export function StudySession({ deck, dueCards, settings }: { deck: { id: string,
       </header>
 
       {/* Progress bar */}
-      <div className="w-full max-w-3xl h-2 bg-zinc-200 dark:bg-zinc-800 rounded-full overflow-hidden mb-6 md:mb-12">
+      <div className="w-full max-w-3xl h-2 bg-zinc-200 dark:bg-zinc-800 rounded-full overflow-hidden mb-3 sm:mb-6 md:mb-12">
         <div
           className="h-full bg-blue-500 transition-all duration-300 ease-out"
           style={{ width: `${progress}%` }}
@@ -436,7 +452,7 @@ export function StudySession({ deck, dueCards, settings }: { deck: { id: string,
           <div className="col-start-1 row-start-1 w-full aspect-video md:aspect-[3/2] pointer-events-none invisible" />
 
           {/* Front */}
-          <div className="col-start-1 row-start-1 backface-hidden bg-white dark:bg-zinc-900 rounded-3xl shadow-lg border border-zinc-200 dark:border-zinc-800 flex flex-col items-center justify-center py-10 px-6 md:py-24 md:px-12 text-center h-full">
+          <div className="col-start-1 row-start-1 backface-hidden bg-white dark:bg-zinc-900 rounded-3xl shadow-lg border border-zinc-200 dark:border-zinc-800 flex flex-col items-center justify-center py-6 px-4 sm:py-10 sm:px-6 md:py-24 md:px-12 text-center h-full">
             {isEnglishQuestion && (
               <button
                 onClick={(e) => {
@@ -445,26 +461,26 @@ export function StudySession({ deck, dueCards, settings }: { deck: { id: string,
                     focusTypingInput();
                   }
                 }}
-                className="absolute top-6 left-6 p-3 rounded-full hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-500 hover:text-blue-600 transition-colors"
+                className="absolute top-4 left-4 sm:top-6 sm:left-6 p-2 sm:p-3 rounded-full hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-500 hover:text-blue-600 transition-colors"
                 title="Aussprache anhören"
               >
-                <Volume2 className="w-6 h-6" />
+                <Volume2 className="w-5 h-5 sm:w-6 sm:h-6" />
               </button>
             )}
 
             {/* Leech-Management: Mnemonic hint for problem cards */}
             {currentCard.lapses >= 3 && currentCard.mnemonic && (
-              <div className="absolute top-6 right-6">
-                <span className="inline-block bg-orange-100 dark:bg-orange-900/30 text-orange-600 dark:text-orange-400 px-3 py-1.5 rounded-xl text-sm font-medium border border-orange-200 dark:border-orange-800/50 shadow-sm">
+              <div className="absolute top-4 right-4 sm:top-6 sm:right-6">
+                <span className="inline-block bg-orange-100 dark:bg-orange-900/30 text-orange-600 dark:text-orange-400 px-2.5 py-1 sm:px-3 sm:py-1.5 rounded-xl text-xs sm:text-sm font-medium border border-orange-200 dark:border-orange-800/50 shadow-sm">
                   💡 {currentCard.mnemonic}
                 </span>
               </div>
             )}
 
-            <span className="text-3xl md:text-5xl font-bold text-zinc-900 dark:text-zinc-100 [overflow-wrap:anywhere] w-full">{questionText}</span>
-            <span className="mt-4 text-sm text-blue-500 font-medium">{subtitleText}</span>
+            <span className="text-2xl sm:text-3xl md:text-5xl font-bold text-zinc-900 dark:text-zinc-100 [overflow-wrap:anywhere] w-full">{questionText}</span>
+            <span className="mt-2 sm:mt-4 text-xs sm:text-sm text-blue-500 font-medium">{subtitleText}</span>
             {isTypingMode ? (
-              <form onSubmit={handleTypingSubmit} className="w-full mt-6 md:mt-8 relative" onClick={e => e.stopPropagation()}>
+              <form onSubmit={handleTypingSubmit} className="w-full mt-4 sm:mt-6 md:mt-8 relative" onClick={e => e.stopPropagation()}>
                 <input
                   ref={inputRef}
                   type="text"
@@ -479,7 +495,7 @@ export function StudySession({ deck, dueCards, settings }: { deck: { id: string,
                     }
                   }}
                   placeholder="Antwort eintippen..."
-                  className="w-full px-6 py-4 pr-16 rounded-xl border-2 border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-950 text-xl text-center focus:outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-500/20 caret-blue-600 dark:caret-blue-400 focus:placeholder-transparent transition-all"
+                  className="w-full px-4 py-3 sm:px-6 sm:py-4 pr-14 sm:pr-16 rounded-xl border-2 border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-950 text-lg sm:text-xl text-center focus:outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-500/20 caret-blue-600 dark:caret-blue-400 focus:placeholder-transparent transition-all"
                   autoFocus
                   autoCorrect="off"
                   spellCheck={false}
@@ -490,50 +506,50 @@ export function StudySession({ deck, dueCards, settings }: { deck: { id: string,
                 />
                 <button
                   type="submit"
-                  className="absolute right-3 top-1/2 -translate-y-1/2 p-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors flex items-center justify-center"
+                  className="absolute right-2.5 sm:right-3 top-1/2 -translate-y-1/2 p-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors flex items-center justify-center"
                   title="Absenden"
                 >
                   <ArrowLeft className="w-5 h-5 rotate-180" />
                 </button>
               </form>
             ) : (
-              <div className="absolute bottom-8 text-sm text-zinc-400 flex items-center gap-2">
+              <div className="absolute bottom-4 sm:bottom-8 text-xs sm:text-sm text-zinc-400 flex items-center gap-2">
                 <RotateCcw className="w-4 h-4" /> Klicken oder Leertaste zum Umdrehen
               </div>
             )}
           </div>
 
           {/* Back */}
-          <div className="col-start-1 row-start-1 backface-hidden rotate-x-180 bg-white dark:bg-zinc-900 rounded-3xl shadow-lg border border-zinc-200 dark:border-zinc-800 flex flex-col items-center justify-center py-10 px-6 md:py-24 md:px-12 text-center h-full">
+          <div className="col-start-1 row-start-1 backface-hidden rotate-x-180 bg-white dark:bg-zinc-900 rounded-3xl shadow-lg border border-zinc-200 dark:border-zinc-800 flex flex-col items-center justify-center py-6 px-4 sm:py-10 sm:px-6 md:py-24 md:px-12 text-center h-full">
             <button
               onClick={(e) => playAudio(backCard.front, e)}
-              className="absolute top-6 left-6 p-3 rounded-full hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-500 hover:text-blue-600 transition-colors"
+              className="absolute top-4 left-4 sm:top-6 sm:left-6 p-2 sm:p-3 rounded-full hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-500 hover:text-blue-600 transition-colors"
               title="Aussprache anhören"
             >
-              <Volume2 className="w-6 h-6" />
+              <Volume2 className="w-5 h-5 sm:w-6 sm:h-6" />
             </button>
-            <span className="text-2xl md:text-3xl font-medium text-zinc-500 mb-2 [overflow-wrap:anywhere] w-full">{!backIsEnglishQuestion ? backCard.back : backCard.front}</span>
-            <span className="text-3xl md:text-5xl font-bold text-blue-600 dark:text-blue-500 mb-6 [overflow-wrap:anywhere] w-full">{!backIsEnglishQuestion ? backCard.front : backCard.back}</span>
+            <span className="text-xl sm:text-2xl md:text-3xl font-medium text-zinc-500 mb-1 sm:mb-2 [overflow-wrap:anywhere] w-full">{!backIsEnglishQuestion ? backCard.back : backCard.front}</span>
+            <span className="text-2xl sm:text-3xl md:text-5xl font-bold text-blue-600 dark:text-blue-500 mb-4 sm:mb-6 [overflow-wrap:anywhere] w-full">{!backIsEnglishQuestion ? backCard.front : backCard.back}</span>
             {backCard.gapText && (
-               <div className="text-md text-zinc-500 mb-4 italic [overflow-wrap:anywhere] w-full">
+               <div className="text-sm sm:text-md text-zinc-500 mb-3 sm:mb-4 italic [overflow-wrap:anywhere] w-full">
                  {backCard.gapText.replace('___', backCard.front)}
                </div>
             )}
             {backCard.notes && (
-              <div className="text-lg md:text-xl text-zinc-600 dark:text-zinc-400 bg-zinc-50 dark:bg-zinc-800/50 p-4 rounded-xl [overflow-wrap:anywhere] w-full">
+              <div className="text-md sm:text-lg md:text-xl text-zinc-600 dark:text-zinc-400 bg-zinc-50 dark:bg-zinc-800/50 p-3 sm:p-4 rounded-xl [overflow-wrap:anywhere] w-full">
                 {backCard.notes}
               </div>
             )}
 
             {activeTypingFeedback && (
-              <div className={`mt-6 p-4 rounded-xl w-full font-medium ${
+              <div className={`mt-4 sm:mt-6 p-3 sm:p-4 rounded-xl w-full font-medium ${
                 activeTypingFeedback.status === 'CORRECT' ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400' :
                 activeTypingFeedback.status === 'TYPO' ? 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400' :
                 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400'
               }`}>
                 <div>{activeTypingFeedback.message}</div>
                 {activeTypingFeedback.status !== 'CORRECT' && activeTypingFeedback.input && (
-                  <div className="mt-2 text-sm opacity-80 font-normal">
+                  <div className="mt-1 sm:mt-2 text-xs sm:text-sm opacity-80 font-normal">
                     Deine Eingabe: &quot;{activeTypingFeedback.input}&quot;
                   </div>
                 )}
@@ -541,8 +557,8 @@ export function StudySession({ deck, dueCards, settings }: { deck: { id: string,
             )}
 
             {/* Box badge */}
-            <div className="absolute top-6 right-6">
-              <span className="inline-flex items-center justify-center px-3 py-1 rounded-full text-xs font-medium bg-zinc-100 dark:bg-zinc-800 text-zinc-500">
+            <div className="absolute top-4 right-4 sm:top-6 sm:right-6">
+              <span className="inline-flex items-center justify-center px-2.5 py-0.5 sm:px-3 sm:py-1 rounded-full text-xs font-medium bg-zinc-100 dark:bg-zinc-800 text-zinc-500">
                 Box {backCard.box}
               </span>
             </div>
@@ -551,7 +567,7 @@ export function StudySession({ deck, dueCards, settings }: { deck: { id: string,
       </div>
 
       {/* Action buttons */}
-      <div className={`mt-12 flex gap-2 transition-all duration-300 ${isFlipped ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4 pointer-events-none'}`}>
+      <div className={`mt-6 sm:mt-12 flex gap-2 transition-all duration-300 ${isFlipped ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4 pointer-events-none'}`}>
         {activeTypingFeedback ? (
           <button
             onClick={(e) => {
