@@ -32,10 +32,18 @@ export function StudySession({ deck, dueCards, settings }: { deck: { id: string,
   const isGlobal = deck.id === 'global';
 
   const inputRef = useRef<HTMLInputElement>(null)
+  const [animateFlip, setAnimateFlip] = useState(true)
 
   const focusTypingInput = () => {
-    if (inputRef.current) {
-      inputRef.current.focus({ preventScroll: false })
+    const input = inputRef.current
+    if (input) {
+      input.focus({ preventScroll: false })
+      const len = input.value.length
+      try {
+        input.setSelectionRange(len, len)
+      } catch {
+        // ignore
+      }
     }
   }
 
@@ -76,11 +84,10 @@ export function StudySession({ deck, dueCards, settings }: { deck: { id: string,
     return () => clearTimeout(timeoutId)
   }, [currentIndex, cards.length, cards])
 
-  const handleAnswer = async (rating: 'again' | 'hard' | 'good' | 'easy') => {
+  const handleAnswer = (rating: 'again' | 'hard' | 'good' | 'easy') => {
     if (isTransitioning) return;
     setIsTransitioning(true);
     const card = cards[currentIndex]
-
 
     // Optimistic state update
     if (rating !== 'again') {
@@ -93,31 +100,46 @@ export function StudySession({ deck, dueCards, settings }: { deck: { id: string,
     const newCount = sessionCardCount + 1;
     setSessionCardCount(newCount);
 
-
-
     if (settings.minigamesEnabled && newCount >= nextMinigameThreshold) {
       setShowMinigame(true);
       setSessionCardCount(0);
       setNextMinigameThreshold(settings.minigameIntervalMin + Math.floor(Math.random() * (settings.minigameIntervalMax - settings.minigameIntervalMin + 1)));
     }
 
+    // Run progress update asynchronously without blocking user gesture context
+    updateCardProgress(card.id, (deck.id === 'global' && card.deckId) ? card.deckId : deck.id, rating).catch(e => {
+      console.error("Failed to update progress", e)
+    })
+
+    const nextIndex = currentIndex + 1
+    const isCompleted = nextIndex >= cards.length
+    const nextCard = cards[nextIndex]
+    const isNextTyping = studyMode === 'smart' && nextCard && nextCard.box >= 4
 
     try {
-      await updateCardProgress(card.id, (deck.id === 'global' && card.deckId) ? card.deckId : deck.id, rating)
-    } catch (e) {
-      console.error("Failed to update progress", e)
+      flushSync(() => {
+        setAnimateFlip(false)
+        setIsFlipped(false)
+        setTypingInput('')
+        if (!isCompleted) {
+          setCurrentIndex(nextIndex)
+        }
+      })
+    } catch {
+      setAnimateFlip(false)
+      setIsFlipped(false)
+      setTypingInput('')
+      if (!isCompleted) {
+        setCurrentIndex(nextIndex)
+      }
     }
 
-
-    setIsFlipped(false)
-    setTypingInput('')
-    if (currentIndex + 1 < cards.length) {
-      setCurrentIndex(curr => curr + 1)
-      // state will be updated by useEffect
+    if (isNextTyping && !isCompleted) {
+      focusTypingInput()
     }
 
     setTimeout(async () => {
-      if (currentIndex + 1 >= cards.length) {
+      if (nextIndex >= cards.length) {
         setSessionCompleted(true)
         // Session complete, save results
         try {
@@ -132,7 +154,7 @@ export function StudySession({ deck, dueCards, settings }: { deck: { id: string,
       setBackCardCache(null);
       setTypingFeedback(null);
       setTypingInput('');
-    }, 500) // Wait for flip animation to finish
+    }, 300)
   }
 
   // Keyboard navigation
@@ -148,6 +170,7 @@ export function StudySession({ deck, dueCards, settings }: { deck: { id: string,
       e.preventDefault()
       if (!isFlipped && !isTypingMode) {
         setBackCardCache({ card: currentCard, isEnglishQuestion, askDirection, showGapText });
+        setAnimateFlip(true);
         setIsFlipped(true);
       } else if (isFlipped && activeTypingFeedback) {
         handleAnswer(activeTypingFeedback.rating);
@@ -254,6 +277,7 @@ export function StudySession({ deck, dueCards, settings }: { deck: { id: string,
                     setBackCardCache(null)
                     setTypingFeedback(null)
                     setTypingInput('')
+                    setAnimateFlip(false)
                     setIsFlipped(false)
                   })
                 } catch {
@@ -264,6 +288,7 @@ export function StudySession({ deck, dueCards, settings }: { deck: { id: string,
                   setBackCardCache(null)
                   setTypingFeedback(null)
                   setTypingInput('')
+                  setAnimateFlip(false)
                   setIsFlipped(false)
                 }
                 if (allCards[0]?.box >= 4 && studyMode === 'smart') {
@@ -324,6 +349,7 @@ export function StudySession({ deck, dueCards, settings }: { deck: { id: string,
       typingFeedback: feedback,
     });
     setTypingFeedback(feedback);
+    setAnimateFlip(true);
     setIsFlipped(true);
   };
 
@@ -341,6 +367,11 @@ export function StudySession({ deck, dueCards, settings }: { deck: { id: string,
         tabIndex={0}
         onKeyDown={handleKeyDown}
         autoFocus={!isTypingMode}
+        onClick={(e) => {
+          if (isTypingMode && !isFlipped && e.target !== inputRef.current) {
+            focusTypingInput();
+          }
+        }}
       >
       <header className="w-full max-w-3xl flex justify-between items-center mb-4 md:mb-8">
         <div className="flex-1">
@@ -390,6 +421,7 @@ export function StudySession({ deck, dueCards, settings }: { deck: { id: string,
           if (!isFlipped) {
             if (!isTypingMode) {
               setBackCardCache({ card: currentCard, isEnglishQuestion, askDirection, showGapText });
+              setAnimateFlip(true);
               setIsFlipped(true);
             } else {
               focusTypingInput();
@@ -398,7 +430,7 @@ export function StudySession({ deck, dueCards, settings }: { deck: { id: string,
         }}
       >
         <div
-          className={`w-full relative transition-all duration-500 transform-style-3d ${isFlipped ? 'rotate-x-180' : ''} grid`}
+          className={`w-full relative ${animateFlip ? 'transition-all duration-500' : ''} transform-style-3d ${isFlipped ? 'rotate-x-180' : ''} grid`}
         >
           {/* Spacer to enforce minimum aspect ratio */}
           <div className="col-start-1 row-start-1 w-full aspect-video md:aspect-[3/2] pointer-events-none invisible" />
@@ -438,8 +470,16 @@ export function StudySession({ deck, dueCards, settings }: { deck: { id: string,
                   type="text"
                   value={typingInput}
                   onChange={e => setTypingInput(e.target.value)}
+                  onFocus={e => {
+                    const len = e.currentTarget.value.length;
+                    try {
+                      e.currentTarget.setSelectionRange(len, len);
+                    } catch {
+                      // ignore
+                    }
+                  }}
                   placeholder="Antwort eintippen..."
-                  className="w-full px-6 py-4 pr-16 rounded-xl border-2 border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-950 text-xl text-center focus:outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-500/20 transition-all"
+                  className="w-full px-6 py-4 pr-16 rounded-xl border-2 border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-950 text-xl text-center focus:outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-500/20 caret-blue-600 dark:caret-blue-400 focus:placeholder-transparent transition-all"
                   autoFocus
                   autoCorrect="off"
                   spellCheck={false}

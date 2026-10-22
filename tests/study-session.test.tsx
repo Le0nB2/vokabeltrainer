@@ -293,4 +293,56 @@ describe('StudySession card flip & typing transition', () => {
 
     expect(document.activeElement).toBe(input)
   })
+
+  it('re-focuses input when clicking the outer study container in typing mode', async () => {
+    const dueCards = [
+      {
+        id: 'card-1',
+        deckId: 'deck-1',
+        front: 'lemon',
+        back: 'Zitrone',
+        box: 5,
+        gapText: null,
+        lapses: 0,
+      },
+    ]
+
+    render(<StudySession deck={mockDeck} dueCards={dueCards} settings={mockSettings} />)
+
+    const input = screen.getByPlaceholderText('Antwort eintippen...') as HTMLInputElement
+    expect(document.activeElement).toBe(input)
+
+    act(() => {
+      input.blur()
+    })
+    expect(document.activeElement).not.toBe(input)
+
+    // Click outside the card on the outer container
+    const outerContainer = input.closest('.flex-1.flex.flex-col')!
+    act(() => {
+      fireEvent.click(outerContainer)
+    })
+
+    expect(document.activeElement).toBe(input)
+  })
+
+  it('has visible caret color and transparent placeholder on focus for clean cursor placement', async () => {
+    const dueCards = [
+      {
+        id: 'card-1',
+        deckId: 'deck-1',
+        front: 'lemon',
+        back: 'Zitrone',
+        box: 5,
+        gapText: null,
+        lapses: 0,
+      },
+    ]
+
+    render(<StudySession deck={mockDeck} dueCards={dueCards} settings={mockSettings} />)
+
+    const input = screen.getByPlaceholderText('Antwort eintippen...') as HTMLInputElement
+    expect(input.className).toContain('caret-blue-600')
+    expect(input.className).toContain('focus:placeholder-transparent')
+  })
 })
