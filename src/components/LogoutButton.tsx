@@ -7,9 +7,11 @@ import { logoutApp } from "@/actions/auth"
 export function LogoutButton({
   className,
   showLabel = false,
+  labelClassName,
 }: {
   className?: string
   showLabel?: boolean
+  labelClassName?: string
 }) {
   const [isLoggingOut, setIsLoggingOut] = useState(false)
 
@@ -37,11 +39,15 @@ export function LogoutButton({
       className={className || defaultClasses}
     >
       {isLoggingOut ? (
-        <Loader2 className="w-5 h-5 animate-spin" />
+        <Loader2 className="w-5 h-5 animate-spin shrink-0" />
       ) : (
-        <LogOut className="w-5 h-5" />
+        <LogOut className="w-5 h-5 shrink-0" />
       )}
-      {showLabel && <span>{isLoggingOut ? "Wird abgemeldet..." : "Abmelden"}</span>}
+      {showLabel && (
+        <span className={labelClassName}>
+          {isLoggingOut ? "Wird abgemeldet..." : "Abmelden"}
+        </span>
+      )}
     </button>
   )
 }

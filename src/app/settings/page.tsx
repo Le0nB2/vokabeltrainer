@@ -21,26 +21,27 @@ export default async function SettingsPage() {
   const { isConfigured: isAuthEnabled } = getAppAuthCredentials()
 
   return (
-    <main className="min-h-screen bg-zinc-50 dark:bg-zinc-950 text-zinc-900 dark:text-zinc-100 p-8">
+    <main className="min-h-screen bg-zinc-50 dark:bg-zinc-950 text-zinc-900 dark:text-zinc-100 p-4 sm:p-8">
       <div className="max-w-3xl mx-auto">
-        <header className="mb-8 flex justify-between items-start">
-          <div>
-            <Link href="/" className="inline-flex items-center gap-2 text-sm text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-100 mb-6 transition-colors">
-              <ArrowLeft className="w-4 h-4" /> Zurück zur Übersicht
-            </Link>
-            <div className="flex items-center gap-3">
-              <SettingsIcon className="w-8 h-8 text-blue-600 shrink-0" />
-              <h1 className="text-2xl sm:text-3xl font-bold truncate">Einstellungen & Backup</h1>
-            </div>
-          </div>
+        <div className="flex items-center justify-between gap-4 mb-6">
+          <Link
+            href="/"
+            className="inline-flex items-center gap-2 text-sm text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-100 transition-colors min-w-0"
+          >
+            <ArrowLeft className="w-4 h-4 shrink-0" />
+            <span className="truncate">Zurück zur Übersicht</span>
+          </Link>
           {isAuthEnabled && (
-            <div className="pt-8">
-              <LogoutButton
-                showLabel
-                className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg border border-zinc-200 dark:border-zinc-800 text-zinc-600 dark:text-zinc-400 hover:text-red-600 dark:hover:text-red-400 hover:bg-zinc-100 dark:hover:bg-zinc-900 text-sm font-medium transition-colors"
-              />
-            </div>
+            <LogoutButton
+              showLabel
+              className="shrink-0 inline-flex items-center gap-2 px-3 py-1.5 rounded-lg border border-zinc-200 dark:border-zinc-800 text-zinc-600 dark:text-zinc-400 hover:text-red-600 dark:hover:text-red-400 hover:bg-zinc-100 dark:hover:bg-zinc-900 text-sm font-medium transition-colors"
+            />
           )}
+        </div>
+
+        <header className="mb-8 flex items-center gap-3">
+          <SettingsIcon className="w-8 h-8 text-blue-600 shrink-0" />
+          <h1 className="text-2xl sm:text-3xl font-bold truncate">Einstellungen & Backup</h1>
         </header>
 
         <AudioSettings initialSettings={settings} />
