@@ -145,6 +145,24 @@ export async function logoutApp() {
   return { success: true }
 }
 
+export async function logoutSettings() {
+  const headersList = await headers()
+  const isSecure = isSecureRequest(headersList)
+  const cookieStore = await cookies()
+  cookieStore.set(SETTINGS_COOKIE_NAME, "", {
+    httpOnly: true,
+    secure: isSecure,
+    path: "/",
+    maxAge: 0,
+  })
+  revalidatePath("/settings")
+  return { success: true }
+}
+
+export async function isSettingsPasswordConfigured() {
+  return Boolean(process.env.SETTINGS_PASSWORD)
+}
+
 export async function isAppAuthRequired() {
   const { isConfigured } = getAppAuthCredentials()
   return isConfigured

@@ -1,5 +1,12 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
-import { loginApp, logoutApp, isAppAuthRequired, checkPassword } from '../src/actions/auth'
+import {
+  loginApp,
+  logoutApp,
+  logoutSettings,
+  isAppAuthRequired,
+  isSettingsPasswordConfigured,
+  checkPassword,
+} from '../src/actions/auth'
 import {
   AUTH_COOKIE_NAME,
   SETTINGS_COOKIE_NAME,
@@ -196,6 +203,18 @@ describe('auth server actions', () => {
     })
   })
 
+  describe('isSettingsPasswordConfigured', () => {
+    it('returns true when SETTINGS_PASSWORD is set', async () => {
+      process.env.SETTINGS_PASSWORD = 'some-password'
+      expect(await isSettingsPasswordConfigured()).toBe(true)
+    })
+
+    it('returns false when SETTINGS_PASSWORD is not set', async () => {
+      delete process.env.SETTINGS_PASSWORD
+      expect(await isSettingsPasswordConfigured()).toBe(false)
+    })
+  })
+
   describe('logoutApp', () => {
     it('clears auth and settings session cookies', async () => {
       mockCookies.set(AUTH_COOKIE_NAME, { value: 'existing-token' })
@@ -207,6 +226,24 @@ describe('auth server actions', () => {
       expect(authCookie.value).toBe('')
       expect(authCookie.maxAge).toBe(0)
 
+      const settingsCookie = mockCookies.get(SETTINGS_COOKIE_NAME)
+      expect(settingsCookie.value).toBe('')
+      expect(settingsCookie.maxAge).toBe(0)
+    })
+  })
+
+  describe('logoutSettings', () => {
+    it('clears only settings session cookie and keeps auth cookie intact', async () => {
+      mockCookies.set(AUTH_COOKIE_NAME, { value: 'existing-app-token' })
+      mockCookies.set(SETTINGS_COOKIE_NAME, { value: 'existing-settings-token' })
+      const result = await logoutSettings()
+      expect(result.success).toBe(true)
+
+      // App auth cookie remains intact
+      const authCookie = mockCookies.get(AUTH_COOKIE_NAME)
+      expect(authCookie.value).toBe('existing-app-token')
+
+      // Settings cookie is cleared
       const settingsCookie = mockCookies.get(SETTINGS_COOKIE_NAME)
       expect(settingsCookie.value).toBe('')
       expect(settingsCookie.maxAge).toBe(0)
