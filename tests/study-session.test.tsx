@@ -37,6 +37,7 @@ describe('StudySession card flip & typing transition', () => {
 
   beforeEach(() => {
     vi.clearAllMocks()
+    window.scrollTo = vi.fn()
   })
 
   it('keeps "Weiter" visible and does not show rating buttons during flip transition', async () => {
@@ -344,5 +345,23 @@ describe('StudySession card flip & typing transition', () => {
     const input = screen.getByPlaceholderText('Antwort eintippen...') as HTMLInputElement
     expect(input.className).toContain('caret-blue-600')
     expect(input.className).toContain('focus:placeholder-transparent')
+  })
+
+  it('resets window scroll position to top (0, 0) when typing mode card is activated', async () => {
+    const dueCards = [
+      {
+        id: 'card-1',
+        deckId: 'deck-1',
+        front: 'pear',
+        back: 'Birne',
+        box: 5,
+        gapText: null,
+        lapses: 0,
+      },
+    ]
+
+    render(<StudySession deck={mockDeck} dueCards={dueCards} settings={mockSettings} />)
+
+    expect(window.scrollTo).toHaveBeenCalledWith(0, 0)
   })
 })
