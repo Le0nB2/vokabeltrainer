@@ -32,6 +32,8 @@ describe("POST /api/scan-image (AUDIT-01 & AUDIT-02)", () => {
     process.env = { ...originalEnv };
     delete process.env.AUTH_USER;
     delete process.env.AUTH_PASSWORD;
+    delete process.env.GEMINI_API_KEY;
+    delete process.env.GEMINI_API_KEYS;
     if (globalThis.__mockCookies) {
       globalThis.__mockCookies.clear();
     }

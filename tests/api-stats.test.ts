@@ -1,13 +1,25 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import prisma from "@/lib/prisma";
 import { getApiStats } from "@/actions/api-stats";
-
-vi.mock("@/lib/auth-guard", () => ({
-  requireAppAuth: vi.fn().mockResolvedValue(true),
-}));
+import { AUTH_COOKIE_NAME, createAppSessionToken, getAppSecret } from "@/lib/auth-utils";
 
 describe("getApiStats action", () => {
+  const originalEnv = process.env;
+
   beforeEach(() => {
+    process.env = { ...originalEnv };
+    const user = process.env.AUTH_USER || "admin";
+    const pass = process.env.AUTH_PASSWORD || "password123";
+    const secret = getAppSecret(pass);
+    const token = createAppSessionToken(user, secret, 3600);
+    if (!globalThis.__mockCookies) {
+      globalThis.__mockCookies = new Map();
+    }
+    globalThis.__mockCookies.set(AUTH_COOKIE_NAME, { value: token });
+  });
+
+  afterEach(() => {
+    process.env = originalEnv;
     vi.restoreAllMocks();
   });
 
@@ -39,7 +51,15 @@ describe("getApiStats action", () => {
       },
     ];
 
-    vi.spyOn(prisma.apiUsageLog, "findMany").mockResolvedValue(mockLogs as any);
+    if (!prisma.apiUsageLog) {
+      (prisma as any).apiUsageLog = {
+        findMany: vi.fn().mockResolvedValue(mockLogs),
+      };
+    } else if (vi.isMockFunction(prisma.apiUsageLog.findMany)) {
+      (prisma.apiUsageLog.findMany as any).mockResolvedValue(mockLogs);
+    } else {
+      (vi.spyOn(prisma.apiUsageLog, "findMany") as any).mockResolvedValue(mockLogs);
+    }
 
     const stats = await getApiStats();
     expect(stats.length).toBeGreaterThan(0);
@@ -53,5 +73,20 @@ describe("getApiStats action", () => {
       quota: 1,
       other: 0,
     });
+  });
+
+  it("handles database query errors gracefully by returning empty array", async () => {
+    if (!prisma.apiUsageLog) {
+      (prisma as any).apiUsageLog = {
+        findMany: vi.fn().mockRejectedValue(new Error("DB error")),
+      };
+    } else if (vi.isMockFunction(prisma.apiUsageLog.findMany)) {
+      (prisma.apiUsageLog.findMany as any).mockRejectedValue(new Error("DB error"));
+    } else {
+      (vi.spyOn(prisma.apiUsageLog, "findMany") as any).mockRejectedValue(new Error("DB error"));
+    }
+
+    const stats = await getApiStats();
+    expect(stats).toEqual([]);
   });
 });

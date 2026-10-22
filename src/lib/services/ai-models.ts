@@ -35,11 +35,36 @@ export async function getModelHierarchy(): Promise<string[]> {
  * If no models have been fetched yet, returns a default list containing the standard and fallback models.
  */
 export async function getStoredAiModels(): Promise<FilteredAiModel[]> {
-  const models = await prisma.aiModel.findMany({
-    orderBy: { displayName: "asc" },
-  });
+  try {
+    const models = await prisma.aiModel.findMany({
+      orderBy: { displayName: "asc" },
+    });
 
-  if (models.length === 0) {
+    if (models.length === 0) {
+      return [
+        {
+          id: DEFAULT_AI_MODEL,
+          name: `models/${DEFAULT_AI_MODEL}`,
+          displayName: "Gemini 3.6 Flash",
+          description: "Standardmodell",
+        },
+        {
+          id: FALLBACK_AI_MODEL,
+          name: `models/${FALLBACK_AI_MODEL}`,
+          displayName: "Gemini Flash-Lite Latest",
+          description: "Fallback-Modell",
+        },
+      ];
+    }
+
+    return models.map((m) => ({
+      id: m.id,
+      name: m.name,
+      displayName: m.displayName,
+      description: m.description,
+    }));
+  } catch (error) {
+    console.error("Fehler beim Laden der gespeicherten KI-Modelle:", error);
     return [
       {
         id: DEFAULT_AI_MODEL,
@@ -55,13 +80,6 @@ export async function getStoredAiModels(): Promise<FilteredAiModel[]> {
       },
     ];
   }
-
-  return models.map((m) => ({
-    id: m.id,
-    name: m.name,
-    displayName: m.displayName,
-    description: m.description,
-  }));
 }
 
 /**
