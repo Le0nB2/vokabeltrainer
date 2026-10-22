@@ -101,7 +101,7 @@ describe("gemini-executor service", () => {
       expect(executeMock).toHaveBeenNthCalledWith(4, expect.anything(), "gemini-flash-lite-latest");
     });
 
-    it("throws when all 3 attempts fail on all models", async () => {
+    it("throws when all attempts fail (3x primary model, 1x fallback model)", async () => {
       const executeMock = vi.fn().mockRejectedValue(new Error("503 Service Unavailable"));
 
       await expect(
@@ -114,8 +114,8 @@ describe("gemini-executor service", () => {
         })
       ).rejects.toThrow("503 Service Unavailable");
 
-      // 3 attempts on gemini-3.6-flash + 3 attempts on gemini-flash-lite-latest = 6 total
-      expect(executeMock).toHaveBeenCalledTimes(6);
+      // 3 attempts on primary model (gemini-3.6-flash) + 1 attempt on fallback model (gemini-flash-lite-latest) = 4 total
+      expect(executeMock).toHaveBeenCalledTimes(4);
     });
 
     it("rotates API key immediately without 3x retrying when quota is exhausted (429)", async () => {

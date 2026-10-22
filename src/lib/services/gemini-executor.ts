@@ -3,7 +3,9 @@ import prisma from "@/lib/prisma";
 import { getModelHierarchy } from "@/lib/services/ai-models";
 
 export class QuotaExceededError extends Error {
-  constructor(message: string = "Dein kostenloses Google API-Kontingente ist aufgebraucht. Versuche es in ein paar Stunden noch einmal") {
+  constructor(
+    message: string = "Dein kostenloses Google API-Kontingent ist für heute aufgebraucht. Heute sind leider keine weiteren KI-Anfragen mehr möglich. Bitte versuche es morgen wieder."
+  ) {
     super(message);
     this.name = "QuotaExceededError";
   }
@@ -50,24 +52,25 @@ export interface CallGeminiOptions<T> {
   apiKeys: string[];
   models?: string[];
   retryDelayMs?: number;
-  maxAttemptsPerModel?: number;
+  maxAttemptsPrimaryModel?: number;
+  maxAttemptsFallbackModel?: number;
   execute: (ai: GoogleGenAI, model: string) => Promise<T>;
 }
 
 /**
  * Executes a Gemini request with model hierarchy and overload retry logic:
- * 1. Requests the selected model first.
- * 2. If overloaded (e.g. 503), retries up to 2 additional times with 3s delay (3 attempts total).
- * 3. If still unsuccessful, falls back to the next model (e.g. gemini-flash-lite-latest)
- *    and also attempts it up to 3 times (with 3s delay between attempts).
- * 4. Rotates across API keys if quota (429) is exhausted.
+ * 1. Requests the selected model first (up to 3 attempts with 3s delay on overload).
+ * 2. If still unsuccessful, falls back to the next model (e.g. gemini-flash-lite-latest)
+ *    and attempts it exactly 1 time.
+ * 3. Rotates across API keys if quota (429) is exhausted.
  */
 export async function callGeminiWithRetry<T>({
   endpoint,
   apiKeys,
   models: customModels,
   retryDelayMs = 3000,
-  maxAttemptsPerModel = 3,
+  maxAttemptsPrimaryModel = 3,
+  maxAttemptsFallbackModel = 1,
   execute,
 }: CallGeminiOptions<T>): Promise<T> {
   if (!apiKeys || apiKeys.length === 0) {
@@ -84,8 +87,10 @@ export async function callGeminiWithRetry<T>({
 
     for (let modelIndex = 0; modelIndex < models.length; modelIndex++) {
       const modelToUse = models[modelIndex];
+      // Das ausgewählte Modell (Index 0) wird 3x angefragt, das Fallback-Modell nur 1x
+      const maxAttempts = modelIndex === 0 ? maxAttemptsPrimaryModel : maxAttemptsFallbackModel;
 
-      for (let attempt = 0; attempt < maxAttemptsPerModel; attempt++) {
+      for (let attempt = 0; attempt < maxAttempts; attempt++) {
         try {
           const result = await execute(ai, modelToUse);
 
@@ -127,16 +132,16 @@ export async function callGeminiWithRetry<T>({
             break; // Stop retrying this model, break to switch API key
           }
 
-          if (isOverloadedError(error)) {
-            if (attempt < maxAttemptsPerModel - 1) {
+          if (isOverloaded) {
+            if (attempt < maxAttempts - 1) {
               console.warn(
-                `Modell ${modelToUse} ist überlastet (Versuch ${attempt + 1}/${maxAttemptsPerModel}, Key ${keyIndex + 1}). Warte ${retryDelayMs / 1000}s vor erneutem Versuch...`
+                `Modell ${modelToUse} ist überlastet (Versuch ${attempt + 1}/${maxAttempts}, Key ${keyIndex + 1}). Warte ${retryDelayMs / 1000}s vor erneutem Versuch...`
               );
               await sleep(retryDelayMs);
               continue; // Retry with the SAME model
             } else {
               console.warn(
-                `Modell ${modelToUse} nach ${maxAttemptsPerModel} Versuchen weiterhin überlastet. Wechsle zum Fallback-Modell falls verfügbar.`
+                `Modell ${modelToUse} nach ${maxAttempts} Versuch(en) weiterhin überlastet. Wechsle zum Fallback-Modell falls verfügbar.`
               );
               break; // Proceed to next model in hierarchy
             }
