@@ -166,7 +166,12 @@ export async function getAvailableAiModelsAction() {
   return await getStoredAiModels()
 }
 
-export async function syncAiModelsAction() {
+export async function syncAiModelsAction(): Promise<{
+  success: boolean;
+  count: number;
+  error?: string;
+  apiStats?: import("@/actions/api-stats").ApiStatsResult[];
+}> {
   await requireAppAuth()
   const isAuth = await checkSettingsAuth()
   if (!isAuth) {
@@ -175,8 +180,10 @@ export async function syncAiModelsAction() {
 
   const { fetchAndPersistGoogleModels } = await import("@/lib/services/ai-models")
   const result = await fetchAndPersistGoogleModels()
-  if (result.success) {
-    revalidatePath("/settings")
-  }
-  return result
+  revalidatePath("/settings")
+
+  const { getApiStats } = await import("@/actions/api-stats")
+  const apiStats = await getApiStats()
+
+  return { ...result, apiStats }
 }

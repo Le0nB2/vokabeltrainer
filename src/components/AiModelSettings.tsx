@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { updateSettings, syncAiModelsAction } from "@/actions/settings"
 import { Sparkles, RefreshCw, AlertCircle, CheckCircle2, CreditCard } from "lucide-react"
 import { ApiUsageChart } from "@/components/ApiUsageChart"
@@ -30,12 +30,17 @@ export function AiModelSettings({
     initialSettings.selectedModel ?? "gemini-3.5-flash-lite"
   )
   const [models, setModels] = useState<ModelItem[]>(initialModels)
+  const [stats, setStats] = useState<ApiStatsResult[] | undefined>(apiStats)
   const [isSaving, setIsSaving] = useState(false)
   const [isRefreshing, setIsRefreshing] = useState(false)
   const [feedback, setFeedback] = useState<{
     type: "success" | "error"
     message: string
   } | null>(null)
+
+  useEffect(() => {
+    setStats(apiStats)
+  }, [apiStats])
 
   const handleModelChange = async (newModel: string) => {
     setSelectedModel(newModel)
@@ -59,6 +64,9 @@ export function AiModelSettings({
     setFeedback(null)
     try {
       const res = await syncAiModelsAction()
+      if (res.apiStats) {
+        setStats(res.apiStats)
+      }
       if (res.success) {
         setFeedback({
           type: "success",
@@ -97,14 +105,14 @@ export function AiModelSettings({
   return (
     <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl p-6 shadow-sm mt-8">
       {/* 1. API Aufrufe & Fehler-Diagramm ganz oben */}
-      {apiStats && (
+      {stats && (
         <div className="mb-6">
-          <ApiUsageChart data={apiStats} embedded />
+          <ApiUsageChart data={stats} embedded />
         </div>
       )}
 
       {/* 2. Nahtlose Verbindung zu den Modell-Optionen */}
-      <div className={apiStats ? "border-t border-zinc-200 dark:border-zinc-800 pt-6" : ""}>
+      <div className={stats ? "border-t border-zinc-200 dark:border-zinc-800 pt-6" : ""}>
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
           <div className="flex items-center gap-2">
             <Sparkles className="w-5 h-5 text-blue-600 shrink-0" />
