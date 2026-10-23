@@ -45,69 +45,59 @@ Eine moderne, lokal lauffähige Vokabeltrainer-Webanwendung, gebaut mit Next.js 
 
 ## Hosting in der Cloud (Render & Neon)
 
-Du möchtest deinen Vokabeltrainer nicht lokal auf deinem eigenen PC laufen lassen, sondern ihn rund um die Uhr aus dem Internet erreichbar machen? Kein Problem! Dank dieser Anleitung kannst du die App völlig **kostenlos** in der Cloud hosten.
+Du möchtest deinen Vokabeltrainer nicht lokal auf deinem eigenen PC laufen lassen, sondern ihn rund um die Uhr aus dem Internet erreichbar machen? Dank der automatischen **Render-Blueprint**-Konfiguration geht das mit minimalem Aufwand und völlig **kostenlos**.
 
-Wir nutzen dafür zwei Dienste:
-1. **Neon:** Eine kostenlose Datenbank in der Cloud (PostgreSQL), in der deine Vokabeln gespeichert werden.
-2. **Render:** Ein Cloud-Anbieter, der deinen Programmcode ausführt und deine App im Internet als Website sichtbar macht.
+Du benötigst dafür lediglich zwei kostenlose Konten und musst nur **zwei Werte** eintragen:
+1. **Neon:** Kostenlose Cloud-Datenbank (PostgreSQL) für deine Vokabeln.
+2. **Google Gemini:** Kostenloser KI-Schlüssel für Eselsbrücken, Beispielsätze und Korrekturen.
+3. **Render:** Führt die App in der Cloud aus.
 
-### Vorbereitung
+---
 
-Den **kostenlosen** API Key erhältst du im [Google AI Studio](https://aistudio.google.com/).
-Gehe dazu wie folgt vor:
+### Schritt 1: Datenbank bei Neon erstellen (1 Minute)
+1. Gehe auf [neon.tech](https://neon.tech/) und registriere dich kostenlos (z. B. mit deinem GitHub-Konto).
+2. Klicke auf **"New Project"**, gib dem Projekt einen Namen (z. B. `vokabeltrainer-db`, Region am besten `Frankfurt`) und klicke auf **"Create Project"**.
+3. Klicke im Dashboard auf **"Connect"** und kopiere den angezeigten **Connection String** (fängt mit `postgresql://...` an).
+   > **Tipp für Einsteiger:** Du musst bei Neon nichts weiter einstellen – die App erkennt den Connection String vollautomatisch und kümmert sich um alles Weitere!
+
+---
+
+### Schritt 2: Google Gemini API Key holen (1 Minute)
 1. Besuche das [Google AI Studio](https://aistudio.google.com/) und melde dich mit deinem Google-Konto an.
-2. Klicke im Menü links auf **"Get API key"**.
-3. Klicke auf den Button **"Create API key"**.
-4. Wähle ein bestehendes Google Cloud Projekt aus oder klicke auf **"Create API key in new project"**.
-5. Notiere den generierten Schlüssel vorübergehend.
+2. Klicke im Menü links auf **"Get API key"** und dann auf **"Create API key"**.
+3. Kopiere den erstellten Schlüssel.
 
-*Hinweis: Die Nutzung der Gemini API im Free Tier ist kostenlos und für den Vokabeltrainer völlig ausreichend.*
+*(Hinweis: Die Nutzung der Gemini API im Free Tier ist kostenlos und für den Vokabeltrainer völlig ausreichend).*
 
-### Schritt 1: Datenbank bei Neon erstellen
-1. Gehe auf [neon.tech](https://neon.tech/) und registriere dich kostenlos (mit deinem GitHub-Konto).
-2. Klicke im Dashboard auf **"New Project"** falls du nicht direkt aufgefordert wirst ein Projekt zu erstellen.
-3. Gib dem Projekt einen Namen (z.B. `vokabeltrainer-db`). Wähle bei Region am besten "Frankfurt" aus, damit die Datenbank schnell erreichbar ist. Klicke auf **"Create Project"**.
-4. Achte darauf, dass Postgres database aktiviert ist.
-5. Wichtig: Nach dem Erstellen des Projekts gelangst du ins Dashboard. Klicke auf **Connect**. Dort siehst du deinen sogenannten **Connection String** (fängt meist mit `postgresql://...` an). Neon bietet zwei Varianten an:
-   - **Pooled connection** (Host mit `-pooler`, optimal für den laufenden App-Betrieb als `DATABASE_URL`).
-   - **Direct connection** (Host ohne `-pooler`, für direkte Verbindung und Prisma-Migrationen als `DIRECT_URL`).
-   Kopiere diesen Connection String und speichere ihn dir kurz in einem Texteditor zwischen! Du brauchst ihn gleich.
+---
 
-### Schritt 2: Code auf Render hochladen
-1. Gehe auf [render.com](https://render.com/), erstelle ein Konto bzw. logge dich über deinen **Google Account** ein.
-2. Klicke im Dashboard oben rechts auf **"New"** und wähle **"Web Service"**.
-3. Wähle **"Public Git Repository"** aus.
-4. Wähle das Repository `https://github.com/Le0nB2/vokabeltrainer` deines Vokabeltrainers aus.
-5. Fülle die Einstellungen wie folgt aus:
-   - **Name:** Wie deine Webseite später heißen soll (z.B. `mein-vokabeltrainer`).
-   - **Language/Runtime:** `Docker` (Wichtig!).
-   - **Branch:** `main` (Wichtig!).
-   - **Region:** Frankfurt (oder die Region, die du bei Neon gewählt hast).
-   - **Instance Type:** `Free` (Kostenlos).
+### Schritt 3: Mit 1-Klick auf Render deployen (Render Blueprint)
 
-### Schritt 3: Umgebungsvariablen (Environment Variables) einrichten
-Bevor du ganz unten auf "Deploy web service" klickst, musst du Render noch sagen, wie es sich mit der Datenbank verbinden kann und dass es sich in der Cloud befindet.
-Scrolle runter zu **"Environment Variables"** und klicke auf **"Add Environment Variable"**. Füge folgende Einträge hinzu:
+Klicke einfach auf den folgenden Button, um das automatische Deployment auf Render zu starten:
 
-| Key (Schlüssel) | Value (Wert) |
+[![Deploy to Render](https://render.com/images/deploy-to-render-button.svg)](https://render.com/deploy?repo=https://github.com/Le0nB2/vokabeltrainer)
+
+*(Alternativ auf [render.com](https://render.com/) einloggen, oben rechts auf **"New +"** $\rightarrow$ **"Blueprint"** klicken und das Repository `https://github.com/Le0nB2/vokabeltrainer` auswählen).*
+
+Render liest automatisch die Projektkonfiguration (`render.yaml`) ein und fragt dich nach nur **zwei Eingaben**:
+
+| Feld | Was du einfügen musst |
 | :--- | :--- |
-| `RENDER` | `true` |
-| `DATABASE_URL` | *(Füge hier den kopierten Connection String von Neon aus Schritt 1 ein, z. B. die Pooled Connection)* |
-| `DIRECT_URL` | *(Optional/Empfohlen: Direct Connection von Neon ohne `-pooler`. Falls weggelassen, leitet die App dies für Migrationen automatisch aus `DATABASE_URL` ab)* |
-| `GEMINI_API_KEY` | *(Dein Google Gemini API Key für die KI-Funktionen)* |
-| `SETTINGS_PASSWORD` | *(Optional: Passwortschutz für die Einstellungen)* |
-| `AUTH_USER` (oder `BASIC_AUTH_USER`) | Benutzername *(Optional: Login-Zugriffsschutz vor der Startseite mit Session-Cookie)* |
-| `AUTH_PASSWORD` (oder `BASIC_AUTH_PASSWORD`) | Kennwort *(Optional: Login-Zugriffsschutz vor der Startseite mit Session-Cookie)* |
-| `AUTH_SECRET` | *(Optional: Geheimer Schlüssel zur Signierung der Session-Cookies; falls leer, wird automatisch das Passwort verwendet)* |
+| **`DATABASE_URL`** | Der kopierte Connection String von Neon aus Schritt 1 |
+| **`GEMINI_API_KEY`** | Dein Google Gemini API Key aus Schritt 2 |
 
-> **Hinweis zum Free-Tier bei Render:** Falls du bei beim Klick auf "Deploy web service" aufgefordert wirst, eine Kreditkarte zu hinterlegen: Dies ist eine Sicherheitsregel von Render, um Missbrauch (wie Krypto-Mining) zu verhindern. Wenn du den Free Plan (0$) ausgewählt hast, brauchst du dir keine Sorgen vor Abbuchungen machen. Render wird im Free-Tier kein Geld abbuchen.
-Da du jedoch die kostenlose Version von Render nutzt, "schläft" deine App ein, wenn sie 15 Minuten lang nicht benutzt wird. Wenn du sie danach wieder aufrufst, dauert das Laden der Seite beim allerersten Mal ca. 30 Sekunden länger, weil Render die App erst wieder "aufwecken" muss. Danach reagiert sie wieder sofort.
+Klicke anschließend ganz unten auf **"Apply"** (bzw. **"Deploy"**).
 
-### Schritt 4: Starten!
-1. Klicke ganz unten auf **"Deploy web service"**.
-2. Render beginnt nun automatisch, deine App herunterzuladen, vorzubereiten und zu starten (das sogenannte "Deployment"). Das kann beim ersten Mal 5-10 Minuten dauern.
-3. Wenn alles fertig ist, siehst du oben links einen grünen Status "Live" und darunter einen Link (z.B. `https://mein-vokabeltrainer.onrender.com`).
-4. Klicke auf den Link – **Fertig!** Dein Vokabeltrainer ist nun im Internet erreichbar.
+Render richtet den Service, Docker und alle Sicherheitsschlüssel vollautomatisch ein. Nach ca. 5 Minuten siehst du den grünen Status **"Live"** und deine persönliche Web-Adresse (z. B. `https://vokabeltrainer-xxxx.onrender.com`). **Fertig!**
+
+---
+
+### Optionale Einstellungen (nach dem Deployment)
+Falls du deine App zusätzlich absichern möchtest, kannst du im Render-Dashboard unter deinem Web Service im Reiter **"Environment"** jederzeit optionale Variablen hinzufügen:
+* **`SETTINGS_PASSWORD`**: Passwort für den Einstellungsbereich.
+* **`AUTH_USER` & `AUTH_PASSWORD`**: Schützt die gesamte Website mit einer Login-Maske (Benutzername & Passwort).
+
+> **Hinweis zum Free-Tier bei Render:** Die kostenlose Instanz geht nach 15 Minuten Inaktivität in einen Ruhezustand („Scale-to-Zero“). Beim ersten Aufruf nach einer Pause dauert das Laden ca. 30–50 Sekunden, da Render den Container wieder hochfährt. Danach reagiert die App sofort.
 
 ## Lokales Setup (Docker)
 
