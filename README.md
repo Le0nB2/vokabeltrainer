@@ -49,8 +49,8 @@ Du möchtest deinen Vokabeltrainer nicht lokal auf deinem eigenen PC laufen lass
 
 Du benötigst dafür kostenlose Konten und nur wenige Minuten:
 1. **Google Gemini:** Kostenloser KI-Schlüssel für das Auslesen der Vokabeln per Foto, Eselsbrücken, Beispielsätze und Korrekturen.
-2. **Neon:** Kostenlose Cloud-Datenbank (PostgreSQL) für deine Vokabeln.
-3. **Render:** Führt die App in der Cloud aus.
+2. **Neon:** Kostenlose Cloud-Datenbank (PostgreSQL) für deine Vokabeln (Anmeldung z. B. per Google-Konto).
+3. **Render:** Führt die App in der Cloud aus (Anmeldung z. B. per Google-Konto).
 
 ---
 
@@ -75,10 +75,13 @@ Du benötigst dafür kostenlose Konten und nur wenige Minuten:
 
 Wenn du gleich auf den Deploy-Button klickst, leitet Render dich zum automatischen Setup weiter. Lies dir kurz die folgenden Schritte durch, damit du weißt, was einzutragen ist:
 
-1. **Blueprint-Name vergeben:**  
+1. **Bei Render anmelden (falls nötig):**  
+   Falls du noch kein Render-Konto hast oder nicht eingeloggt bist, wirst du zunächst zur Anmeldeseite weitergeleitet. Du kannst dich dort bequem mit einem Klick kostenlos mit deinem **Google-Konto** (oder GitHub) registrieren bzw. einloggen. Danach landest du direkt in der Blueprint-Einrichtungsmaske.
+
+2. **Blueprint-Name vergeben:**  
    Ganz oben im Feld **"Blueprint Name"** einen beliebigen Projektnamen eingeben (z. B. `vokabeltrainer`).
 
-2. **Nach unten scrollen zu den Umgebungsvariablen:**  
+3. **Nach unten scrollen zu den Umgebungsvariablen:**  
    Scrolle auf der Render-Seite etwas nach unten zum Bereich **"Environment Variables"** unter dem Service *vokabeltrainer*. Trage dort in die entsprechenden Eingabefelder die folgenden Zugangsdaten ein:
 
    | Feld | Was du eintragen musst |
@@ -89,10 +92,10 @@ Wenn du gleich auf den Deploy-Button klickst, leitet Render dich zum automatisch
    | **`AUTH_PASSWORD`** | Dein gewünschtes Passwort für den Website-Login |
    | **`SETTINGS_PASSWORD`** | Ein Passwort zum Schutz des Einstellungsbereichs (Für Eltern) |
 
-3. **Was ist mit weiteren Variablen?**  
+4. **Was ist mit weiteren Variablen?**  
    Du musst **ausschließlich** die 5 oben genannten Felder ausfüllen. Automatische Werte (wie `AUTH_SECRET` oder `NOTIFICATION_API_TOKEN`) lässt du einfach unverändert – Render generiert diese Sicherheitsschlüssel beim ersten Starten vollautomatisch für dich.
 
-4. **Bereitstellung starten:**  
+5. **Bereitstellung starten:**  
    Klicke ganz unten auf **"Apply"** (bzw. **"Deploy"**). Render richtet den Service und alle Sicherheitsschlüssel vollautomatisch ein. Nach ca. 5 Minuten siehst du den grünen Status **"Live"** und deine persönliche Web-Adresse (z. B. `https://vokabeltrainer-xxxx.onrender.com`). **Fertig!** Wenn du die Seite aufrufst, wirst du direkt durch deine Login-Maske geschützt.
 
 #### Jetzt das Deployment starten:
