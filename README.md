@@ -47,7 +47,7 @@ Eine moderne, lokal lauffähige Vokabeltrainer-Webanwendung, gebaut mit Next.js 
 
 Du möchtest deinen Vokabeltrainer nicht lokal auf deinem eigenen PC laufen lassen, sondern ihn rund um die Uhr aus dem Internet erreichbar machen? Dank der automatischen **Render-Blueprint**-Konfiguration geht das mit minimalem Aufwand und völlig **kostenlos**.
 
-Du benötigst dafür lediglich zwei kostenlose Konten und musst nur **zwei Werte** eintragen:
+Du benötigst dafür kostenlose Konten und nur wenige Minuten:
 1. **Neon:** Kostenlose Cloud-Datenbank (PostgreSQL) für deine Vokabeln.
 2. **Google Gemini:** Kostenloser KI-Schlüssel für Eselsbrücken, Beispielsätze und Korrekturen.
 3. **Render:** Führt die App in der Cloud aus.
@@ -79,23 +79,19 @@ Klicke einfach auf den folgenden Button, um das automatische Deployment auf Rend
 
 *(Alternativ auf [render.com](https://render.com/) einloggen, oben rechts auf **"New +"** $\rightarrow$ **"Blueprint"** klicken und das Repository `https://github.com/Le0nB2/vokabeltrainer` auswählen).*
 
-Render liest automatisch die Projektkonfiguration (`render.yaml`) ein und fragt dich nach nur **zwei Eingaben**:
+Render liest automatisch die Projektkonfiguration (`render.yaml`) ein und fragt dich nach den folgenden Zugangsdaten, damit deine App direkt von Beginn an geschützt und voll einsatzbereit ist:
 
-| Feld | Was du einfügen musst |
+| Feld | Was du eintragen musst |
 | :--- | :--- |
 | **`DATABASE_URL`** | Der kopierte Connection String von Neon aus Schritt 1 |
 | **`GEMINI_API_KEY`** | Dein Google Gemini API Key aus Schritt 2 |
+| **`AUTH_USER`** | Dein gewünschter Benutzername für den Website-Login (Schutz vor Fremdzugriff) |
+| **`AUTH_PASSWORD`** | Dein gewünschtes Passwort für den Website-Login |
+| **`SETTINGS_PASSWORD`** | Ein Passwort zum Schutz des Einstellungsbereichs (z. B. für Eltern/Lehrkräfte) |
 
 Klicke anschließend ganz unten auf **"Apply"** (bzw. **"Deploy"**).
 
-Render richtet den Service, Docker und alle Sicherheitsschlüssel vollautomatisch ein. Nach ca. 5 Minuten siehst du den grünen Status **"Live"** und deine persönliche Web-Adresse (z. B. `https://vokabeltrainer-xxxx.onrender.com`). **Fertig!**
-
----
-
-### Optionale Einstellungen (nach dem Deployment)
-Falls du deine App zusätzlich absichern möchtest, kannst du im Render-Dashboard unter deinem Web Service im Reiter **"Environment"** jederzeit optionale Variablen hinzufügen:
-* **`SETTINGS_PASSWORD`**: Passwort für den Einstellungsbereich.
-* **`AUTH_USER` & `AUTH_PASSWORD`**: Schützt die gesamte Website mit einer Login-Maske (Benutzername & Passwort).
+Render richtet den Service, Docker und alle Sicherheitsschlüssel vollautomatisch ein. Nach ca. 5 Minuten siehst du den grünen Status **"Live"** und deine persönliche Web-Adresse (z. B. `https://vokabeltrainer-xxxx.onrender.com`). **Fertig!** Wenn du die Seite aufrufst, wirst du direkt durch die Login-Maske geschützt.
 
 > **Hinweis zum Free-Tier bei Render:** Die kostenlose Instanz geht nach 15 Minuten Inaktivität in einen Ruhezustand („Scale-to-Zero“). Beim ersten Aufruf nach einer Pause dauert das Laden ca. 30–50 Sekunden, da Render den Container wieder hochfährt. Danach reagiert die App sofort.
 
