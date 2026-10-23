@@ -77,7 +77,7 @@ Klicke einfach auf den folgenden Button, um das automatische Deployment auf Rend
 
 [![Deploy to Render](https://render.com/images/deploy-to-render-button.svg)](https://render.com/deploy?repo=https://github.com/Le0nB2/vokabeltrainer)
 
-*(Alternativ auf [render.com](https://render.com/) einloggen, oben rechts auf **"New +"** $\rightarrow$ **"Blueprint"** klicken und das Repository `https://github.com/Le0nB2/vokabeltrainer` auswählen).*
+*(Alternativ auf [render.com](https://render.com/) einloggen, oben rechts auf **"New +"** -> **"Blueprint"** klicken und das Repository `https://github.com/Le0nB2/vokabeltrainer` auswählen).*
 
 Render liest automatisch die Projektkonfiguration ein und fragt dich nach den folgenden Zugangsdaten, damit deine App direkt von Beginn an geschützt und voll einsatzbereit ist:
 
