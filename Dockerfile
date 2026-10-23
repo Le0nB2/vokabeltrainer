@@ -22,6 +22,7 @@ COPY . .
 # Argument to determine if this is a Render deployment
 ARG RENDER
 ENV RENDER=${RENDER}
+ENV DIRECT_URL="postgresql://postgres:postgres@localhost:5432/vokabeltrainer?schema=public"
 
 # Conditionally use the PostgreSQL schema if RENDER is set
 RUN if [ "$RENDER" = "true" ]; then \
