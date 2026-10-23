@@ -68,7 +68,10 @@ Gehe dazu wie folgt vor:
 2. Klicke im Dashboard auf **"New Project"** falls du nicht direkt aufgefordert wirst ein Projekt zu erstellen.
 3. Gib dem Projekt einen Namen (z.B. `vokabeltrainer-db`). Wähle bei Region am besten "Frankfurt" aus, damit die Datenbank schnell erreichbar ist. Klicke auf **"Create Project"**.
 4. Achte darauf, dass Postgres database aktiviert ist.
-5. Wichtig: Nach create Projekt gelangst du ins Dashboard. Klicke auf Connect. Auf der nächsten Seite siehst du direkt deinen sogenannten **Connection String** (fängt meist mit `postgres://...` an). Kopiere diesen Text und speichere ihn dir kurz in einem Texteditor zwischen! Du brauchst ihn gleich.
+5. Wichtig: Nach dem Erstellen des Projekts gelangst du ins Dashboard. Klicke auf **Connect**. Dort siehst du deinen sogenannten **Connection String** (fängt meist mit `postgresql://...` an). Neon bietet zwei Varianten an:
+   - **Pooled connection** (Host mit `-pooler`, optimal für den laufenden App-Betrieb als `DATABASE_URL`).
+   - **Direct connection** (Host ohne `-pooler`, für direkte Verbindung und Prisma-Migrationen als `DIRECT_URL`).
+   Kopiere diesen Connection String und speichere ihn dir kurz in einem Texteditor zwischen! Du brauchst ihn gleich.
 
 ### Schritt 2: Code auf Render hochladen
 1. Gehe auf [render.com](https://render.com/), erstelle ein Konto bzw. logge dich über deinen **Google Account** ein.
@@ -89,7 +92,8 @@ Scrolle runter zu **"Environment Variables"** und klicke auf **"Add Environment 
 | Key (Schlüssel) | Value (Wert) |
 | :--- | :--- |
 | `RENDER` | `true` |
-| `DATABASE_URL` | *(Füge hier den kopierten Connection String von Neon aus Schritt 1 ein)* |
+| `DATABASE_URL` | *(Füge hier den kopierten Connection String von Neon aus Schritt 1 ein, z. B. die Pooled Connection)* |
+| `DIRECT_URL` | *(Optional/Empfohlen: Direct Connection von Neon ohne `-pooler`. Falls weggelassen, leitet die App dies für Migrationen automatisch aus `DATABASE_URL` ab)* |
 | `GEMINI_API_KEY` | *(Dein Google Gemini API Key für die KI-Funktionen)* |
 | `SETTINGS_PASSWORD` | *(Optional: Passwortschutz für die Einstellungen)* |
 | `AUTH_USER` (oder `BASIC_AUTH_USER`) | Benutzername *(Optional: Login-Zugriffsschutz vor der Startseite mit Session-Cookie)* |
