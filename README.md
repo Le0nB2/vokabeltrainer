@@ -76,7 +76,7 @@ Du benötigst dafür kostenlose Konten und nur wenige Minuten:
 Wenn du gleich auf den Deploy-Button klickst, leitet Render dich zum automatischen Setup weiter. Lies dir kurz die folgenden Schritte durch, damit du weißt, was einzutragen ist:
 
 1. **Blueprint-Name vergeben:**  
-   Ganz oben im Feld **"Service Group Name"** (oder **"Blueprint Name"**) einen beliebigen Projektnamen eingeben (z. B. `vokabeltrainer`).
+   Ganz oben im Feld **"Blueprint Name"** einen beliebigen Projektnamen eingeben (z. B. `vokabeltrainer`).
 
 2. **Nach unten scrollen zu den Umgebungsvariablen:**  
    Scrolle auf der Render-Seite etwas nach unten zum Bereich **"Environment Variables"** unter dem Service *vokabeltrainer*. Trage dort in die entsprechenden Eingabefelder die folgenden Zugangsdaten ein:
@@ -95,8 +95,6 @@ Wenn du gleich auf den Deploy-Button klickst, leitet Render dich zum automatisch
 4. **Bereitstellung starten:**  
    Klicke ganz unten auf **"Apply"** (bzw. **"Deploy"**). Render richtet den Service und alle Sicherheitsschlüssel vollautomatisch ein. Nach ca. 5 Minuten siehst du den grünen Status **"Live"** und deine persönliche Web-Adresse (z. B. `https://vokabeltrainer-xxxx.onrender.com`). **Fertig!** Wenn du die Seite aufrufst, wirst du direkt durch deine Login-Maske geschützt.
 
----
-
 #### Jetzt das Deployment starten:
 
 Klicke auf den Button, um die Bereitstellung auf Render zu starten:
@@ -108,6 +106,8 @@ Klicke auf den Button, um die Bereitstellung auf Render zu starten:
 *(Alternativ: Auf [render.com](https://render.com/) einloggen, oben rechts auf **"New +"** -> **"Blueprint"** klicken und das Repository `https://github.com/Le0nB2/vokabeltrainer` auswählen).*
 
 > **Hinweis zum Free-Tier bei Render:** Die kostenlose Instanz geht nach 10 Minuten Inaktivität in einen Ruhezustand. Beim ersten Aufruf nach einer Pause dauert das Laden der App ca. 30–50 Sekunden, da Render die App wieder hochfährt. Danach reagiert die App sofort.
+
+---
 
 ## Lokales Hosting auf dem eigenen Server (Docker)
 
