@@ -5,30 +5,19 @@ services:
     env: docker
     plan: free
     envVars:
-      - key: NODE_ENV
-        value: production
-      - key: NEXT_TELEMETRY_DISABLED
-        value: 1
-      - key: RENDER
-        value: true
       - key: DATABASE_URL
         sync: false
-      - key: DIRECT_URL
-        sync: false
       - key: GEMINI_API_KEY
-        sync: false
-      - key: SETTINGS_PASSWORD
-        sync: false
-      - key: BASIC_AUTH_USER
-        sync: false
-      - key: BASIC_AUTH_PASSWORD
         sync: false
       - key: AUTH_USER
         sync: false
       - key: AUTH_PASSWORD
         sync: false
+      - key: SETTINGS_PASSWORD
+        sync: false
+      - key: RENDER
+        value: true
       - key: AUTH_SECRET
         generateValue: true
       - key: NOTIFICATION_API_TOKEN
         generateValue: true
-
