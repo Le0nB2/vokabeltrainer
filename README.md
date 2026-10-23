@@ -112,6 +112,30 @@ Klicke auf den Button, um die Bereitstellung auf Render zu starten:
 
 *(Alternativ: Auf [render.com](https://render.com/) einloggen, oben rechts auf **"New +"** -> **"Blueprint"** klicken und das Repository `https://github.com/Le0nB2/vokabeltrainer` auswählen).*
 
+## 📱 Als App auf dem Homescreen nutzen (PWA)
+
+Die Web-App kann ohne App Store direkt als App auf dem Homescreen des Smartphones installiert werden (sogenannte Progressive Web App (PWA)):
+
+<details>
+<summary><b>iOS (Safari)</b></summary>
+
+1. Öffne die URL im **Safari-Browser**.
+2. Tippe unten links neben die URL und dann auf das **Teilen-Symbol** (Viereck mit Pfeil nach oben).
+3. Scrolle nach unten und wähle **„Zum Home-Bildschirm“**.
+4. Bestätige oben rechts mit **„Hinzufügen“**.
+
+</details>
+
+<details>
+<summary><b>Android (Chrome)</b></summary>
+
+1. Öffne die URL im **Chrome-Browser**.
+2. Tippe oben rechts auf das **Drei-Punkte-Menü** (⋮).
+3. Wähle **„App installieren“** (oder **„Zum Startbildschirm hinzufügen“**).
+4. Bestätige den Dialog mit **„Installieren“**.
+
+</details>
+
 
 ---
 
