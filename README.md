@@ -71,21 +71,15 @@ Du benötigst dafür kostenlose Konten und nur wenige Minuten:
 
 ---
 
-### Schritt 3: Mit 1-Klick auf Render deployen (Render Blueprint)
+### Schritt 3: Bereitstellung auf Render (Render Blueprint)
 
-Klicke einfach auf den folgenden Button, um das automatische Deployment auf Render zu starten:
-
-[![Deploy to Render](https://render.com/images/deploy-to-render-button.svg)](https://render.com/deploy?repo=https://github.com/Le0nB2/vokabeltrainer)
-
-*(Alternativ auf [render.com](https://render.com/) einloggen, oben rechts auf **"New +"** -> **"Blueprint"** klicken und das Repository `https://github.com/Le0nB2/vokabeltrainer` auswählen).*
-
-#### So füllst du die Render-Maske aus:
+Wenn du gleich auf den Deploy-Button klickst, leitet Render dich zum automatischen Setup weiter. Lies dir kurz die folgenden Schritte durch, damit du weißt, was einzutragen ist:
 
 1. **Blueprint-Name vergeben:**  
    Ganz oben im Feld **"Service Group Name"** (oder **"Blueprint Name"**) einen beliebigen Projektnamen eingeben (z. B. `vokabeltrainer`).
 
 2. **Nach unten scrollen zu den Umgebungsvariablen:**  
-   Scrolle auf der Seite etwas nach unten zum Bereich **"Environment Variables"** unter dem Service *vokabeltrainer*. Trage dort in die entsprechenden Eingabefelder die folgenden Zugangsdaten ein:
+   Scrolle auf der Render-Seite etwas nach unten zum Bereich **"Environment Variables"** unter dem Service *vokabeltrainer*. Trage dort in die entsprechenden Eingabefelder die folgenden Zugangsdaten ein:
 
    | Feld | Was du eintragen musst |
    | :--- | :--- |
@@ -99,9 +93,19 @@ Klicke einfach auf den folgenden Button, um das automatische Deployment auf Rend
    Du musst **ausschließlich** die 5 oben genannten Felder ausfüllen. Automatische Werte (wie `AUTH_SECRET` oder `NOTIFICATION_API_TOKEN`) lässt du einfach unverändert – Render generiert diese Sicherheitsschlüssel beim ersten Starten vollautomatisch für dich.
 
 4. **Bereitstellung starten:**  
-   Klicke ganz unten auf **"Apply"** (bzw. **"Deploy"**).
+   Klicke ganz unten auf **"Apply"** (bzw. **"Deploy"**). Render richtet den Service und alle Sicherheitsschlüssel vollautomatisch ein. Nach ca. 5 Minuten siehst du den grünen Status **"Live"** und deine persönliche Web-Adresse (z. B. `https://vokabeltrainer-xxxx.onrender.com`). **Fertig!** Wenn du die Seite aufrufst, wirst du direkt durch deine Login-Maske geschützt.
 
-Render richtet den Service und alle Sicherheitsschlüssel vollautomatisch ein. Nach ca. 5 Minuten siehst du den grünen Status **"Live"** und deine persönliche Web-Adresse (z. B. `https://vokabeltrainer-xxxx.onrender.com`). **Fertig!** Wenn du die Seite aufrufst, wirst du direkt durch die Login-Maske geschützt.
+---
+
+#### Jetzt das Deployment starten:
+
+Klicke auf den Button, um die Bereitstellung auf Render zu starten:
+
+[![Deploy to Render](https://render.com/images/deploy-to-render-button.svg)](https://render.com/deploy?repo=https://github.com/Le0nB2/vokabeltrainer)
+
+> 💡 **Tipp:** Klicke mit gedrückter **`Strg`**-Taste (am Mac: **`Cmd`**-Taste) oder mit dem **Mausrad** auf den Button, um Render in einem neuen Tab zu öffnen. So bleibt diese Anleitung daneben geöffnet!
+
+*(Alternativ: Auf [render.com](https://render.com/) einloggen, oben rechts auf **"New +"** -> **"Blueprint"** klicken und das Repository `https://github.com/Le0nB2/vokabeltrainer` auswählen).*
 
 > **Hinweis zum Free-Tier bei Render:** Die kostenlose Instanz geht nach 10 Minuten Inaktivität in einen Ruhezustand. Beim ersten Aufruf nach einer Pause dauert das Laden der App ca. 30–50 Sekunden, da Render die App wieder hochfährt. Danach reagiert die App sofort.
 
