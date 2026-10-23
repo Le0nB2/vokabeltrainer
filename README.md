@@ -76,7 +76,7 @@ Du benötigst dafür kostenlose Konten und nur wenige Minuten:
 Wenn du gleich auf den Deploy-Button klickst, leitet Render dich zum automatischen Setup weiter. Lies dir kurz die folgenden Schritte durch, damit du weißt, was einzutragen ist:
 
 1. **Bei Render anmelden (falls nötig):**  
-   Falls du noch kein Render-Konto hast oder nicht eingeloggt bist, wirst du zunächst zur Anmeldeseite weitergeleitet. Du kannst dich dort bequem mit einem Klick kostenlos mit deinem **Google-Konto** (oder GitHub) registrieren bzw. einloggen. Danach landest du direkt in der Blueprint-Einrichtungsmaske.
+   Falls du noch kein Render-Konto hast oder nicht eingeloggt bist, wirst du zunächst zur Anmeldeseite weitergeleitet. Du kannst dich dort bequem mit einem Klick kostenlos mit deinem **Google-Konto** registrieren bzw. einloggen. Danach landest du direkt in der Blueprint-Einrichtungsmaske.
 
 2. **Blueprint-Name vergeben:**  
    Ganz oben im Feld **"Blueprint Name"** einen beliebigen Projektnamen eingeben (z. B. `vokabeltrainer`).
