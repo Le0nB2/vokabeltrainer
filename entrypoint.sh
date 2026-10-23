@@ -19,6 +19,15 @@ if [ -z "$DIRECT_URL" ] || [ "$DIRECT_URL" = "$DEFAULT_BUILD_DIRECT_URL" ]; then
   fi
 fi
 
+# Falls PostgreSQL verwendet wird: Wecke schlafende Serverless-Instanzen (z. B. Neon) auf
+# und beende verwaiste, blockierende Advisory Locks (72707369) von abgestürzten Sessions
+TARGET_MIGRATE_URL="${DIRECT_URL:-$DATABASE_URL}"
+if echo "$TARGET_MIGRATE_URL" | grep -q "^postgres"; then
+  echo "Warming up PostgreSQL database and clearing stale migration advisory locks..."
+  echo "SELECT pg_terminate_backend(pid) FROM pg_locks WHERE objid = 72707369 AND pid != pg_backend_pid();" | \
+    npx prisma db execute --stdin --url="$TARGET_MIGRATE_URL" 2>/dev/null || true
+fi
+
 echo "Running prisma migrations..."
 MAX_RETRIES=5
 RETRY_DELAY=5
