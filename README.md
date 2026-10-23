@@ -67,7 +67,7 @@ Du benötigst dafür kostenlose Konten und nur wenige Minuten:
 1. Gehe auf [neon.tech](https://neon.tech/) und registriere dich kostenlos (z. B. mit deinem Google-Konto).
 2. Klicke auf **"New Project"**, gib dem Projekt einen Namen (z. B. `vokabeltrainer-db`, Region am besten `Frankfurt`) und klicke auf **"Create Project"**.
 3. Klicke im Dashboard auf **"Connect"** und kopiere den angezeigten **Connection String** (fängt mit `postgresql://...` an).
-   > **Tipp für Einsteiger:** Du musst bei Neon nichts weiter einstellen!
+   > **Fertig:** Du musst bei Neon nichts weiter einstellen!
 
 ---
 
@@ -112,7 +112,9 @@ Klicke auf den Button, um die Bereitstellung auf Render zu starten:
 
 *(Alternativ: Auf [render.com](https://render.com/) einloggen, oben rechts auf **"New +"** -> **"Blueprint"** klicken und das Repository `https://github.com/Le0nB2/vokabeltrainer` auswählen).*
 
-## 📱 Als App auf dem Homescreen nutzen (PWA)
+---
+
+### Schritt 4: 📱 Als App auf dem Homescreen nutzen (PWA)
 
 Die Web-App kann ohne App Store direkt als App auf dem Homescreen des Smartphones installiert werden (sogenannte Progressive Web App (PWA)):
 
