@@ -62,18 +62,20 @@ export function LearningStatsChart({ stats }: LearningStatsChartProps) {
         }
       },
       datalabels: {
-        color: '#52525b', // zinc-600
+        color: textColor,
         font: {
-          weight: 'normal' as const,
+          weight: 'bold' as const,
+          size: 11,
         },
+        anchor: 'end' as const,
+        align: 'top' as const,
+        offset: 2,
+        clip: false,
         display: function(context: { dataset: any, dataIndex: number }) {
           return context.dataset.data[context.dataIndex] > 0;
         },
         formatter: Math.round,
-        anchor: 'center' as const,
-        align: 'center' as const,
       },
-
     },
     scales: {
       x: {
@@ -86,6 +88,7 @@ export function LearningStatsChart({ stats }: LearningStatsChartProps) {
       },
       y: {
         beginAtZero: true,
+        grace: '8%',
         ticks: {
           color: textColor,
         },
@@ -102,14 +105,14 @@ export function LearningStatsChart({ stats }: LearningStatsChartProps) {
       {
         label: 'Richtig',
         data: stats.map(s => s.correct),
-        backgroundColor: 'rgba(34, 197, 94, 0.5)',
+        backgroundColor: isDark ? 'rgba(34, 197, 94, 0.75)' : 'rgba(34, 197, 94, 0.5)',
         borderColor: 'rgb(34, 197, 94)',
         borderWidth: 1,
       },
       {
         label: 'Falsch',
         data: stats.map(s => s.incorrect),
-        backgroundColor: 'rgba(239, 68, 68, 0.5)',
+        backgroundColor: isDark ? 'rgba(239, 68, 68, 0.75)' : 'rgba(239, 68, 68, 0.5)',
         borderColor: 'rgb(239, 68, 68)',
         borderWidth: 1,
       },
