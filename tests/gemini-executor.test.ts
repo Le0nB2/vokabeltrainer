@@ -152,5 +152,40 @@ describe("gemini-executor service", () => {
         })
       ).rejects.toThrow(QuotaExceededError);
     });
+
+    it("notifies onStatus callback on start, overload retry, and fallback", async () => {
+      const statusEvents: any[] = [];
+      const onStatus = vi.fn((event) => {
+        statusEvents.push(event);
+      });
+
+      const executeMock = vi
+        .fn()
+        // 3 failures on gemini-3.6-flash
+        .mockRejectedValueOnce(new Error("503 Overloaded"))
+        .mockRejectedValueOnce(new Error("503 Overloaded"))
+        .mockRejectedValueOnce(new Error("503 Overloaded"))
+        // Success on gemini-flash-lite-latest
+        .mockResolvedValueOnce("success");
+
+      await callGeminiWithRetry({
+        endpoint: "test-endpoint",
+        apiKeys: ["key-1"],
+        models: ["gemini-3.6-flash", "gemini-flash-lite-latest"],
+        retryDelayMs: 1,
+        execute: executeMock,
+        onStatus,
+      });
+
+      expect(onStatus).toHaveBeenCalled();
+      const retryEvents = statusEvents.filter((e) => e.type === "retry");
+      expect(retryEvents).toHaveLength(2); // 2 retries on primary model
+      expect(retryEvents[0].attempt).toBe(1);
+      expect(retryEvents[0].message).toContain("überlastet");
+
+      const fallbackEvents = statusEvents.filter((e) => e.type === "fallback");
+      expect(fallbackEvents).toHaveLength(1);
+      expect(fallbackEvents[0].model).toBe("gemini-flash-lite-latest");
+    });
   });
 });

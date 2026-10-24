@@ -5,6 +5,8 @@ import { useParams, useRouter } from "next/navigation";
 import { ArrowLeft, Loader2, Download, Printer } from "lucide-react";
 import { usePDF, Document, Page } from "@react-pdf/renderer";
 import WorksheetPDF from "./WorksheetPDF";
+import { AiProgressCard } from "@/components/AiProgressCard";
+import { readAiStatusStream, AiStatusMessage } from "@/lib/services/ai-status";
 
 interface WorksheetData {
   multipleChoice: {
@@ -44,6 +46,15 @@ interface WorksheetResponse {
   dateStr: string;
 }
 
+interface ApiWorksheetPayload {
+  worksheet: {
+    exercises: WorksheetData;
+    solutions: SolutionData;
+  };
+  worksheetId: string;
+  dateStr: string;
+}
+
 export default function WorksheetPage() {
   const params = useParams();
   const router = useRouter();
@@ -52,6 +63,14 @@ export default function WorksheetPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [worksheetData, setWorksheetData] = useState<WorksheetResponse | null>(null);
+  const [currentStatus, setCurrentStatus] = useState<AiStatusMessage | null>(null);
+  const [statusHistory, setStatusHistory] = useState<AiStatusMessage[]>([]);
+
+  const worksheetSteps = [
+    { id: "prep", label: "1. Vorbereitung" },
+    { id: "ai", label: "2. KI-Aufgaben" },
+    { id: "pdf", label: "3. Druck-Layout" },
+  ];
 
   const [pdfInstance, updatePdf] = usePDF({
     document: worksheetData ? <WorksheetPDF exercises={worksheetData.exercises} solutions={worksheetData.solutions} worksheetId={worksheetData.worksheetId} dateStr={worksheetData.dateStr} /> : <Document><Page></Page></Document>
@@ -68,14 +87,22 @@ export default function WorksheetPage() {
       try {
         const res = await fetch("/api/worksheet", {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ deckId }),
+          headers: {
+            "Content-Type": "application/json",
+            "Accept": "text/event-stream",
+          },
+          body: JSON.stringify({ deckId, stream: true }),
         });
 
-        const data = await res.json();
         if (!res.ok) {
-          throw new Error(data.error || "Fehler beim Generieren");
+          const errorData = await res.json().catch(() => ({}));
+          throw new Error(errorData.error || `Fehler beim Generieren (${res.status})`);
         }
+
+        const data = await readAiStatusStream<ApiWorksheetPayload>(res, (statusUpdate) => {
+          setCurrentStatus(statusUpdate);
+          setStatusHistory((prev) => [...prev, statusUpdate]);
+        });
 
         setWorksheetData({
           exercises: data.worksheet.exercises,
@@ -141,13 +168,22 @@ export default function WorksheetPage() {
   };
 
   if (loading) {
+    const activeStepIndex =
+      currentStatus?.stage === "optimizing"
+        ? 2
+        : currentStatus?.stage === "complete"
+        ? 3
+        : 1;
+
     return (
-      <div className="min-h-screen flex flex-col items-center justify-center p-4">
-        <Loader2 className="w-8 h-8 animate-spin text-blue-500 mb-4" />
-        <h2 className="text-xl font-bold mb-2 text-center">Arbeitsblatt wird erstellt...</h2>
-        <p className="text-zinc-500 text-center max-w-md">
-          Dies dauert normalerweise 10 bis 20 Sekunden. Die KI generiert nun passende Übungsaufgaben für deine Vokabeln. Das Layout wird zusätzlich für den Druck optimiert.
-        </p>
+      <div className="min-h-screen flex flex-col items-center justify-center p-4 bg-zinc-50/50 dark:bg-zinc-950/50">
+        <AiProgressCard
+          title="Arbeitsblatt wird erstellt"
+          currentStatus={currentStatus}
+          statusHistory={statusHistory}
+          steps={worksheetSteps}
+          activeStepIndex={activeStepIndex}
+        />
       </div>
     );
   }
