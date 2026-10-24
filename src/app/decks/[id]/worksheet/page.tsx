@@ -6,6 +6,7 @@ import { ArrowLeft, Loader2, Download, Printer } from "lucide-react";
 import { usePDF, Document, Page } from "@react-pdf/renderer";
 import WorksheetPDF from "./WorksheetPDF";
 import { AiProgressCard } from "@/components/AiProgressCard";
+import { AiActivityLog } from "@/components/AiActivityLog";
 import { readAiStatusStream, AiStatusMessage } from "@/lib/services/ai-status";
 
 interface WorksheetData {
@@ -196,15 +197,15 @@ export default function WorksheetPage() {
 
 
   return (
-    <div className="min-h-screen bg-zinc-100 flex flex-col items-center justify-center p-4">
-      <div className="bg-white p-8 rounded-2xl shadow-sm border border-zinc-200 max-w-md w-full text-center">
+    <div className="min-h-screen bg-zinc-100 dark:bg-zinc-950 flex flex-col items-center justify-center p-4">
+      <div className="bg-white dark:bg-zinc-900 p-8 rounded-2xl shadow-sm border border-zinc-200 dark:border-zinc-800 max-w-md w-full text-center">
         <div className="w-16 h-16 bg-green-100 text-green-600 rounded-full flex items-center justify-center mx-auto mb-6">
           <svg className="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
           </svg>
         </div>
-        <h2 className="text-2xl font-bold text-zinc-900 mb-2">Arbeitsblatt ist fertig!</h2>
-        <p className="text-zinc-600 mb-8">
+        <h2 className="text-2xl font-bold text-zinc-900 dark:text-zinc-100 mb-2">Arbeitsblatt ist fertig!</h2>
+        <p className="text-zinc-600 dark:text-zinc-400 mb-8">
           Dein PDF-Arbeitsblatt mit Lösungen wurde erfolgreich generiert und ist bereit zum Drucken.
         </p>
 
@@ -221,22 +222,28 @@ export default function WorksheetPage() {
           <button
             onClick={handleDownload}
             disabled={pdfInstance.loading || !pdfInstance.url}
-            className={`w-full flex items-center justify-center gap-2 px-6 py-4 rounded-xl font-medium transition-colors ${pdfInstance.loading || !pdfInstance.url ? "bg-zinc-50 cursor-not-allowed text-zinc-400" : "bg-zinc-100 hover:bg-zinc-200 text-zinc-900"}`}
+            className={`w-full flex items-center justify-center gap-2 px-6 py-4 rounded-xl font-medium transition-colors ${pdfInstance.loading || !pdfInstance.url ? "bg-zinc-50 dark:bg-zinc-800/40 cursor-not-allowed text-zinc-400" : "bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700 text-zinc-900 dark:text-zinc-100"}`}
           >
             <Download className="w-5 h-5" />
             PDF herunterladen
           </button>
 
-          <div className="pt-4 mt-4 border-t border-zinc-100">
+          <div className="pt-4 mt-4 border-t border-zinc-100 dark:border-zinc-800">
             <button
               onClick={() => router.push(`/decks/${deckId}`)}
-              className="w-full flex items-center justify-center gap-2 px-6 py-4 text-zinc-600 hover:text-zinc-900 hover:bg-zinc-50 rounded-xl font-medium transition-colors"
+              className="w-full flex items-center justify-center gap-2 px-6 py-4 text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100 hover:bg-zinc-50 dark:hover:bg-zinc-800 rounded-xl font-medium transition-colors"
             >
               <ArrowLeft className="w-5 h-5" />
               Zurück zum Deck
             </button>
           </div>
         </div>
+
+        {statusHistory.length > 0 && (
+          <div className="mt-6 pt-4 border-t border-zinc-100 dark:border-zinc-800">
+            <AiActivityLog history={statusHistory} />
+          </div>
+        )}
       </div>
     </div>
   );

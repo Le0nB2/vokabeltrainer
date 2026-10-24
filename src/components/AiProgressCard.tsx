@@ -6,12 +6,11 @@ import {
   AlertTriangle,
   RefreshCw,
   FileCheck2,
-  ChevronDown,
-  ChevronUp,
   Clock,
   Sparkles,
 } from "lucide-react";
 import { AiStatusMessage, AiStage } from "@/lib/services/ai-status";
+import { AiActivityLog } from "./AiActivityLog";
 
 interface AiProgressCardProps {
   title: string;
@@ -26,7 +25,6 @@ export function AiProgressCard({
 }: AiProgressCardProps) {
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
   const [retryCountdown, setRetryCountdown] = useState<number | null>(null);
-  const [showHistory, setShowHistory] = useState(false);
 
   // Elapsed timer
   useEffect(() => {
@@ -190,40 +188,10 @@ export function AiProgressCard({
       {renderStatusBanner()}
 
       {/* Activity Log (Collapsible) */}
-      {statusHistory.length > 0 && (
-        <div className="border-t border-zinc-200 dark:border-zinc-800 pt-4">
-          <button
-            type="button"
-            onClick={() => setShowHistory(!showHistory)}
-            className="flex items-center justify-between w-full text-xs text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-200 transition-colors"
-          >
-            <span>Aktivitäten ({statusHistory.length})</span>
-            {showHistory ? (
-              <ChevronUp className="w-4 h-4" />
-            ) : (
-              <ChevronDown className="w-4 h-4" />
-            )}
-          </button>
-
-          {showHistory && (
-            <div className="mt-2.5 max-h-40 overflow-y-auto space-y-1.5 text-[11px] font-mono bg-zinc-50 dark:bg-zinc-950/60 p-2.5 rounded-lg border border-zinc-200 dark:border-zinc-800">
-              {statusHistory.map((item, index) => {
-                const date = new Date(item.timestamp);
-                const timeStr = date.toTimeString().split(" ")[0];
-                return (
-                  <div
-                    key={index}
-                    className="flex items-start gap-2 text-zinc-600 dark:text-zinc-400"
-                  >
-                    <span className="text-zinc-400 shrink-0">[{timeStr}]</span>
-                    <span className="break-all">{item.message}</span>
-                  </div>
-                );
-              })}
-            </div>
-          )}
-        </div>
-      )}
+      <AiActivityLog
+        history={statusHistory}
+        className="border-t border-zinc-200 dark:border-zinc-800 pt-4"
+      />
     </div>
   );
 }
