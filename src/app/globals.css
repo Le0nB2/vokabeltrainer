@@ -1,6 +1,9 @@
 @import "tailwindcss";
 
 @layer utilities {
+  .pt-safe-study {
+    padding-top: max(3.5rem, calc(env(safe-area-inset-top, 0px) + 2rem));
+  }
   .perspective-1000 {
     perspective: 1000px;
   }

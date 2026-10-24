@@ -379,7 +379,7 @@ export function StudySession({ deck, dueCards, settings }: { deck: { id: string,
         />
       )}
       <div
-        className="flex-1 flex flex-col items-center p-3 sm:p-4 md:p-8 outline-none"
+        className="flex-1 flex flex-col items-center px-4 pb-4 pt-safe-study sm:p-6 md:p-8 outline-none"
         tabIndex={0}
         onKeyDown={handleKeyDown}
         autoFocus={!isTypingMode}
@@ -389,13 +389,13 @@ export function StudySession({ deck, dueCards, settings }: { deck: { id: string,
           }
         }}
       >
-      <header className="w-full max-w-3xl flex justify-between items-center mb-3 sm:mb-4 md:mb-8">
+      <header className="w-full max-w-3xl flex justify-between items-center mb-4 sm:mb-6 md:mb-8">
         <div className="flex-1">
-          <Link href={isGlobal ? '/' : `/decks/${deck.id}`} className="text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-100 inline-block">
+          <Link href={isGlobal ? '/' : `/decks/${deck.id}`} className="text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100 inline-block p-1">
             <ArrowLeft className="w-6 h-6" />
           </Link>
         </div>
-        <div className="text-sm font-medium text-zinc-500 flex-1 text-center">
+        <div className="text-sm font-semibold text-zinc-700 dark:text-zinc-200 flex-1 text-center">
           Karte {currentIndex + 1} von {cards.length}
         </div>
         <div className="flex-1 flex justify-end">
@@ -413,7 +413,7 @@ export function StudySession({ deck, dueCards, settings }: { deck: { id: string,
                 focusTypingInput();
               }
             }}
-            className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-zinc-200 dark:bg-zinc-800 text-xs font-medium text-zinc-600 dark:text-zinc-400 hover:bg-zinc-300 dark:hover:bg-zinc-700 transition-colors"
+            className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-zinc-200 dark:bg-zinc-800 text-xs font-medium text-zinc-700 dark:text-zinc-300 hover:bg-zinc-300 dark:hover:bg-zinc-700 transition-colors"
             title={studyMode === 'smart' ? 'Smart-Modus aktiv (Tippen ab Box 4)' : 'Klassisch aktiv (Immer umdrehen)'}
           >
             {studyMode === 'smart' ? <Keyboard className="w-4 h-4" /> : <Type className="w-4 h-4" />}
@@ -423,7 +423,7 @@ export function StudySession({ deck, dueCards, settings }: { deck: { id: string,
       </header>
 
       {/* Progress bar */}
-      <div className="w-full max-w-3xl h-2 bg-zinc-200 dark:bg-zinc-800 rounded-full overflow-hidden mb-3 sm:mb-6 md:mb-12">
+      <div className="w-full max-w-3xl h-2 bg-zinc-200 dark:bg-zinc-800 rounded-full overflow-hidden mb-4 sm:mb-6 md:mb-12">
         <div
           className="h-full bg-blue-500 transition-all duration-300 ease-out"
           style={{ width: `${progress}%` }}
