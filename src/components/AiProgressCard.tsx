@@ -165,6 +165,13 @@ export function AiProgressCard({
                 <p className="text-xs text-blue-800/90 dark:text-blue-300/90 mt-1 leading-relaxed">
                   {message}
                 </p>
+                {elapsedSeconds >= 15 && (
+                  <p className="text-[11px] text-blue-600/80 dark:text-blue-400/80 mt-1.5 italic">
+                    {elapsedSeconds >= 60
+                      ? "Großes Aufgabenpaket (84 Übungen) wird ausgearbeitet... Verbindung bleibt aktiv."
+                      : "Umfangreiches Arbeitsblatt mit vielen Übungen wird generiert..."}
+                  </p>
+                )}
               </div>
             </div>
           </div>

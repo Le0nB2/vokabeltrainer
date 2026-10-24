@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react"
 import { updateSettings, syncAiModelsAction } from "@/actions/settings"
-import { Sparkles, RefreshCw, AlertCircle, CheckCircle2, CreditCard } from "lucide-react"
+import { Sparkles, RefreshCw, AlertCircle, CheckCircle2, CreditCard, Clock } from "lucide-react"
 import { ApiUsageChart } from "@/components/ApiUsageChart"
 import type { ApiStatsResult } from "@/actions/api-stats"
 
@@ -220,6 +220,15 @@ export function AiModelSettings({
                 <CheckCircle2 className="w-4 h-4 shrink-0 text-green-600 dark:text-green-400" />
                 <div>
                   <span className="font-semibold">Kostenlos (Free Tier):</span> Dieses Modell kann regulär mit dem kostenlosen Google API-Key genutzt werden.
+                </div>
+              </div>
+            )}
+
+            {(selectedModel.includes("3.7") || selectedModel.includes("3.8")) && (
+              <div className="mt-3 flex items-start gap-2.5 p-3 rounded-lg bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-900/50 text-blue-800 dark:text-blue-300 text-xs">
+                <Clock className="w-4 h-4 shrink-0 mt-0.5 text-blue-600 dark:text-blue-400" />
+                <div>
+                  <span className="font-semibold">Hinweis zur Geschwindigkeit:</span> Gemini 3.7 & 3.8 nutzen eine erweiterte Denkphase (Reasoning). Bei großen Aufgaben (wie Arbeitsblättern mit 84 Übungen) dauert die Generierung typischerweise 1 bis 3 Minuten. Für sekundenschnelle Antworten empfiehlt sich <strong>Gemini 3.6 Flash</strong> oder <strong>3.5 Flash</strong>.
                 </div>
               </div>
             )}

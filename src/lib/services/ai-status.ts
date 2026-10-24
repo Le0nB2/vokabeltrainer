@@ -70,10 +70,15 @@ export async function readAiStatusStream<T = any>(
         }
       }
 
-      if (dataStr) {
+      if (dataStr && eventType !== "ping") {
+        if (eventType === "ping") {
+          // Keep-alive heartbeat to prevent timeouts on mobile browsers & proxies
+          continue;
+        }
+
         try {
           const parsed = JSON.parse(dataStr);
-          if (eventType === "status" || parsed.stage) {
+          if (eventType === "status" || (parsed.stage && parsed.stage !== "error")) {
             onStatus(parsed);
           }
           if (eventType === "complete" || parsed.stage === "complete") {
@@ -106,7 +111,7 @@ export async function readAiStatusStream<T = any>(
       if (line.startsWith("event: ")) eventType = line.slice(7).trim();
       else if (line.startsWith("data: ")) dataStr = line.slice(6).trim();
     }
-    if (dataStr) {
+    if (dataStr && eventType !== "ping") {
       try {
         const parsed = JSON.parse(dataStr);
         if (eventType === "status" || parsed.stage) onStatus(parsed);

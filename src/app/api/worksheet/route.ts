@@ -273,10 +273,42 @@ ${JSON.stringify(selectedCards.map(c => ({ englisch: c.front, deutsch: c.back })
     const isStream = isStreamingRequested || req.headers.get("accept")?.includes("text/event-stream");
 
     if (isStream) {
+      let isClosed = false;
       const stream = new ReadableStream({
         async start(controller) {
+          const safeEnqueue = (eventBytes: Uint8Array) => {
+            if (isClosed) return false;
+            try {
+              controller.enqueue(eventBytes);
+              return true;
+            } catch {
+              isClosed = true;
+              return false;
+            }
+          };
+
+          const safeClose = () => {
+            if (isClosed) return;
+            isClosed = true;
+            try {
+              controller.close();
+            } catch {
+              // Ignore if already closed
+            }
+          };
+
+          // Keep-alive heartbeat: sends a ping every 3s so Safari/mobile proxies don't drop the stream
+          const heartbeat = setInterval(() => {
+            safeEnqueue(
+              formatSseEvent("ping", {
+                stage: "generating",
+                timestamp: Date.now(),
+              })
+            );
+          }, 3000);
+
           try {
-            controller.enqueue(
+            safeEnqueue(
               formatSseEvent("status", {
                 stage: "init",
                 message: `Vokabeln geladen (${selectedCards.length} Vokabeln). Starte KI-Generierung...`,
@@ -295,7 +327,7 @@ ${JSON.stringify(selectedCards.map(c => ({ englisch: c.front, deutsch: c.back })
                     ? "key_switch"
                     : "generating";
 
-                controller.enqueue(
+                safeEnqueue(
                   formatSseEvent("status", {
                     stage,
                     message: statusEvent.message,
@@ -308,7 +340,7 @@ ${JSON.stringify(selectedCards.map(c => ({ englisch: c.front, deutsch: c.back })
                 );
               },
               (optimizingMsg) => {
-                controller.enqueue(
+                safeEnqueue(
                   formatSseEvent("status", {
                     stage: "optimizing",
                     message: optimizingMsg,
@@ -318,7 +350,7 @@ ${JSON.stringify(selectedCards.map(c => ({ englisch: c.front, deutsch: c.back })
               }
             );
 
-            controller.enqueue(
+            safeEnqueue(
               formatSseEvent("complete", {
                 stage: "complete",
                 message: "Arbeitsblatt erfolgreich generiert!",
@@ -326,7 +358,6 @@ ${JSON.stringify(selectedCards.map(c => ({ englisch: c.front, deutsch: c.back })
                 timestamp: Date.now(),
               })
             );
-            controller.close();
           } catch (err: unknown) {
             console.error("Worksheet streaming error:", err);
             const errorMsg =
@@ -334,19 +365,20 @@ ${JSON.stringify(selectedCards.map(c => ({ englisch: c.front, deutsch: c.back })
                 ? err.message
                 : "Fehler beim Erstellen des Arbeitsblatts. Bitte versuche es erneut.";
 
-            try {
-              controller.enqueue(
-                formatSseEvent("error", {
-                  stage: "error",
-                  error: errorMsg,
-                  timestamp: Date.now(),
-                })
-              );
-              controller.close();
-            } catch {
-              // Ignore if already closed
-            }
+            safeEnqueue(
+              formatSseEvent("error", {
+                stage: "error",
+                error: errorMsg,
+                timestamp: Date.now(),
+              })
+            );
+          } finally {
+            clearInterval(heartbeat);
+            safeClose();
           }
+        },
+        cancel() {
+          isClosed = true;
         },
       });
 
