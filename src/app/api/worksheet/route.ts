@@ -5,10 +5,12 @@ import prisma from "@/lib/prisma";
 import { z } from "zod";
 import { requireAppAuth, UnauthorizedError } from "@/lib/auth-guard";
 import { consumeRateLimit, formatRetryDuration, getClientIpFromHeaders } from "@/lib/rate-limit";
-import { callGeminiWithRetry, QuotaExceededError } from "@/lib/services/gemini-executor";
+import { callGeminiWithRetry, QuotaExceededError, GeminiStatusEvent } from "@/lib/services/gemini-executor";
+import { formatSseEvent } from "@/lib/services/ai-status";
 
 const requestSchema = z.object({
-  deckId: z.string().min(1, "No deckId provided").max(100, "deckId darf maximal 100 Zeichen lang sein")
+  deckId: z.string().min(1, "No deckId provided").max(100, "deckId darf maximal 100 Zeichen lang sein"),
+  stream: z.boolean().optional(),
 });
 
 export async function POST(req: NextRequest) {
@@ -45,7 +47,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Invalid request body" }, { status: 400 });
     }
 
-    const { deckId } = parseResult.data;
+    const { deckId, stream: isStreamingRequested } = parseResult.data;
 
     const deck = await prisma.deck.findUnique({
       where: { id: deckId },
@@ -181,84 +183,217 @@ ${JSON.stringify(selectedCards.map(c => ({ englisch: c.front, deutsch: c.back })
       required: ["exercises", "solutions"]
     };
 
-    const parsedWorksheet = await callGeminiWithRetry({
-      endpoint: "worksheet",
-      apiKeys,
-      execute: async (ai, modelToUse) => {
-        const response = await ai.models.generateContent({
-          model: modelToUse,
-          contents: [promptText],
-          config: {
-            responseMimeType: "application/json",
-            responseJsonSchema: responseSchema,
-            temperature: 0.2, // low temp for structured task
-          },
-        });
-
-        const textResponse = response.text;
-        if (!textResponse) {
-          throw new Error("Failed to generate text from Gemini");
-        }
-
-        const data = JSON.parse(textResponse);
-
-        // Shuffle multiple choice options manually to ensure uniform distribution
-        if (data?.exercises?.multipleChoice && Array.isArray(data.exercises.multipleChoice)) {
-          data.exercises.multipleChoice = data.exercises.multipleChoice.map((mc: { options?: string[], correctIndex?: number }) => {
-            if (mc.options && Array.isArray(mc.options) && typeof mc.correctIndex === 'number') {
-              const correctAnswer = mc.options[mc.correctIndex];
-
-              // Fisher-Yates shuffle
-              for (let j = mc.options.length - 1; j > 0; j--) {
-                const k = Math.floor(Math.random() * (j + 1));
-                [mc.options[j], mc.options[k]] = [mc.options[k], mc.options[j]];
-              }
-
-              // Find new correct index
-              mc.correctIndex = mc.options.indexOf(correctAnswer);
-            }
-            return mc;
+    const generateWorksheetData = async (
+      onGeminiStatus?: (event: GeminiStatusEvent) => void | Promise<void>,
+      onProgress?: (message: string) => void
+    ) => {
+      const parsedWorksheet = await callGeminiWithRetry({
+        endpoint: "worksheet",
+        apiKeys,
+        onStatus: onGeminiStatus,
+        execute: async (ai, modelToUse) => {
+          const response = await ai.models.generateContent({
+            model: modelToUse,
+            contents: [promptText],
+            config: {
+              responseMimeType: "application/json",
+              responseJsonSchema: responseSchema,
+              temperature: 0.2, // low temp for structured task
+            },
           });
-        }
 
-        return data;
-      },
-    });
+          const textResponse = response.text;
+          if (!textResponse) {
+            throw new Error("Failed to generate text from Gemini");
+          }
 
-    const settings = await prisma.settings.upsert({
-      where: { id: "default" },
-      update: { worksheetCount: { increment: 1 } },
-      create: { id: "default", worksheetCount: 1 }
-    });
+          const data = JSON.parse(textResponse);
 
-    // Compute alphabetical ID (A001 to Z999)
-    const count = settings.worksheetCount;
-    const letterIndex = Math.floor((count - 1) / 999);
-    const letter = String.fromCharCode(65 + (letterIndex % 26)); // A-Z, wraps around
-    const number = ((count - 1) % 999) + 1;
-    const worksheetId = `${letter}${number.toString().padStart(3, '0')}`;
+          // Shuffle multiple choice options manually to ensure uniform distribution
+          if (data?.exercises?.multipleChoice && Array.isArray(data.exercises.multipleChoice)) {
+            data.exercises.multipleChoice = data.exercises.multipleChoice.map((mc: { options?: string[], correctIndex?: number }) => {
+              if (mc.options && Array.isArray(mc.options) && typeof mc.correctIndex === 'number') {
+                const correctAnswer = mc.options[mc.correctIndex];
 
-    // Generate date string in German format
-    const today = new Date();
-    const dateStr = `${today.getDate().toString().padStart(2, '0')}.${(today.getMonth() + 1).toString().padStart(2, '0')}.${today.getFullYear()}`;
+                // Fisher-Yates shuffle
+                for (let j = mc.options.length - 1; j > 0; j--) {
+                  const k = Math.floor(Math.random() * (j + 1));
+                  [mc.options[j], mc.options[k]] = [mc.options[k], mc.options[j]];
+                }
 
-    // Optimiere Worksheet, sodass es nicht mehr als 4 Seiten lang ist
-    const optimized = await generateOptimizedPdf(
-      worksheetId,
-      dateStr,
-      parsedWorksheet.exercises,
-      parsedWorksheet.solutions,
-      4
-    );
+                // Find new correct index
+                mc.correctIndex = mc.options.indexOf(correctAnswer);
+              }
+              return mc;
+            });
+          }
 
-    parsedWorksheet.exercises = optimized.finalExercises;
-    parsedWorksheet.solutions = optimized.finalSolutions;
+          return data;
+        },
+      });
 
-    return NextResponse.json({
-      worksheet: parsedWorksheet,
-      worksheetId,
-      dateStr
-    });
+      onProgress?.("Aufgaben generiert! Optimiere Layout für maximal 4 Druckseiten...");
+
+      const settings = await prisma.settings.upsert({
+        where: { id: "default" },
+        update: { worksheetCount: { increment: 1 } },
+        create: { id: "default", worksheetCount: 1 }
+      });
+
+      // Compute alphabetical ID (A001 to Z999)
+      const count = settings.worksheetCount;
+      const letterIndex = Math.floor((count - 1) / 999);
+      const letter = String.fromCharCode(65 + (letterIndex % 26)); // A-Z, wraps around
+      const number = ((count - 1) % 999) + 1;
+      const worksheetId = `${letter}${number.toString().padStart(3, '0')}`;
+
+      // Generate date string in German format
+      const today = new Date();
+      const dateStr = `${today.getDate().toString().padStart(2, '0')}.${(today.getMonth() + 1).toString().padStart(2, '0')}.${today.getFullYear()}`;
+
+      // Optimiere Worksheet, sodass es nicht mehr als 4 Seiten lang ist
+      const optimized = await generateOptimizedPdf(
+        worksheetId,
+        dateStr,
+        parsedWorksheet.exercises,
+        parsedWorksheet.solutions,
+        4
+      );
+
+      parsedWorksheet.exercises = optimized.finalExercises;
+      parsedWorksheet.solutions = optimized.finalSolutions;
+
+      return {
+        worksheet: parsedWorksheet,
+        worksheetId,
+        dateStr,
+      };
+    };
+
+    const isStream = isStreamingRequested || req.headers.get("accept")?.includes("text/event-stream");
+
+    if (isStream) {
+      let isClosed = false;
+      const stream = new ReadableStream({
+        async start(controller) {
+          const safeEnqueue = (eventBytes: Uint8Array) => {
+            if (isClosed) return false;
+            try {
+              controller.enqueue(eventBytes);
+              return true;
+            } catch {
+              isClosed = true;
+              return false;
+            }
+          };
+
+          const safeClose = () => {
+            if (isClosed) return;
+            isClosed = true;
+            try {
+              controller.close();
+            } catch {
+              // Ignore if already closed
+            }
+          };
+
+          // Keep-alive heartbeat: sends a ping every 3s so Safari/mobile proxies don't drop the stream
+          const heartbeat = setInterval(() => {
+            safeEnqueue(
+              formatSseEvent("ping", {
+                stage: "generating",
+                timestamp: Date.now(),
+              })
+            );
+          }, 3000);
+
+          try {
+            safeEnqueue(
+              formatSseEvent("status", {
+                stage: "init",
+                message: `Vokabeln geladen (${selectedCards.length} Vokabeln). Starte KI-Generierung...`,
+                timestamp: Date.now(),
+              })
+            );
+
+            const result = await generateWorksheetData(
+              async (statusEvent) => {
+                const stage =
+                  statusEvent.type === "retry"
+                    ? "retrying"
+                    : statusEvent.type === "fallback"
+                    ? "fallback"
+                    : statusEvent.type === "key_switch"
+                    ? "key_switch"
+                    : "generating";
+
+                safeEnqueue(
+                  formatSseEvent("status", {
+                    stage,
+                    message: statusEvent.message,
+                    model: statusEvent.model,
+                    attempt: statusEvent.attempt,
+                    maxAttempts: statusEvent.maxAttempts,
+                    delaySeconds: statusEvent.delaySeconds,
+                    timestamp: Date.now(),
+                  })
+                );
+              },
+              (optimizingMsg) => {
+                safeEnqueue(
+                  formatSseEvent("status", {
+                    stage: "optimizing",
+                    message: optimizingMsg,
+                    timestamp: Date.now(),
+                  })
+                );
+              }
+            );
+
+            safeEnqueue(
+              formatSseEvent("complete", {
+                stage: "complete",
+                message: "Arbeitsblatt erfolgreich generiert!",
+                data: result,
+                timestamp: Date.now(),
+              })
+            );
+          } catch (err: unknown) {
+            console.error("Worksheet streaming error:", err);
+            const errorMsg =
+              err instanceof QuotaExceededError
+                ? err.message
+                : "Fehler beim Erstellen des Arbeitsblatts. Bitte versuche es erneut.";
+
+            safeEnqueue(
+              formatSseEvent("error", {
+                stage: "error",
+                error: errorMsg,
+                timestamp: Date.now(),
+              })
+            );
+          } finally {
+            clearInterval(heartbeat);
+            safeClose();
+          }
+        },
+        cancel() {
+          isClosed = true;
+        },
+      });
+
+      return new Response(stream, {
+        headers: {
+          "Content-Type": "text/event-stream; charset=utf-8",
+          "Cache-Control": "no-cache, no-transform",
+          Connection: "keep-alive",
+          "X-Accel-Buffering": "no",
+        },
+      });
+    }
+
+    const result = await generateWorksheetData();
+    return NextResponse.json(result);
 
   } catch (error: unknown) {
     if (error instanceof QuotaExceededError) {

@@ -2,6 +2,8 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import prisma from "@/lib/prisma";
 import {
   callGeminiWithRetry,
+  getRetryDelayMs,
+  DEFAULT_RETRY_DELAYS_MS,
   isOverloadedError,
   isQuotaError,
   QuotaExceededError,
@@ -151,6 +153,76 @@ describe("gemini-executor service", () => {
           execute: executeMock,
         })
       ).rejects.toThrow(QuotaExceededError);
+    });
+
+    it("notifies onStatus callback on start, overload retry, and fallback", async () => {
+      const statusEvents: any[] = [];
+      const onStatus = vi.fn((event) => {
+        statusEvents.push(event);
+      });
+
+      const executeMock = vi
+        .fn()
+        // 3 failures on gemini-3.6-flash
+        .mockRejectedValueOnce(new Error("503 Overloaded"))
+        .mockRejectedValueOnce(new Error("503 Overloaded"))
+        .mockRejectedValueOnce(new Error("503 Overloaded"))
+        // Success on gemini-flash-lite-latest
+        .mockResolvedValueOnce("success");
+
+      await callGeminiWithRetry({
+        endpoint: "test-endpoint",
+        apiKeys: ["key-1"],
+        models: ["gemini-3.6-flash", "gemini-flash-lite-latest"],
+        retryDelayMs: 1,
+        execute: executeMock,
+        onStatus,
+      });
+
+      expect(onStatus).toHaveBeenCalled();
+      const retryEvents = statusEvents.filter((e) => e.type === "retry");
+      expect(retryEvents).toHaveLength(2); // 2 retries on primary model
+      expect(retryEvents[0].attempt).toBe(1);
+      expect(retryEvents[0].message).toContain("überlastet");
+
+      const fallbackEvents = statusEvents.filter((e) => e.type === "fallback");
+      expect(fallbackEvents).toHaveLength(1);
+      expect(fallbackEvents[0].model).toBe("gemini-flash-lite-latest");
+    });
+
+    it("uses staged backoff delays (4s on 1st retry, 7s on 2nd retry)", async () => {
+      expect(DEFAULT_RETRY_DELAYS_MS).toEqual([4000, 7000]);
+      expect(getRetryDelayMs(0)).toBe(4000);
+      expect(getRetryDelayMs(1)).toBe(7000);
+      expect(getRetryDelayMs(2)).toBe(7000);
+      expect(getRetryDelayMs(0, 150)).toBe(150);
+      expect(getRetryDelayMs(0, undefined, [2000, 5000])).toBe(2000);
+      expect(getRetryDelayMs(1, undefined, [2000, 5000])).toBe(5000);
+
+      const statusEvents: any[] = [];
+      const onStatus = vi.fn((event) => {
+        statusEvents.push(event);
+      });
+
+      const executeMock = vi
+        .fn()
+        .mockRejectedValueOnce(new Error("503 Overloaded"))
+        .mockRejectedValueOnce(new Error("503 Overloaded"))
+        .mockResolvedValueOnce("recovered");
+
+      // Pass minimal delays [1, 2] to test staged behavior without slowing down tests
+      await callGeminiWithRetry({
+        endpoint: "test-endpoint",
+        apiKeys: ["key-1"],
+        models: ["gemini-3.6-flash"],
+        retryDelaysMs: [4000, 7000],
+        retryDelayMs: 1, // overrides for execution speed
+        execute: executeMock,
+        onStatus,
+      });
+
+      const retryEvents = statusEvents.filter((e) => e.type === "retry");
+      expect(retryEvents).toHaveLength(2);
     });
   });
 });

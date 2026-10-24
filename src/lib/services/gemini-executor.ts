@@ -47,19 +47,52 @@ export function isQuotaError(error: unknown): boolean {
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
+/**
+ * Default backoff retry delays for overloaded models (in ms):
+ * 1st retry (after attempt 1 fails): 4 seconds
+ * 2nd retry (after attempt 2 fails): 7 seconds
+ */
+export const DEFAULT_RETRY_DELAYS_MS = [4000, 7000];
+
+export function getRetryDelayMs(
+  attempt: number,
+  customDelayMs?: number,
+  customDelaysMs?: number[]
+): number {
+  if (customDelayMs !== undefined) {
+    return customDelayMs;
+  }
+  if (customDelaysMs && customDelaysMs[attempt] !== undefined) {
+    return customDelaysMs[attempt];
+  }
+  return DEFAULT_RETRY_DELAYS_MS[attempt] ?? 7000;
+}
+
+export interface GeminiStatusEvent {
+  type: "start" | "retry" | "fallback" | "key_switch";
+  message: string;
+  model?: string;
+  attempt?: number;
+  maxAttempts?: number;
+  delaySeconds?: number;
+  keyIndex?: number;
+}
+
 export interface CallGeminiOptions<T> {
   endpoint: string;
   apiKeys: string[];
   models?: string[];
   retryDelayMs?: number;
+  retryDelaysMs?: number[];
   maxAttemptsPrimaryModel?: number;
   maxAttemptsFallbackModel?: number;
   execute: (ai: GoogleGenAI, model: string) => Promise<T>;
+  onStatus?: (event: GeminiStatusEvent) => void | Promise<void>;
 }
 
 /**
  * Executes a Gemini request with model hierarchy and overload retry logic:
- * 1. Requests the selected model first (up to 3 attempts with 3s delay on overload).
+ * 1. Requests the selected model first (up to 3 attempts with staged backoff: 4s on 1st retry, 7s on 2nd retry).
  * 2. If still unsuccessful, falls back to the next model (e.g. gemini-flash-lite-latest)
  *    and attempts it exactly 1 time.
  * 3. Rotates across API keys if quota (429) is exhausted.
@@ -68,14 +101,25 @@ export async function callGeminiWithRetry<T>({
   endpoint,
   apiKeys,
   models: customModels,
-  retryDelayMs = 3000,
+  retryDelayMs,
+  retryDelaysMs,
   maxAttemptsPrimaryModel = 3,
   maxAttemptsFallbackModel = 1,
   execute,
+  onStatus,
 }: CallGeminiOptions<T>): Promise<T> {
   if (!apiKeys || apiKeys.length === 0) {
     throw new Error("No API keys provided for Gemini request");
   }
+
+  const safeNotify = async (event: GeminiStatusEvent) => {
+    if (!onStatus) return;
+    try {
+      await onStatus(event);
+    } catch (notifyErr) {
+      console.error("Fehler im onStatus-Callback:", notifyErr);
+    }
+  };
 
   const models = customModels && customModels.length > 0 ? customModels : await getModelHierarchy();
   let lastError: unknown = null;
@@ -92,6 +136,15 @@ export async function callGeminiWithRetry<T>({
 
       for (let attempt = 0; attempt < maxAttempts; attempt++) {
         try {
+          await safeNotify({
+            type: "start",
+            message: `KI-Anfrage an Modell ${modelToUse} gestartet (Versuch ${attempt + 1}/${maxAttempts})...`,
+            model: modelToUse,
+            attempt: attempt + 1,
+            maxAttempts,
+            keyIndex: keyIndex + 1,
+          });
+
           const result = await execute(ai, modelToUse);
 
           // Log success to DB
@@ -126,6 +179,13 @@ export async function callGeminiWithRetry<T>({
               `API-Key bei Index ${keyIndex} hat Kontingent erschöpft (Modell ${modelToUse}). Versuche nächsten Key falls verfügbar.`
             );
             keyQuotaExhausted = true;
+            if (keyIndex < apiKeys.length - 1) {
+              await safeNotify({
+                type: "key_switch",
+                message: `API-Key ${keyIndex + 1} hat Kontingent erschöpft. Wechsle zu Schlüssel ${keyIndex + 2}...`,
+                keyIndex: keyIndex + 2,
+              });
+            }
             if (keyIndex === apiKeys.length - 1 && modelIndex === models.length - 1) {
               throw new QuotaExceededError();
             }
@@ -134,15 +194,34 @@ export async function callGeminiWithRetry<T>({
 
           if (isOverloaded) {
             if (attempt < maxAttempts - 1) {
+              const currentDelayMs = getRetryDelayMs(attempt, retryDelayMs, retryDelaysMs);
+              const delaySec = Math.max(1, Math.round(currentDelayMs / 1000));
               console.warn(
-                `Modell ${modelToUse} ist überlastet (Versuch ${attempt + 1}/${maxAttempts}, Key ${keyIndex + 1}). Warte ${retryDelayMs / 1000}s vor erneutem Versuch...`
+                `Modell ${modelToUse} ist überlastet (Versuch ${attempt + 1}/${maxAttempts}, Key ${keyIndex + 1}). Warte ${delaySec}s vor erneutem Versuch...`
               );
-              await sleep(retryDelayMs);
+              await safeNotify({
+                type: "retry",
+                message: `Modell ${modelToUse} ist überlastet. Neuer Versuch in ${delaySec} Sekunden (Versuch ${attempt + 1}/${maxAttempts})...`,
+                model: modelToUse,
+                attempt: attempt + 1,
+                maxAttempts,
+                delaySeconds: delaySec,
+                keyIndex: keyIndex + 1,
+              });
+              await sleep(currentDelayMs);
               continue; // Retry with the SAME model
             } else {
+              const nextModel = models[modelIndex + 1];
               console.warn(
                 `Modell ${modelToUse} nach ${maxAttempts} Versuch(en) weiterhin überlastet. Wechsle zum Fallback-Modell falls verfügbar.`
               );
+              if (nextModel) {
+                await safeNotify({
+                  type: "fallback",
+                  message: `Modell ${modelToUse} nach ${maxAttempts} Versuchen weiterhin überlastet. Wechsle zum Fallback-Modell ${nextModel}...`,
+                  model: nextModel,
+                });
+              }
               break; // Proceed to next model in hierarchy
             }
           }
