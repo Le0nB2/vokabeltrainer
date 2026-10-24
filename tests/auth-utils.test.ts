@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import {
   secureCompare,
+  deriveSecretFromPassword,
   getAppAuthCredentials,
   getAppSecret,
   getFallbackSecret,
@@ -75,6 +76,30 @@ describe('auth-utils', () => {
       const creds = getAppAuthCredentials()
       expect(creds.isConfigured).toBe(false)
     })
+
+    it('enforces auth (fail-secure isConfigured: true) when only AUTH_USER is set', () => {
+      process.env.AUTH_USER = 'admin'
+      delete process.env.AUTH_PASSWORD
+      delete process.env.BASIC_AUTH_USER
+      delete process.env.BASIC_AUTH_PASSWORD
+
+      const creds = getAppAuthCredentials()
+      expect(creds.isConfigured).toBe(true)
+      expect(creds.user).toBe('admin')
+      expect(creds.password).toBe('')
+    })
+
+    it('enforces auth (fail-secure isConfigured: true) when only AUTH_PASSWORD is set', () => {
+      delete process.env.AUTH_USER
+      process.env.AUTH_PASSWORD = 'password123'
+      delete process.env.BASIC_AUTH_USER
+      delete process.env.BASIC_AUTH_PASSWORD
+
+      const creds = getAppAuthCredentials()
+      expect(creds.isConfigured).toBe(true)
+      expect(creds.user).toBe('')
+      expect(creds.password).toBe('password123')
+    })
   })
 
   describe('SEC-09: Fallback Secret Hardening (getAppSecret & getFallbackSecret)', () => {
@@ -96,10 +121,13 @@ describe('auth-utils', () => {
       expect(getAppSecret()).toBe('explicit-session-secret')
     })
 
-    it('uses provided password when no environment secrets are set', () => {
+    it('derives a strong 256-bit key from provided password when no environment secrets are set', () => {
       delete process.env.AUTH_SECRET
       delete process.env.SESSION_SECRET
-      expect(getAppSecret('admin-pass-123')).toBe('admin-pass-123')
+      const secret = getAppSecret('admin-pass-123')
+      expect(secret).toHaveLength(64)
+      expect(secret).toMatch(/^[0-9a-f]{64}$/)
+      expect(secret).toBe(deriveSecretFromPassword('admin-pass-123'))
     })
 
     it('generates a cryptographically random 256-bit hex secret and never uses the static fallback', () => {

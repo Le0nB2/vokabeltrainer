@@ -85,23 +85,48 @@ export async function loginApp(credentials: { username?: string; password?: stri
   }
 
   const clientIp = await getClientIp()
-  const rateLimitKey = `login:${clientIp}`
-  const rateLimit = checkRateLimit(rateLimitKey)
-  if (rateLimit.isBlocked) {
+  const ipKey = `login:ip:${clientIp}`
+  const ipRateLimit = checkRateLimit(ipKey, { maxAttempts: 5, windowMs: 15 * 60 * 1000, blockDurationMs: 15 * 60 * 1000 })
+  if (ipRateLimit.isBlocked) {
     return {
       success: false,
-      error: `Zu viele Fehlversuche. Bitte versuche es in ${formatRetryDuration(rateLimit.retryAfterSeconds)} erneut.`,
+      error: `Zu viele Fehlversuche. Bitte versuche es in ${formatRetryDuration(ipRateLimit.retryAfterSeconds)} erneut.`,
     }
   }
 
   const username = (credentials.username || "").trim()
   const password = credentials.password || ""
 
+  // Account-level rate limiting (max 10 failures per username across all IPs in 15 min window)
+  const userKey = username ? `login:user:${username.toLowerCase()}` : null
+  if (userKey) {
+    const userRateLimit = checkRateLimit(userKey, { maxAttempts: 10, windowMs: 15 * 60 * 1000, blockDurationMs: 15 * 60 * 1000 })
+    if (userRateLimit.isBlocked) {
+      return {
+        success: false,
+        error: `Zu viele Fehlversuche für diesen Benutzer. Bitte versuche es in ${formatRetryDuration(userRateLimit.retryAfterSeconds)} erneut.`,
+      }
+    }
+  }
+
+  // Global rate limit against distributed brute force / password spraying (max 50 attempts in 15 min)
+  const globalKey = "login:global"
+  const globalRateLimit = checkRateLimit(globalKey, { maxAttempts: 50, windowMs: 15 * 60 * 1000, blockDurationMs: 15 * 60 * 1000 })
+  if (globalRateLimit.isBlocked) {
+    return {
+      success: false,
+      error: `Zu viele fehlerhafte Anmeldeversuche. Bitte versuche es in ${formatRetryDuration(globalRateLimit.retryAfterSeconds)} erneut.`,
+    }
+  }
+
   const isUserValid = envUser ? secureCompare(username, envUser) : true
   const isPasswordValid = envPassword ? secureCompare(password, envPassword) : false
 
   if (isUserValid && isPasswordValid) {
-    resetRateLimit(rateLimitKey)
+    resetRateLimit(ipKey)
+    if (userKey) {
+      resetRateLimit(userKey)
+    }
     const headersList = await headers()
     const isSecure = isSecureRequest(headersList)
     const cookieStore = await cookies()
@@ -119,7 +144,11 @@ export async function loginApp(credentials: { username?: string; password?: stri
     return { success: true }
   }
 
-  recordRateLimitFailure(rateLimitKey)
+  recordRateLimitFailure(ipKey, { maxAttempts: 5, windowMs: 15 * 60 * 1000, blockDurationMs: 15 * 60 * 1000 })
+  if (userKey) {
+    recordRateLimitFailure(userKey, { maxAttempts: 10, windowMs: 15 * 60 * 1000, blockDurationMs: 15 * 60 * 1000 })
+  }
+  recordRateLimitFailure(globalKey, { maxAttempts: 50, windowMs: 15 * 60 * 1000, blockDurationMs: 15 * 60 * 1000 })
 
   // Delay to mitigate brute force
   await new Promise((resolve) => setTimeout(resolve, 500))
@@ -133,12 +162,14 @@ export async function logoutApp() {
   cookieStore.set(AUTH_COOKIE_NAME, "", {
     httpOnly: true,
     secure: isSecure,
+    sameSite: "lax",
     path: "/",
     maxAge: 0,
   })
   cookieStore.set(SETTINGS_COOKIE_NAME, "", {
     httpOnly: true,
     secure: isSecure,
+    sameSite: "lax",
     path: "/",
     maxAge: 0,
   })
@@ -152,6 +183,7 @@ export async function logoutSettings() {
   cookieStore.set(SETTINGS_COOKIE_NAME, "", {
     httpOnly: true,
     secure: isSecure,
+    sameSite: "lax",
     path: "/",
     maxAge: 0,
   })

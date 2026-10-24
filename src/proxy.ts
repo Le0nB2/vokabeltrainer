@@ -76,7 +76,9 @@ export async function proxy(req: NextRequest) {
     pathname === "/manifest.json" ||
     pathname === "/manifest.webmanifest" ||
     pathname === "/icon.png" ||
-    pathname.startsWith("/icon-")
+    pathname === "/icon-192.png" ||
+    pathname === "/icon-512.png" ||
+    /^\/icon-\d+x\d+\.png$/.test(pathname)
   ) {
     return NextResponse.next();
   }

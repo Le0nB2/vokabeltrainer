@@ -96,18 +96,53 @@ export function isSecureRequest(
 }
 
 /**
+ * Derive a cryptographic 256-bit secret key from a password when explicit secrets are missing.
+ * Prevents low-entropy HMAC keys susceptible to offline brute-force.
+ */
+export function deriveSecretFromPassword(password: string): string {
+  return createHmac("sha256", "vokabeltrainer-domain-key-v1").update(password).digest("hex")
+}
+
+/**
  * Retrieve configured credentials from environment variables.
  * Supports AUTH_USER / AUTH_PASSWORD with fallback to BASIC_AUTH_USER / BASIC_AUTH_PASSWORD.
+ * Implements Fail-Secure: if only one credential is set, authentication is enforced
+ * rather than silently bypassed.
  */
 export function getAppAuthCredentials() {
   const user = process.env.AUTH_USER || process.env.BASIC_AUTH_USER || ""
   const password = process.env.AUTH_PASSWORD || process.env.BASIC_AUTH_PASSWORD || ""
-  const isConfigured = Boolean(user && password)
+  
+  // Both configured properly
+  if (user && password) {
+    return {
+      user,
+      password,
+      isConfigured: true,
+    }
+  }
+
+  // Neither configured -> single-user local unauthenticated mode
+  if (!user && !password) {
+    return {
+      user: "",
+      password: "",
+      isConfigured: false,
+    }
+  }
+
+  // Fail-Secure: Only one credential was configured!
+  // Enforce auth to prevent accidental public exposure of the web application.
+  if (process.env.NODE_ENV !== "test") {
+    console.error(
+      "[Security Alert] Incomplete auth credentials: only one of AUTH_USER / AUTH_PASSWORD is set. Authentication is enforced (Fail-Secure) and logins will fail until both are configured."
+    )
+  }
 
   return {
     user,
     password,
-    isConfigured,
+    isConfigured: true,
   }
 }
 
@@ -118,7 +153,7 @@ export function getAppSecret(password?: string): string {
   return (
     process.env.AUTH_SECRET ||
     process.env.SESSION_SECRET ||
-    password ||
+    (password ? deriveSecretFromPassword(password) : undefined) ||
     getFallbackSecret()
   )
 }

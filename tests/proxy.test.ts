@@ -132,6 +132,13 @@ describe('proxy middleware session auth', () => {
     }
   })
 
+  it('should not allow unauthenticated access to arbitrary paths prefixed with /icon-', async () => {
+    const req = createMockRequest('/icon-fake-admin')
+    const result: any = await proxy(req)
+    expect(result.type).toBe('redirect')
+    expect(result.url).toContain('/login?redirect=%2Ficon-fake-admin')
+  })
+
   it('should return 401 JSON without WWW-Authenticate header for unauthenticated /api requests', async () => {
     const req = createMockRequest('/api/notifications/due-count')
     const result: any = await proxy(req)
