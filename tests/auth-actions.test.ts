@@ -170,6 +170,23 @@ describe('auth server actions', () => {
           expect(res.error).toBe('Ungültiger Benutzername oder falsches Passwort')
         }
       })
+
+      it('blocks account after 10 failed login attempts across different IPs (anti-distributed brute force)', async () => {
+        // 2 different IPs, 5 failed attempts each = 10 attempts for 'admin'
+        for (let ip = 1; ip <= 2; ip++) {
+          mockHeaders.set('x-forwarded-for', `10.0.1.${ip}`)
+          for (let attempt = 0; attempt < 5; attempt++) {
+            const res = await loginApp({ username: 'admin', password: 'wrong' })
+            expect(res.success).toBe(false)
+          }
+        }
+
+        // A new 3rd IP attempts to log in as 'admin' with correct password -> blocked by user limit
+        mockHeaders.set('x-forwarded-for', '10.0.1.99')
+        const blockedRes = await loginApp({ username: 'admin', password: 'password123' })
+        expect(blockedRes.success).toBe(false)
+        expect(blockedRes.error).toContain('Zu viele Fehlversuche für diesen Benutzer')
+      }, 15000)
     })
   })
 
@@ -216,7 +233,7 @@ describe('auth server actions', () => {
   })
 
   describe('logoutApp', () => {
-    it('clears auth and settings session cookies', async () => {
+    it('clears auth and settings session cookies with sameSite lax', async () => {
       mockCookies.set(AUTH_COOKIE_NAME, { value: 'existing-token' })
       mockCookies.set(SETTINGS_COOKIE_NAME, { value: 'existing-settings-token' })
       const result = await logoutApp()
@@ -225,10 +242,12 @@ describe('auth server actions', () => {
       const authCookie = mockCookies.get(AUTH_COOKIE_NAME)
       expect(authCookie.value).toBe('')
       expect(authCookie.maxAge).toBe(0)
+      expect(authCookie.sameSite).toBe('lax')
 
       const settingsCookie = mockCookies.get(SETTINGS_COOKIE_NAME)
       expect(settingsCookie.value).toBe('')
       expect(settingsCookie.maxAge).toBe(0)
+      expect(settingsCookie.sameSite).toBe('lax')
     })
   })
 
@@ -247,6 +266,7 @@ describe('auth server actions', () => {
       const settingsCookie = mockCookies.get(SETTINGS_COOKIE_NAME)
       expect(settingsCookie.value).toBe('')
       expect(settingsCookie.maxAge).toBe(0)
+      expect(settingsCookie.sameSite).toBe('lax')
     })
   })
 
