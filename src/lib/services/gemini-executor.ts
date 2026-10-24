@@ -47,6 +47,27 @@ export function isQuotaError(error: unknown): boolean {
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
+/**
+ * Default backoff retry delays for overloaded models (in ms):
+ * 1st retry (after attempt 1 fails): 4 seconds
+ * 2nd retry (after attempt 2 fails): 7 seconds
+ */
+export const DEFAULT_RETRY_DELAYS_MS = [4000, 7000];
+
+export function getRetryDelayMs(
+  attempt: number,
+  customDelayMs?: number,
+  customDelaysMs?: number[]
+): number {
+  if (customDelayMs !== undefined) {
+    return customDelayMs;
+  }
+  if (customDelaysMs && customDelaysMs[attempt] !== undefined) {
+    return customDelaysMs[attempt];
+  }
+  return DEFAULT_RETRY_DELAYS_MS[attempt] ?? 7000;
+}
+
 export interface GeminiStatusEvent {
   type: "start" | "retry" | "fallback" | "key_switch";
   message: string;
@@ -62,6 +83,7 @@ export interface CallGeminiOptions<T> {
   apiKeys: string[];
   models?: string[];
   retryDelayMs?: number;
+  retryDelaysMs?: number[];
   maxAttemptsPrimaryModel?: number;
   maxAttemptsFallbackModel?: number;
   execute: (ai: GoogleGenAI, model: string) => Promise<T>;
@@ -70,7 +92,7 @@ export interface CallGeminiOptions<T> {
 
 /**
  * Executes a Gemini request with model hierarchy and overload retry logic:
- * 1. Requests the selected model first (up to 3 attempts with 3s delay on overload).
+ * 1. Requests the selected model first (up to 3 attempts with staged backoff: 4s on 1st retry, 7s on 2nd retry).
  * 2. If still unsuccessful, falls back to the next model (e.g. gemini-flash-lite-latest)
  *    and attempts it exactly 1 time.
  * 3. Rotates across API keys if quota (429) is exhausted.
@@ -79,7 +101,8 @@ export async function callGeminiWithRetry<T>({
   endpoint,
   apiKeys,
   models: customModels,
-  retryDelayMs = 3000,
+  retryDelayMs,
+  retryDelaysMs,
   maxAttemptsPrimaryModel = 3,
   maxAttemptsFallbackModel = 1,
   execute,
@@ -170,8 +193,9 @@ export async function callGeminiWithRetry<T>({
           }
 
           if (isOverloaded) {
-            const delaySec = Math.round(retryDelayMs / 1000);
             if (attempt < maxAttempts - 1) {
+              const currentDelayMs = getRetryDelayMs(attempt, retryDelayMs, retryDelaysMs);
+              const delaySec = Math.max(1, Math.round(currentDelayMs / 1000));
               console.warn(
                 `Modell ${modelToUse} ist überlastet (Versuch ${attempt + 1}/${maxAttempts}, Key ${keyIndex + 1}). Warte ${delaySec}s vor erneutem Versuch...`
               );
@@ -184,7 +208,7 @@ export async function callGeminiWithRetry<T>({
                 delaySeconds: delaySec,
                 keyIndex: keyIndex + 1,
               });
-              await sleep(retryDelayMs);
+              await sleep(currentDelayMs);
               continue; // Retry with the SAME model
             } else {
               const nextModel = models[modelIndex + 1];
