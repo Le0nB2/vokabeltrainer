@@ -6,7 +6,6 @@ import {
   AlertTriangle,
   RefreshCw,
   FileCheck2,
-  CheckCircle2,
   ChevronDown,
   ChevronUp,
   Clock,
@@ -14,25 +13,16 @@ import {
 } from "lucide-react";
 import { AiStatusMessage, AiStage } from "@/lib/services/ai-status";
 
-export interface StepItem {
-  id: string;
-  label: string;
-}
-
 interface AiProgressCardProps {
   title: string;
   currentStatus: AiStatusMessage | null;
   statusHistory: AiStatusMessage[];
-  steps?: StepItem[];
-  activeStepIndex?: number;
 }
 
 export function AiProgressCard({
   title,
   currentStatus,
   statusHistory,
-  steps,
-  activeStepIndex = 1,
 }: AiProgressCardProps) {
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
   const [retryCountdown, setRetryCountdown] = useState<number | null>(null);
@@ -81,7 +71,7 @@ export function AiProgressCard({
               <div className="flex-1 min-w-0">
                 <div className="flex items-center justify-between gap-2">
                   <h4 className="font-semibold text-sm">
-                    Modell vorübergehend überlastet (503)
+                    Vorübergehend überlastet
                   </h4>
                   {retryCountdown !== null && retryCountdown > 0 && (
                     <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-bold bg-amber-200 dark:bg-amber-800 text-amber-800 dark:text-amber-100">
@@ -154,14 +144,7 @@ export function AiProgressCard({
                 <Loader2 className="w-5 h-5 animate-spin" />
               </div>
               <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2">
-                  <h4 className="font-semibold text-sm">KI-Generierung läuft</h4>
-                  {currentStatus?.model && (
-                    <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-blue-100 dark:bg-blue-900/60 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800">
-                      {currentStatus.model}
-                    </span>
-                  )}
-                </div>
+                <h4 className="font-semibold text-sm">KI-Generierung läuft</h4>
                 <p className="text-xs text-blue-800/90 dark:text-blue-300/90 mt-1 leading-relaxed">
                   {message}
                 </p>
@@ -202,48 +185,6 @@ export function AiProgressCard({
           <span>{elapsedSeconds}s</span>
         </div>
       </div>
-
-      {/* Stepper Progress */}
-      {steps && steps.length > 0 && (
-        <div className="space-y-2">
-          <div className="grid grid-cols-3 gap-2">
-            {steps.map((step, idx) => {
-              const isCompleted = idx < activeStepIndex;
-              const isCurrent = idx === activeStepIndex;
-
-              return (
-                <div
-                  key={step.id}
-                  className={`flex flex-col items-center text-center p-2 rounded-lg border text-xs transition-all ${
-                    isCompleted
-                      ? "border-emerald-300 bg-emerald-50 text-emerald-800 dark:border-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-300"
-                      : isCurrent
-                      ? "border-blue-400 bg-blue-50 text-blue-800 dark:border-blue-700 dark:bg-blue-950/40 dark:text-blue-200 font-semibold shadow-xs"
-                      : "border-zinc-200 bg-zinc-50 text-zinc-400 dark:border-zinc-800 dark:bg-zinc-800/40 dark:text-zinc-500"
-                  }`}
-                >
-                  <div className="mb-1">
-                    {isCompleted ? (
-                      <CheckCircle2 className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
-                    ) : isCurrent ? (
-                      stage === "retrying" ? (
-                        <AlertTriangle className="w-4 h-4 text-amber-500 animate-pulse" />
-                      ) : (
-                        <Loader2 className="w-4 h-4 text-blue-500 animate-spin" />
-                      )
-                    ) : (
-                      <span className="w-4 h-4 rounded-full border border-zinc-300 dark:border-zinc-700 flex items-center justify-center text-[10px]">
-                        {idx + 1}
-                      </span>
-                    )}
-                  </div>
-                  <span className="truncate w-full">{step.label}</span>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      )}
 
       {/* Current Status Box */}
       {renderStatusBanner()}

@@ -66,12 +66,6 @@ export default function WorksheetPage() {
   const [currentStatus, setCurrentStatus] = useState<AiStatusMessage | null>(null);
   const [statusHistory, setStatusHistory] = useState<AiStatusMessage[]>([]);
 
-  const worksheetSteps = [
-    { id: "prep", label: "1. Vorbereitung" },
-    { id: "ai", label: "2. KI-Aufgaben" },
-    { id: "pdf", label: "3. Druck-Layout" },
-  ];
-
   const [pdfInstance, updatePdf] = usePDF({
     document: worksheetData ? <WorksheetPDF exercises={worksheetData.exercises} solutions={worksheetData.solutions} worksheetId={worksheetData.worksheetId} dateStr={worksheetData.dateStr} /> : <Document><Page></Page></Document>
   });
@@ -168,21 +162,12 @@ export default function WorksheetPage() {
   };
 
   if (loading) {
-    const activeStepIndex =
-      currentStatus?.stage === "optimizing"
-        ? 2
-        : currentStatus?.stage === "complete"
-        ? 3
-        : 1;
-
     return (
       <div className="min-h-screen flex flex-col items-center justify-center p-4 bg-zinc-50/50 dark:bg-zinc-950/50">
         <AiProgressCard
           title="Arbeitsblatt wird erstellt"
           currentStatus={currentStatus}
           statusHistory={statusHistory}
-          steps={worksheetSteps}
-          activeStepIndex={activeStepIndex}
         />
       </div>
     );

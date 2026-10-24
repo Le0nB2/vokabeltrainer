@@ -49,7 +49,7 @@ describe("AiProgressCard component", () => {
       />
     );
 
-    expect(screen.getByText("Modell vorübergehend überlastet (503)")).toBeDefined();
+    expect(screen.getByText("Vorübergehend überlastet")).toBeDefined();
     expect(screen.getByText("in 3s")).toBeDefined();
     expect(
       screen.getByText("Modell gemini-2.5-flash ist überlastet. Neuer Versuch in 3 Sekunden (Versuch 1/3)...")
