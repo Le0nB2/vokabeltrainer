@@ -183,10 +183,10 @@ Beim Start:
 Die App ist nun unter [http://localhost:3001](http://localhost:3001) erreichbar.
 
 ## Tech-Stack
-- Frontend & Backend: Next.js 16 (App Router, Server Actions)
+- Frontend & Backend: Next.js (App Router, Server Actions)
 - Styling: Tailwind CSS, Lucide Icons
 - Datenbank: SQLite via Prisma ORM
-- KI-Analyse: `@google/genai` (Gemini 3.5 Flash Lite Structured Output)
+- KI-Analyse: `@google/genai` (Gemini Structured Output)
 
 ## Dienste und Versionen
 
