@@ -62,6 +62,11 @@ describe('User Management Actions', () => {
     // Set valid settings session
     const settingsToken = createSettingsSessionToken('settingssecret')
     mockCookies.set(SETTINGS_COOKIE_NAME, { value: settingsToken })
+
+    vi.spyOn(prisma, '$transaction').mockImplementation(async (cb: any) => {
+      if (typeof cb === 'function') return cb(prisma)
+      return Promise.all(cb)
+    })
   })
 
   afterEach(() => {
@@ -134,7 +139,7 @@ describe('User Management Actions', () => {
 
     const res = await setupPrimaryAdmin({
       username: 'eltern',
-      password: 'mypassword123',
+      password: 'MyPassword123!',
     })
 
     expect(res.success).toBe(true)
@@ -174,7 +179,7 @@ describe('User Management Actions', () => {
 
     const res = await createUser({
       username: 'ben',
-      password: 'mypassword123',
+      password: 'MyPassword123!',
       displayName: 'Ben',
     })
 
@@ -190,7 +195,7 @@ describe('User Management Actions', () => {
     )
 
     const savedHash = createSpy.mock.calls[0][0].data.passwordHash
-    expect(verifyPassword('mypassword123', savedHash)).toBe(true)
+    expect(verifyPassword('MyPassword123!', savedHash)).toBe(true)
   })
 
   it('prevents secondary user creation if no primary admin is configured', async () => {
@@ -203,7 +208,7 @@ describe('User Management Actions', () => {
 
     const res = await createUser({
       username: 'kind1',
-      password: 'mypassword123',
+      password: 'MyPassword123!',
     })
 
     expect(res.success).toBe(false)
@@ -220,7 +225,7 @@ describe('User Management Actions', () => {
 
     const res = await createUser({
       username: 'anna',
-      password: 'mypassword123',
+      password: 'MyPassword123!',
     })
 
     expect(res.success).toBe(false)
@@ -233,7 +238,7 @@ describe('User Management Actions', () => {
 
     const res = await createUser({
       username: 'admin',
-      password: 'mypassword123',
+      password: 'MyPassword123!',
     })
 
     expect(res.success).toBe(false)
@@ -270,11 +275,11 @@ describe('User Management Actions', () => {
   it('resets a user password', async () => {
     const updateSpy = vi.spyOn(prisma.user, 'update').mockResolvedValueOnce({} as any)
 
-    const res = await resetUserPassword('u-123', 'newpassword999')
+    const res = await resetUserPassword('u-123', 'NewPassword999!')
     expect(res.success).toBe(true)
     expect(updateSpy).toHaveBeenCalled()
     const savedHash = updateSpy.mock.calls[0][0].data.passwordHash as string
-    expect(verifyPassword('newpassword999', savedHash)).toBe(true)
+    expect(verifyPassword('NewPassword999!', savedHash)).toBe(true)
   })
 
   it('toggles user active status and prevents deactivating primary admin', async () => {
@@ -305,5 +310,31 @@ describe('User Management Actions', () => {
       where: { id: 'u-123' },
       data: { isActive: false },
     })
+  })
+
+  it('enforces password policy (min 8 chars and at least one special char) on createUser and resetUserPassword', async () => {
+    vi.spyOn(prisma.deck, 'count').mockResolvedValue(3)
+    vi.spyOn(prisma.user, 'findMany').mockResolvedValue([])
+
+    // 1. Password shorter than 8 chars
+    const shortRes = await createUser({
+      username: 'user1',
+      password: 'Pass1!',
+    })
+    expect(shortRes.success).toBe(false)
+    expect(shortRes.error).toContain('mindestens 8 Zeichen')
+
+    // 2. Password without special character
+    const noSpecRes = await createUser({
+      username: 'user1',
+      password: 'Password123',
+    })
+    expect(noSpecRes.success).toBe(false)
+    expect(noSpecRes.error).toContain('mindestens ein Sonderzeichen')
+
+    // 3. resetUserPassword rejects password without special character
+    const resetRes = await resetUserPassword('u-123', 'Password123')
+    expect(resetRes.success).toBe(false)
+    expect(resetRes.error).toContain('mindestens ein Sonderzeichen')
   })
 })

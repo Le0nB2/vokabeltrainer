@@ -10,6 +10,9 @@ import {
   getAppAuthCredentials,
   getAppSecret,
   createAppSessionToken,
+  getPasswordVersion,
+  validateUsername,
+  validatePasswordPolicy,
   isSecureRequest,
   hashPassword,
 } from "@/lib/auth-utils"
@@ -173,70 +176,67 @@ export async function setupPrimaryAdmin(data: {
     return { success: false, error: "Es ist bereits ein Hauptnutzer in der Datenbank eingerichtet." }
   }
 
-  const cleanUsername = (data.username || "").trim().toLowerCase()
-  const cleanPassword = data.password || ""
-
-  if (!cleanUsername || cleanUsername.length < 2 || cleanUsername.length > 50) {
-    return { success: false, error: "Der Benutzername muss zwischen 2 und 50 Zeichen lang sein." }
+  const userValidation = validateUsername(data.username)
+  if (!userValidation.valid) {
+    return { success: false, error: userValidation.error }
   }
 
-  if (!/^[a-zA-Z0-9_\-\.]+$/.test(cleanUsername)) {
-    return { success: false, error: "Der Benutzername darf nur Buchstaben, Zahlen, Bindestriche und Punkte enthalten." }
+  const passValidation = validatePasswordPolicy(data.password)
+  if (!passValidation.valid) {
+    return { success: false, error: passValidation.error }
   }
 
-  if (cleanUsername === "default") {
-    return { success: false, error: "Dieser Benutzername ist reserviert." }
-  }
-
-  if (!cleanPassword || cleanPassword.length < 6) {
-    return { success: false, error: "Das Passwort muss mindestens 6 Zeichen lang sein." }
-  }
-
+  const cleanUsername = data.username.trim().toLowerCase()
+  const cleanPassword = data.password
   const passwordHash = hashPassword(cleanPassword)
 
   const existingUser = await prisma.user.findUnique({
     where: { username: cleanUsername },
   })
 
-  // 1. Create primary admin or promote existing user
-  let newAdmin: any
-  if (existingUser) {
-    newAdmin = await prisma.user.update({
-      where: { id: existingUser.id },
-      data: {
-        role: "ADMIN",
-        passwordHash,
-        isActive: true,
-      },
-    })
-  } else {
-    newAdmin = await prisma.user.create({
-      data: {
-        username: cleanUsername,
-        displayName: "Hauptnutzer",
-        passwordHash,
-        role: "ADMIN",
-        isActive: true,
-      },
-    })
-  }
+  // 1. Atomically create primary admin / promote and transfer existing unassigned decks
+  const newAdmin = await prisma.$transaction(async (tx) => {
+    let adminRecord: any
+    if (existingUser) {
+      adminRecord = await tx.user.update({
+        where: { id: existingUser.id },
+        data: {
+          role: "ADMIN",
+          passwordHash,
+          isActive: true,
+        },
+      })
+    } else {
+      adminRecord = await tx.user.create({
+        data: {
+          username: cleanUsername,
+          displayName: "Hauptnutzer",
+          passwordHash,
+          role: "ADMIN",
+          isActive: true,
+        },
+      })
+    }
 
-  // 2. Transfer all existing unassigned decks to this new Hauptnutzer
-  await prisma.deck.updateMany({
-    where: {
-      OR: [{ userId: null }, { userId: "default" }, { userId: "admin" }],
-    },
-    data: {
-      userId: newAdmin.id,
-    },
+    await tx.deck.updateMany({
+      where: {
+        OR: [{ userId: null }, { userId: "default" }, { userId: "admin" }],
+      },
+      data: {
+        userId: adminRecord.id,
+      },
+    })
+
+    return adminRecord
   })
 
-  // 3. Set session cookie so the administrator is immediately logged in
+  // 2. Set session cookie so the administrator is immediately logged in
   try {
     const secret = getAppSecret()
     const token = createAppSessionToken(newAdmin.username, secret, AUTH_COOKIE_MAX_AGE, {
       id: newAdmin.id,
       role: newAdmin.role,
+      pv: getPasswordVersion(newAdmin.passwordHash),
     })
     const cookieStore = await cookies()
     const headersList = await headers()
@@ -277,25 +277,19 @@ export async function createUser(data: {
     }
   }
 
-  const cleanUsername = (data.username || "").trim()
-  const cleanPassword = data.password || ""
+  const userValidation = validateUsername(data.username)
+  if (!userValidation.valid) {
+    return { success: false, error: userValidation.error }
+  }
+
+  const passValidation = validatePasswordPolicy(data.password)
+  if (!passValidation.valid) {
+    return { success: false, error: passValidation.error }
+  }
+
+  const cleanUsername = data.username.trim()
+  const cleanPassword = data.password
   const cleanDisplayName = data.displayName?.trim() || null
-
-  if (!cleanUsername || cleanUsername.length < 2 || cleanUsername.length > 50) {
-    return { success: false, error: "Der Benutzername muss zwischen 2 und 50 Zeichen lang sein." }
-  }
-
-  if (!/^[a-zA-Z0-9_\-\.]+$/.test(cleanUsername)) {
-    return { success: false, error: "Der Benutzername darf nur Buchstaben, Zahlen, Bindestriche und Punkte enthalten." }
-  }
-
-  if (cleanUsername.toLowerCase() === "default") {
-    return { success: false, error: "Dieser Benutzername ist reserviert." }
-  }
-
-  if (!cleanPassword || cleanPassword.length < 4) {
-    return { success: false, error: "Das Passwort muss mindestens 4 Zeichen lang sein." }
-  }
 
   const { user: envUser } = getAppAuthCredentials()
   if (envUser && cleanUsername.toLowerCase() === envUser.toLowerCase()) {
@@ -371,11 +365,12 @@ export async function resetUserPassword(userId: string, newPassword: string) {
     }
   }
 
-  const cleanPassword = newPassword || ""
-  if (cleanPassword.length < 4) {
-    return { success: false, error: "Das Passwort muss mindestens 4 Zeichen lang sein." }
+  const passValidation = validatePasswordPolicy(newPassword)
+  if (!passValidation.valid) {
+    return { success: false, error: passValidation.error }
   }
 
+  const cleanPassword = newPassword
   const passwordHash = hashPassword(cleanPassword)
 
   await prisma.user.update({

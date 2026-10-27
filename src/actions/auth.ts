@@ -8,6 +8,7 @@ import {
   createSettingsSessionToken,
   getAppAuthCredentials,
   getAppSecret,
+  getPasswordVersion,
   hashPassword,
   isSecureRequest,
   secureCompare,
@@ -277,7 +278,7 @@ export async function loginApp(credentials: { username?: string; password?: stri
     }
   }
 
-  let authenticatedUser: { id: string; username: string; role: string } | null = null
+  let authenticatedUser: { id: string; username: string; role: string; pv?: string } | null = null
 
   // 0. Check for emergency reset password in environment (ADMIN_PASSWORD or RESET_ADMIN_PASSWORD)
   const resetEnvPassword = process.env.RESET_ADMIN_PASSWORD || process.env.ADMIN_PASSWORD
@@ -288,10 +289,11 @@ export async function loginApp(credentials: { username?: string; password?: stri
       })
       if (adminUser) {
         // Automatically synchronize DB hash to match this new admin password
+        const newHash = hashPassword(password)
         await prisma.user.update({
           where: { id: adminUser.id },
           data: {
-            passwordHash: hashPassword(password),
+            passwordHash: newHash,
             lastLoginAt: new Date(),
           },
         })
@@ -299,6 +301,7 @@ export async function loginApp(credentials: { username?: string; password?: stri
           id: adminUser.id,
           username: adminUser.username,
           role: adminUser.role,
+          pv: getPasswordVersion(newHash),
         }
       }
     } catch {
@@ -324,6 +327,7 @@ export async function loginApp(credentials: { username?: string; password?: stri
             id: dbUser.id,
             username: dbUser.username,
             role: dbUser.role || "USER",
+            pv: getPasswordVersion(dbUser.passwordHash),
           }
           // Asynchronously update lastLoginAt
           prisma.user
@@ -351,6 +355,7 @@ export async function loginApp(credentials: { username?: string; password?: stri
     const token = createAppSessionToken(authenticatedUser.username, secret, AUTH_COOKIE_MAX_AGE, {
       id: authenticatedUser.id,
       role: authenticatedUser.role,
+      pv: authenticatedUser.pv,
     })
 
     cookieStore.set(AUTH_COOKIE_NAME, token, {

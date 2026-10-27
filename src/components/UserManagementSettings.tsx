@@ -82,8 +82,8 @@ export function UserManagementSettings({
       return
     }
 
-    if (setupPassword.length < 6) {
-      setMessage({ type: "error", text: "Das Passwort muss mindestens 6 Zeichen lang sein." })
+    if (setupPassword.length < 8 || !/[^a-zA-Z0-9]/.test(setupPassword)) {
+      setMessage({ type: "error", text: "Das Passwort muss mindestens 8 Zeichen lang sein und mindestens ein Sonderzeichen enthalten." })
       return
     }
 
@@ -250,8 +250,8 @@ export function UserManagementSettings({
 
   // Handle resetting a user's password
   const handleResetPassword = async (userId: string) => {
-    if (!editingPassword || editingPassword.length < 4) {
-      alert("Das neue Passwort muss mindestens 4 Zeichen lang sein.")
+    if (!editingPassword || editingPassword.length < 8 || !/[^a-zA-Z0-9]/.test(editingPassword)) {
+      alert("Das neue Passwort muss mindestens 8 Zeichen lang sein und mindestens ein Sonderzeichen enthalten.")
       return
     }
 
@@ -408,12 +408,13 @@ export function UserManagementSettings({
                   </div>
                   <div>
                     <label className="block text-xs font-medium text-zinc-600 dark:text-zinc-400 mb-1">
-                      Passwort (mind. 6 Zeichen) *
+                      Passwort (mind. 8 Zeichen & 1 Sonderzeichen) *
                     </label>
                     <input
                       type="password"
                       required
-                      placeholder="Geheimes Passwort"
+                      minLength={8}
+                      placeholder="Mind. 8 Zeichen & 1 Sonderzeichen"
                       value={setupPassword}
                       onChange={(e) => setSetupPassword(e.target.value)}
                       className="w-full px-3 py-2 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
@@ -426,6 +427,7 @@ export function UserManagementSettings({
                     <input
                       type="password"
                       required
+                      minLength={8}
                       placeholder="Passwort wiederholen"
                       value={setupPasswordConfirm}
                       onChange={(e) => setSetupPasswordConfirm(e.target.value)}
@@ -528,7 +530,8 @@ export function UserManagementSettings({
                   <input
                     type="password"
                     required
-                    placeholder="Mind. 4 Zeichen"
+                    minLength={8}
+                    placeholder="Mind. 8 Zeichen & 1 Sonderzeichen"
                     value={newPassword}
                     onChange={(e) => setNewPassword(e.target.value)}
                     className="w-full px-3 py-2 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
@@ -617,7 +620,7 @@ export function UserManagementSettings({
                       <div className="flex items-center gap-2 flex-wrap">
                         <input
                           type="password"
-                          placeholder="Neues Passwort"
+                          placeholder="Mind. 8 Z. & 1 S.-Z."
                           value={editingPassword}
                           onChange={(e) => setEditingPassword(e.target.value)}
                           className="px-2 py-1 text-xs border rounded dark:bg-zinc-800 dark:border-zinc-700 w-32"

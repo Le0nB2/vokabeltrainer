@@ -5,13 +5,32 @@ import {
   getAppAuthCredentials,
   getAppSecret,
   createAppSessionToken,
+  getPasswordVersion,
+  validateUsername,
+  validatePasswordPolicy,
   AUTH_COOKIE_NAME,
   AUTH_COOKIE_MAX_AGE,
   hashPassword,
   isSecureRequest,
 } from "@/lib/auth-utils"
+import {
+  checkRateLimit,
+  recordRateLimitFailure,
+  resetRateLimit,
+  formatRetryDuration,
+  getClientIpFromHeaders,
+} from "@/lib/rate-limit"
 import { cookies, headers } from "next/headers"
 import { revalidatePath } from "next/cache"
+
+async function getClientIp(): Promise<string> {
+  try {
+    const headersList = await headers()
+    return getClientIpFromHeaders(headersList)
+  } catch {
+    return "127.0.0.1"
+  }
+}
 
 export async function getSetupState(): Promise<{
   needsSetup: boolean
@@ -65,6 +84,16 @@ export async function completeSetupSingleUser(): Promise<{ success: boolean; err
     return { success: false, error: "Die Ersteinrichtung wurde bereits abgeschlossen." }
   }
 
+  const clientIp = await getClientIp()
+  const rateLimitKey = `setup:ip:${clientIp}`
+  const rateLimit = checkRateLimit(rateLimitKey, { maxAttempts: 5, windowMs: 15 * 60 * 1000, blockDurationMs: 15 * 60 * 1000 })
+  if (rateLimit.isBlocked) {
+    return {
+      success: false,
+      error: `Zu viele Anfragen. Bitte versuche es in ${formatRetryDuration(rateLimit.retryAfterSeconds)} erneut.`,
+    }
+  }
+
   try {
     await prisma.settings.upsert({
       where: { id: "default" },
@@ -77,10 +106,12 @@ export async function completeSetupSingleUser(): Promise<{ success: boolean; err
       },
     })
 
+    resetRateLimit(rateLimitKey)
     revalidatePath("/")
     revalidatePath("/settings")
     return { success: true }
   } catch (err) {
+    recordRateLimitFailure(rateLimitKey, { maxAttempts: 5, windowMs: 15 * 60 * 1000, blockDurationMs: 15 * 60 * 1000 })
     console.error("Error completing single-user setup:", err)
     return { success: false, error: "Fehler beim Speichern der Einstellungen." }
   }
@@ -97,15 +128,28 @@ export async function completeSetupProtected(params: {
     return { success: false, error: "Die Ersteinrichtung wurde bereits abgeschlossen." }
   }
 
+  const clientIp = await getClientIp()
+  const rateLimitKey = `setup:ip:${clientIp}`
+  const rateLimit = checkRateLimit(rateLimitKey, { maxAttempts: 5, windowMs: 15 * 60 * 1000, blockDurationMs: 15 * 60 * 1000 })
+  if (rateLimit.isBlocked) {
+    return {
+      success: false,
+      error: `Zu viele Versuche. Bitte versuche es in ${formatRetryDuration(rateLimit.retryAfterSeconds)} erneut.`,
+    }
+  }
+
+  const userValidation = validateUsername(params.username)
+  if (!userValidation.valid) {
+    return { success: false, error: userValidation.error }
+  }
+
+  const passValidation = validatePasswordPolicy(params.password)
+  if (!passValidation.valid) {
+    return { success: false, error: passValidation.error }
+  }
+
   const username = params.username.trim()
   const password = params.password
-
-  if (!username || username.length < 2) {
-    return { success: false, error: "Der Anmeldename muss mindestens 2 Zeichen lang sein." }
-  }
-  if (!password || password.length < 6) {
-    return { success: false, error: "Das Passwort muss mindestens 6 Zeichen lang sein." }
-  }
 
   let settingsPasswordHash: string | null = null
   if (params.settingsOption === "same") {
@@ -126,38 +170,44 @@ export async function completeSetupProtected(params: {
     }
 
     const passwordHash = hashPassword(password)
-    const user = await prisma.user.create({
-      data: {
-        username,
-        displayName: null,
-        passwordHash,
-        role: "ADMIN",
-        isActive: true,
-      },
-    })
 
-    // Reassign existing unassigned decks to this primary admin
-    await prisma.deck.updateMany({
-      where: {
-        OR: [{ userId: null }, { userId: "default" }, { userId: "admin" }],
-      },
-      data: {
-        userId: user.id,
-      },
-    })
+    // Atomically create admin, assign decks, and update settings
+    const user = await prisma.$transaction(async (tx) => {
+      const newUser = await tx.user.create({
+        data: {
+          username,
+          displayName: null,
+          passwordHash,
+          role: "ADMIN",
+          isActive: true,
+        },
+      })
 
-    // Update settings with completion flag and settings password hash
-    await prisma.settings.upsert({
-      where: { id: "default" },
-      create: {
-        id: "default",
-        isSetupCompleted: true,
-        settingsPasswordHash,
-      },
-      update: {
-        isSetupCompleted: true,
-        settingsPasswordHash,
-      },
+      // Reassign existing unassigned decks to this primary admin
+      await tx.deck.updateMany({
+        where: {
+          OR: [{ userId: null }, { userId: "default" }, { userId: "admin" }],
+        },
+        data: {
+          userId: newUser.id,
+        },
+      })
+
+      // Update settings with completion flag and settings password hash
+      await tx.settings.upsert({
+        where: { id: "default" },
+        create: {
+          id: "default",
+          isSetupCompleted: true,
+          settingsPasswordHash,
+        },
+        update: {
+          isSetupCompleted: true,
+          settingsPasswordHash,
+        },
+      })
+
+      return newUser
     })
 
     // Create session cookie so the user is directly logged in
@@ -168,6 +218,7 @@ export async function completeSetupProtected(params: {
     const token = createAppSessionToken(user.username, secret, AUTH_COOKIE_MAX_AGE, {
       id: user.id,
       role: user.role,
+      pv: getPasswordVersion(user.passwordHash),
     })
 
     cookieStore.set(AUTH_COOKIE_NAME, token, {
@@ -178,10 +229,12 @@ export async function completeSetupProtected(params: {
       maxAge: AUTH_COOKIE_MAX_AGE,
     })
 
+    resetRateLimit(rateLimitKey)
     revalidatePath("/")
     revalidatePath("/settings")
     return { success: true }
   } catch (err) {
+    recordRateLimitFailure(rateLimitKey, { maxAttempts: 5, windowMs: 15 * 60 * 1000, blockDurationMs: 15 * 60 * 1000 })
     console.error("Error completing protected setup:", err)
     return { success: false, error: "Unerwarteter Fehler beim Einrichten des Kontos." }
   }

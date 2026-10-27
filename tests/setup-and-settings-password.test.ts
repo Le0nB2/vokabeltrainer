@@ -69,6 +69,10 @@ describe('Setup Wizard & Kindersicherung Settings Password', () => {
     mockCookies.clear()
     mockHeaders.clear()
     vi.restoreAllMocks()
+    vi.spyOn(prisma, '$transaction').mockImplementation(async (cb: any) => {
+      if (typeof cb === 'function') return cb(prisma)
+      return Promise.all(cb)
+    })
   })
 
   afterEach(() => {
@@ -152,19 +156,27 @@ describe('Setup Wizard & Kindersicherung Settings Password', () => {
     it('rejects short usernames and passwords', async () => {
       const res1 = await completeSetupProtected({
         username: 'a',
-        password: 'password123',
+        password: 'Password123!',
         settingsOption: 'same',
       })
       expect(res1.success).toBe(false)
-      expect(res1.error).toContain('Anmeldename muss mindestens 2 Zeichen')
+      expect(res1.error).toContain('Benutzername muss zwischen 2 und 50 Zeichen')
 
       const res2 = await completeSetupProtected({
-        username: 'admin',
+        username: 'adminuser',
         password: '123',
         settingsOption: 'same',
       })
       expect(res2.success).toBe(false)
-      expect(res2.error).toContain('Passwort muss mindestens 6 Zeichen')
+      expect(res2.error).toContain('mindestens 8 Zeichen')
+
+      const res3 = await completeSetupProtected({
+        username: 'adminuser',
+        password: 'Password123',
+        settingsOption: 'same',
+      })
+      expect(res3.success).toBe(false)
+      expect(res3.error).toContain('Sonderzeichen')
     })
 
     it('creates admin user and sets settingsPasswordHash with same password', async () => {
@@ -183,7 +195,7 @@ describe('Setup Wizard & Kindersicherung Settings Password', () => {
 
       const res = await completeSetupProtected({
         username: 'mama',
-        password: 'securepassword',
+        password: 'SecurePass123!',
         settingsOption: 'same',
       })
       expect(res.success).toBe(true)
@@ -208,7 +220,7 @@ describe('Setup Wizard & Kindersicherung Settings Password', () => {
 
       const res = await completeSetupProtected({
         username: 'papa',
-        password: 'securepassword',
+        password: 'SecurePass123!',
         settingsOption: 'pin',
         customPin: '1234',
       })

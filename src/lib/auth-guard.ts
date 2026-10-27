@@ -5,6 +5,7 @@ import {
   getAppAuthCredentials,
   getAppSecret,
   decodeAppSessionToken,
+  getPasswordVersion,
 } from "./auth-utils"
 
 export class UnauthorizedError extends Error {
@@ -39,9 +40,16 @@ export async function getCurrentUser(): Promise<AuthUser | null> {
         try {
           const dbUser = await prisma.user.findUnique({
             where: { id: payload.id },
-            select: { id: true, username: true, role: true, isActive: true },
+            select: { id: true, username: true, role: true, isActive: true, passwordHash: true },
           })
           if (dbUser && dbUser.isActive) {
+            // Revoke active session if password hash has changed since token issuance
+            if (payload.pv && dbUser.passwordHash) {
+              const currentPv = getPasswordVersion(dbUser.passwordHash)
+              if (payload.pv !== currentPv) {
+                return null
+              }
+            }
             return {
               id: dbUser.id,
               username: dbUser.username,

@@ -63,13 +63,24 @@ export function SetupWizard({ isPublicOrRender }: SetupWizardProps) {
     e.preventDefault()
     setError(null)
 
-    if (!username.trim() || username.trim().length < 2) {
-      setError("Der Anmeldename muss mindestens 2 Zeichen lang sein.")
+    const cleanUsername = username.trim()
+    if (!cleanUsername || cleanUsername.length < 2 || cleanUsername.length > 50) {
+      setError("Der Benutzername muss zwischen 2 und 50 Zeichen lang sein.")
       return
     }
 
-    if (password.length < 6) {
-      setError("Das Passwort muss mindestens 6 Zeichen lang sein.")
+    if (!/^[a-zA-Z0-9_\-\.]+$/.test(cleanUsername)) {
+      setError("Der Benutzername darf nur Buchstaben, Zahlen, Bindestriche und Punkte enthalten.")
+      return
+    }
+
+    if (cleanUsername.toLowerCase() === "default" || cleanUsername.toLowerCase() === "env-admin") {
+      setError("Dieser Benutzername ist reserviert.")
+      return
+    }
+
+    if (password.length < 8 || !/[^a-zA-Z0-9]/.test(password)) {
+      setError("Das Passwort muss mindestens 8 Zeichen lang sein und mindestens ein Sonderzeichen enthalten.")
       return
     }
 
@@ -266,9 +277,9 @@ export function SetupWizard({ isPublicOrRender }: SetupWizardProps) {
                     type="password"
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
-                    placeholder="Mindestens 6 Zeichen"
+                    placeholder="Mind. 8 Zeichen & 1 Sonderzeichen"
                     required
-                    minLength={6}
+                    minLength={8}
                     className="w-full px-3.5 py-2.5 rounded-xl border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                   />
                 </div>
@@ -283,7 +294,7 @@ export function SetupWizard({ isPublicOrRender }: SetupWizardProps) {
                     onChange={(e) => setConfirmPassword(e.target.value)}
                     placeholder="Passwort wiederholen"
                     required
-                    minLength={6}
+                    minLength={8}
                     className="w-full px-3.5 py-2.5 rounded-xl border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                   />
                 </div>

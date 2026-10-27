@@ -196,7 +196,58 @@ export interface AppSessionPayload {
   u: string;
   id?: string;
   role?: string;
+  pv?: string;
   exp: number;
+}
+
+/**
+ * Generates a short version fingerprint of a password hash to detect password changes
+ * and revoke active sessions.
+ */
+export function getPasswordVersion(passwordHash: string): string {
+  if (!passwordHash) return ""
+  return createHash("sha256").update(passwordHash).digest("hex").slice(0, 12)
+}
+
+/**
+ * Validates a username according to application security guidelines:
+ * - 2 to 50 characters
+ * - Only alphanumeric, underscores, hyphens, and dots
+ * - Not a reserved system name ("default", "env-admin")
+ */
+export function validateUsername(username: string): { valid: boolean; error?: string } {
+  const clean = (username || "").trim()
+  if (!clean || clean.length < 2 || clean.length > 50) {
+    return { valid: false, error: "Der Benutzername muss zwischen 2 und 50 Zeichen lang sein." }
+  }
+  if (!/^[a-zA-Z0-9_\-\.]+$/.test(clean)) {
+    return { valid: false, error: "Der Benutzername darf nur Buchstaben, Zahlen, Bindestriche und Punkte enthalten." }
+  }
+  if (clean.toLowerCase() === "default" || clean.toLowerCase() === "env-admin") {
+    return { valid: false, error: "Dieser Benutzername ist reserviert." }
+  }
+  return { valid: true }
+}
+
+/**
+ * Validates user passwords according to enhanced security policy:
+ * - Minimum 8 characters
+ * - At least one special character
+ */
+export function validatePasswordPolicy(password: string): { valid: boolean; error?: string } {
+  if (!password || password.length < 8) {
+    return {
+      valid: false,
+      error: "Das Passwort muss mindestens 8 Zeichen lang sein und mindestens ein Sonderzeichen enthalten.",
+    }
+  }
+  if (!/[^a-zA-Z0-9]/.test(password)) {
+    return {
+      valid: false,
+      error: "Das Passwort muss mindestens 8 Zeichen lang sein und mindestens ein Sonderzeichen enthalten.",
+    }
+  }
+  return { valid: true }
 }
 
 /**
@@ -206,7 +257,7 @@ export function createAppSessionToken(
   username: string,
   secret: string,
   maxAgeSeconds = AUTH_COOKIE_MAX_AGE,
-  metadata?: { id?: string; role?: string }
+  metadata?: { id?: string; role?: string; pv?: string }
 ): string {
   const payload: Record<string, unknown> = {
     u: username,
@@ -214,6 +265,7 @@ export function createAppSessionToken(
   }
   if (metadata?.id) payload.id = metadata.id
   if (metadata?.role) payload.role = metadata.role
+  if (metadata?.pv) payload.pv = metadata.pv
 
   const data = Buffer.from(JSON.stringify(payload)).toString("base64url")
   const sig = createHmac("sha256", secret).update(data).digest("hex")
