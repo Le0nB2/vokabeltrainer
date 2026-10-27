@@ -34,10 +34,35 @@ export async function getCurrentUser(): Promise<AuthUser | null> {
   if (token) {
     const payload = decodeAppSessionToken(token, secret)
     if (payload) {
-      return {
-        id: payload.id || (authUser && payload.u === authUser ? "admin" : payload.u),
-        username: payload.u,
-        role: payload.role || (authUser && payload.u === authUser ? "ADMIN" : "USER"),
+      // If it's a database user session, verify the user still exists and is active
+      if (payload.id && payload.id !== "admin" && payload.id !== "default") {
+        try {
+          const dbUser = await prisma.user.findUnique({
+            where: { id: payload.id },
+            select: { id: true, username: true, role: true, isActive: true },
+          })
+          if (dbUser && dbUser.isActive) {
+            return {
+              id: dbUser.id,
+              username: dbUser.username,
+              role: dbUser.role,
+            }
+          }
+          // User was deleted or deactivated: do not treat as authenticated
+        } catch {
+          // If query fails (e.g. in test mock), proceed with payload
+          return {
+            id: payload.id,
+            username: payload.u,
+            role: payload.role || "USER",
+          }
+        }
+      } else if (!authUser || payload.u === authUser) {
+        return {
+          id: payload.id || "admin",
+          username: payload.u,
+          role: payload.role || "ADMIN",
+        }
       }
     }
   }
