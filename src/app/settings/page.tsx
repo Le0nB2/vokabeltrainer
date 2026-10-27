@@ -37,7 +37,6 @@ export default async function SettingsPage() {
           <h1 className="text-2xl sm:text-3xl font-bold">Einstellungen & Backup</h1>
         </header>
 
-        <SettingsPasswordSettings isProtected={isSettingsProtected} />
         <AudioSettings initialSettings={settings} />
         <MinigameSettings initialSettings={settings} />
         <NotificationSettings initialSettings={settings} />
@@ -46,6 +45,7 @@ export default async function SettingsPage() {
           initialModels={availableModels}
           apiStats={apiStats}
         />
+        <SettingsPasswordSettings isProtected={isSettingsProtected} />
         <UserManagementSettings initialData={userManagementData} />
         <ImportExport />
       </div>

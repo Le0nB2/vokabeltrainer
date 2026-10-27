@@ -279,6 +279,26 @@ describe('Setup Wizard & Kindersicherung Settings Password', () => {
       expect(mockCookies.has(SETTINGS_COOKIE_NAME)).toBe(true)
     })
 
+    it('checkPassword rejects child/normal user account password when attempting to unlock settings', async () => {
+      vi.spyOn(prisma.settings, 'findUnique').mockResolvedValue({
+        id: 'default',
+        settingsPasswordHash: hashPassword('KindersicherungPin4444'),
+      } as any)
+
+      // Only admins are returned by the admin query in checkPassword; child users (role: "USER") are excluded
+      vi.spyOn(prisma.user, 'findMany').mockResolvedValue([
+        {
+          id: 'admin-user-id',
+          passwordHash: hashPassword('MasterElternPasswort123!'),
+        } as any,
+      ])
+
+      const res = await checkPassword('ChildPass123!')
+      expect(res.success).toBe(false)
+      expect(res.error).toContain('Falsches Passwort')
+      expect(mockCookies.has(SETTINGS_COOKIE_NAME)).toBe(false)
+    })
+
     it('checkPassword rejects wrong password', async () => {
       vi.spyOn(prisma.settings, 'findUnique').mockResolvedValue({
         id: 'default',
