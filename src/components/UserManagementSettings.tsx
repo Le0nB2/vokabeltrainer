@@ -3,6 +3,7 @@
 import { useState } from "react"
 import {
   Users,
+  User,
   UserPlus,
   Key,
   Trash2,
@@ -10,8 +11,10 @@ import {
   UserX,
   UserCheck,
   Loader2,
-  AlertTriangle,
   CheckCircle,
+  Plus,
+  ChevronDown,
+  ChevronUp,
 } from "lucide-react"
 import {
   createUser,
@@ -52,6 +55,7 @@ export function UserManagementSettings({
   const [setupPassword, setSetupPassword] = useState("")
   const [setupPasswordConfirm, setSetupPasswordConfirm] = useState("")
   const [isSettingUpAdmin, setIsSettingUpAdmin] = useState(false)
+  const [showSetupForm, setShowSetupForm] = useState(false)
 
   // Secondary User Creation State
   const [isCreating, setIsCreating] = useState(false)
@@ -109,7 +113,7 @@ export function UserManagementSettings({
             {
               id: res.userId || "primary-admin",
               username: setupUsername,
-              displayName: "Hauptnutzer",
+              displayName: null,
               role: "ADMIN",
               isActive: true,
               isEnvUser: false,
@@ -269,27 +273,53 @@ export function UserManagementSettings({
     }
   }
 
+  const isMultiUser = data.hasPrimaryAdmin && data.users.length > 1
+  const isSingleUserProtected = data.hasPrimaryAdmin && data.users.length <= 1
+  const isSingleUserUnprotected = !data.hasPrimaryAdmin
+
   return (
     <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl p-4 sm:p-6 mt-6">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4 mb-4">
         <div className="flex items-center gap-3 min-w-0">
           <div className="p-2 bg-blue-100 dark:bg-blue-900/30 rounded-lg shrink-0">
-            <Users className="w-6 h-6 text-blue-600 dark:text-blue-400" />
+            {isMultiUser ? (
+              <Users className="w-6 h-6 text-blue-600 dark:text-blue-400" />
+            ) : isSingleUserProtected ? (
+              <UserCheck className="w-6 h-6 text-blue-600 dark:text-blue-400" />
+            ) : (
+              <User className="w-6 h-6 text-blue-600 dark:text-blue-400" />
+            )}
           </div>
           <div className="min-w-0">
-            <h3 className="text-lg font-semibold text-zinc-900 dark:text-zinc-100">
-              Benutzerverwaltung
-            </h3>
-            <p className="text-xs sm:text-sm text-zinc-500">
-              {data.hasPrimaryAdmin
-                ? "Profile für dich und deine Kinder mit getrennten Vokabelstapeln verwalten."
-                : "Für die Nutzung mehrerer Profile muss zuerst ein Hauptnutzer festgelegt werden."}
+            <div className="flex items-center gap-2 flex-wrap">
+              <h3 className="text-lg font-semibold text-zinc-900 dark:text-zinc-100">
+                {isMultiUser
+                  ? "Profile & Konten"
+                  : isSingleUserProtected
+                  ? "Dein Profil"
+                  : "Benutzerprofil (optional)"}
+              </h3>
+              <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400">
+                {isMultiUser
+                  ? `${data.users.length} Profile`
+                  : isSingleUserProtected
+                  ? "Passwortgeschützt"
+                  : "Einzelnutzer"}
+              </span>
+            </div>
+            <p className="text-xs sm:text-sm text-zinc-500 mt-0.5">
+              {isMultiUser
+                ? "Hier verwaltest du alle Profile mit getrennten Vokabelstapeln."
+                : isSingleUserProtected
+                ? "Dein persönlicher Bereich ist aktiv und passwortgeschützt."
+                : "Du nutzt den Vokabeltrainer im Einzelnutzer-Modus ganz ohne Login."}
             </p>
           </div>
         </div>
 
-        {data.hasPrimaryAdmin && (
+        {/* In Multi-User mode: Prominent Header Button */}
+        {isMultiUser && (
           <button
             type="button"
             onClick={() => {
@@ -299,7 +329,7 @@ export function UserManagementSettings({
             className="shrink-0 inline-flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-3.5 py-2 rounded-lg text-sm font-medium transition-colors w-full sm:w-auto"
           >
             <UserPlus className="w-4 h-4" />
-            <span>Weiteren Nutzer anlegen</span>
+            <span>{showCreateForm ? "Formular schließen" : "Profil hinzufügen"}</span>
           </button>
         )}
       </div>
@@ -317,142 +347,158 @@ export function UserManagementSettings({
         </div>
       )}
 
-      {/* CASE 1: NO PRIMARY ADMIN CONFIGURED */}
-      {!data.hasPrimaryAdmin && (
-        <div className="space-y-6">
-          {/* Explanation Alert */}
-          <div className="p-4 rounded-xl bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 text-amber-900 dark:text-amber-200 text-sm space-y-2">
-            <div className="flex items-center gap-2 font-semibold text-base text-amber-800 dark:text-amber-300">
-              <AlertTriangle className="w-5 h-5 shrink-0" />
-              <span>Erst Hauptnutzer einrichten</span>
-            </div>
-            <p className="leading-relaxed">
-              Aktuell ist für diesen Vokabeltrainer noch kein <strong>Hauptnutzer (Administrator/Eltern)</strong> eingerichtet. Die App läuft daher im ungeschützten Einzelnutzer-Modus.
+      {/* CASE 1: UNPROTECTED SINGLE USER MODE */}
+      {isSingleUserUnprotected && (
+        <div className="space-y-4">
+          <div className="p-4 rounded-xl bg-zinc-50 dark:bg-zinc-800/40 border border-zinc-200 dark:border-zinc-800 text-sm space-y-1">
+            <p className="font-semibold text-zinc-900 dark:text-zinc-100 flex items-center gap-1.5">
+              <CheckCircle className="w-4 h-4 text-green-600 dark:text-green-400 shrink-0" />
+              <span>Einzelnutzer-Modus aktiv</span>
             </p>
-            <p className="leading-relaxed">
-              Damit du weitere Profile (z. B. für deine Kinder) anlegen kannst und jeder nur seine eigenen Vokabeln und Lernfortschritte sieht, muss zuerst der Hauptnutzer festgelegt werden.
-            </p>
-            <p className="text-xs text-amber-800/90 dark:text-amber-300/90 font-medium pt-1">
-              ✓ Deine bisherigen Vokabeln und Lernstände bleiben zu 100% erhalten und gehören automatisch dem neuen Hauptnutzer!
+            <p className="text-zinc-600 dark:text-zinc-400 text-xs sm:text-sm leading-relaxed">
+              Alle Vokabeln und Lernfunktionen stehen direkt zur Verfügung. Du brauchst kein Passwort und kein Login.
             </p>
           </div>
 
-          {/* Create directly in Settings */}
-          <div className="bg-zinc-50 dark:bg-zinc-800/50 border border-zinc-200 dark:border-zinc-700 rounded-xl p-5">
-            <h4 className="font-semibold text-sm text-zinc-900 dark:text-zinc-100 mb-1">
-              Hauptnutzer anlegen
-            </h4>
-            <p className="text-xs text-zinc-500 dark:text-zinc-400 mb-4">
-              Gib einen Benutzernamen und ein sicheres Passwort ein. Mit diesen Daten loggst du dich künftig als Eltern- bzw. Administrator-Konto ein.
-            </p>
+          <div className="pt-1">
+            <button
+              type="button"
+              onClick={() => setShowSetupForm(!showSetupForm)}
+              className="inline-flex items-center gap-1.5 text-xs font-medium text-zinc-600 dark:text-zinc-400 hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
+            >
+              {showSetupForm ? (
+                <>
+                  <ChevronUp className="w-4 h-4" />
+                  <span>Einrichtung abbrechen</span>
+                </>
+              ) : (
+                <>
+                  <ChevronDown className="w-4 h-4" />
+                  <span>Passwortschutz oder getrennte Profile einrichten (optional)</span>
+                </>
+              )}
+            </button>
+          </div>
 
-            <form onSubmit={handleSetupAdmin} className="space-y-4">
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                <div>
-                  <label className="block text-xs font-medium text-zinc-600 dark:text-zinc-400 mb-1">
-                    Benutzername des Hauptnutzers *
-                  </label>
-                  <input
-                    type="text"
-                    required
-                    placeholder="z. B. eltern oder dein Name"
-                    value={setupUsername}
-                    onChange={(e) => setSetupUsername(e.target.value)}
-                    className="w-full px-3 py-2 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-medium text-zinc-600 dark:text-zinc-400 mb-1">
-                    Passwort (mind. 6 Zeichen) *
-                  </label>
-                  <input
-                    type="password"
-                    required
-                    placeholder="Geheimes Passwort"
-                    value={setupPassword}
-                    onChange={(e) => setSetupPassword(e.target.value)}
-                    className="w-full px-3 py-2 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-medium text-zinc-600 dark:text-zinc-400 mb-1">
-                    Passwort wiederholen *
-                  </label>
-                  <input
-                    type="password"
-                    required
-                    placeholder="Passwort wiederholen"
-                    value={setupPasswordConfirm}
-                    onChange={(e) => setSetupPasswordConfirm(e.target.value)}
-                    className="w-full px-3 py-2 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  />
-                </div>
-              </div>
-              <div className="flex justify-end">
-                <button
-                  type="submit"
-                  disabled={isSettingUpAdmin}
-                  className="w-full sm:w-auto inline-flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-5 py-2 rounded-lg text-sm font-medium transition-colors disabled:opacity-50"
-                >
-                  {isSettingUpAdmin ? <Loader2 className="w-4 h-4 animate-spin" /> : <Shield className="w-4 h-4" />}
-                  <span>{isSettingUpAdmin ? "Wird eingerichtet..." : "Hauptnutzer anlegen & aktivieren"}</span>
-                </button>
-              </div>
-            </form>
-
-            {data.users.length > 0 && (
-              <div className="mt-4 pt-4 border-t border-zinc-200 dark:border-zinc-700">
-                <p className="text-xs font-medium text-zinc-700 dark:text-zinc-300 mb-2">
-                  Bereits vorhandenes Konto übernehmen:
+          {showSetupForm && (
+            <div className="bg-zinc-50 dark:bg-zinc-800/50 border border-zinc-200 dark:border-zinc-700 rounded-xl p-4 sm:p-5 mt-2 space-y-3">
+              <div>
+                <h4 className="font-semibold text-sm text-zinc-900 dark:text-zinc-100">
+                  Persönliches Hauptkonto anlegen
+                </h4>
+                <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-1">
+                  Erstelle hier dein persönliches Eltern- oder Hauptkonto. Deine bisherigen Vokabeln bleiben zu 100% erhalten. Anschließend kannst du bei Bedarf weitere Profile für Kinder hinzufügen.
                 </p>
-                <div className="flex flex-wrap gap-2">
-                  {data.users.map((u) => (
-                    <button
-                      key={u.id}
-                      type="button"
-                      onClick={() => setSetupUsername(u.username)}
-                      className="text-xs bg-zinc-200 hover:bg-blue-100 dark:bg-zinc-700 dark:hover:bg-blue-900/40 text-zinc-800 dark:text-zinc-200 px-3 py-1.5 rounded-lg transition-colors flex items-center gap-1.5"
-                    >
-                      <Shield className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" />
-                      <span>&quot;{u.username}&quot; als Hauptnutzer übernehmen</span>
-                    </button>
-                  ))}
-                </div>
               </div>
-            )}
-          </div>
+
+              <form onSubmit={handleSetupAdmin} className="space-y-4 pt-1">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  <div>
+                    <label className="block text-xs font-medium text-zinc-600 dark:text-zinc-400 mb-1">
+                      Anmeldename *
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      placeholder="z. B. eltern oder dein Name"
+                      value={setupUsername}
+                      onChange={(e) => setSetupUsername(e.target.value)}
+                      className="w-full px-3 py-2 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-zinc-600 dark:text-zinc-400 mb-1">
+                      Passwort (mind. 6 Zeichen) *
+                    </label>
+                    <input
+                      type="password"
+                      required
+                      placeholder="Geheimes Passwort"
+                      value={setupPassword}
+                      onChange={(e) => setSetupPassword(e.target.value)}
+                      className="w-full px-3 py-2 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-zinc-600 dark:text-zinc-400 mb-1">
+                      Passwort wiederholen *
+                    </label>
+                    <input
+                      type="password"
+                      required
+                      placeholder="Passwort wiederholen"
+                      value={setupPasswordConfirm}
+                      onChange={(e) => setSetupPasswordConfirm(e.target.value)}
+                      className="w-full px-3 py-2 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    />
+                  </div>
+                </div>
+
+                <div className="flex justify-end gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setShowSetupForm(false)}
+                    className="w-full sm:w-auto px-3.5 py-2 rounded-lg border border-zinc-300 dark:border-zinc-700 text-sm text-zinc-600 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-700 text-center"
+                  >
+                    Abbrechen
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={isSettingUpAdmin}
+                    className="w-full sm:w-auto inline-flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-5 py-2 rounded-lg text-sm font-medium transition-colors disabled:opacity-50"
+                  >
+                    {isSettingUpAdmin ? <Loader2 className="w-4 h-4 animate-spin" /> : <Shield className="w-4 h-4" />}
+                    <span>{isSettingUpAdmin ? "Wird eingerichtet..." : "Konto anlegen & aktivieren"}</span>
+                  </button>
+                </div>
+              </form>
+
+              {data.users.length > 0 && (
+                <div className="mt-4 pt-4 border-t border-zinc-200 dark:border-zinc-700">
+                  <p className="text-xs font-medium text-zinc-700 dark:text-zinc-300 mb-2">
+                    Bereits vorhandenes Konto übernehmen:
+                  </p>
+                  <div className="flex flex-wrap gap-2">
+                    {data.users.map((u) => (
+                      <button
+                        key={u.id}
+                        type="button"
+                        onClick={() => setSetupUsername(u.username)}
+                        className="text-xs bg-zinc-200 hover:bg-blue-100 dark:bg-zinc-700 dark:hover:bg-blue-900/40 text-zinc-800 dark:text-zinc-200 px-3 py-1.5 rounded-lg transition-colors flex items-center gap-1.5"
+                      >
+                        <Shield className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" />
+                        <span>&quot;{u.username}&quot; als Hauptnutzer übernehmen</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
         </div>
       )}
 
-      {/* CASE 2: PRIMARY ADMIN IS CONFIGURED */}
+      {/* CASE 2 & 3: PROTECTED USER (SINGLE OR MULTI) */}
       {data.hasPrimaryAdmin && (
         <div className="space-y-4">
-          {/* Status info bar */}
-          <div className="p-3 rounded-lg bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800 text-xs text-blue-900 dark:text-blue-200 flex items-start sm:items-center gap-2">
-            <CheckCircle className="w-4 h-4 text-blue-600 dark:text-blue-400 shrink-0 mt-0.5 sm:mt-0" />
-            <span className="leading-relaxed">
-              {data.primaryAdminType === "env"
-                ? "Hauptnutzer ist über die Server-Umgebung (Render / Docker) geschützt und aktiv."
-                : "Hauptnutzer ist als geschütztes Administratorkonto eingerichtet."}
-            </span>
-          </div>
-
-          {/* Form to create a secondary user (child) */}
+          {/* Create form (when active) */}
           {showCreateForm && (
             <form
               onSubmit={handleCreate}
-              className="p-4 mb-4 rounded-xl bg-zinc-50 dark:bg-zinc-800/60 border border-zinc-200 dark:border-zinc-700 space-y-4"
+              className="p-4 rounded-xl bg-zinc-50 dark:bg-zinc-800/60 border border-zinc-200 dark:border-zinc-700 space-y-4"
             >
-              <h4 className="text-sm font-semibold text-zinc-900 dark:text-zinc-100">
-                Neuen Benutzer anlegen (z. B. für ein Kind)
-              </h4>
-              <p className="text-xs text-zinc-500">
-                Dieser Benutzer erhält einen eigenen, isolierten Lernbereich mit separaten Vokabelstapeln und eigenem Lernfortschritt.
-              </p>
+              <div>
+                <h4 className="text-sm font-semibold text-zinc-900 dark:text-zinc-100">
+                  Neues Profil anlegen
+                </h4>
+                <p className="text-xs text-zinc-500 mt-0.5">
+                  Dieses Profil erhält einen eigenen Lernbereich mit separaten Vokabelstapeln und eigenem Lernfortschritt.
+                </p>
+              </div>
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 <div>
                   <label className="block text-xs font-medium text-zinc-600 dark:text-zinc-400 mb-1">
-                    Benutzername *
+                    Anmeldename *
                   </label>
                   <input
                     type="text"
@@ -465,11 +511,11 @@ export function UserManagementSettings({
                 </div>
                 <div>
                   <label className="block text-xs font-medium text-zinc-600 dark:text-zinc-400 mb-1">
-                    Anzeigename (optional)
+                    Rufname / Vorname (optional)
                   </label>
                   <input
                     type="text"
-                    placeholder="z. B. Leon B."
+                    placeholder="z. B. Leon"
                     value={newDisplayName}
                     onChange={(e) => setNewDisplayName(e.target.value)}
                     className="w-full px-3 py-2 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
@@ -503,13 +549,13 @@ export function UserManagementSettings({
                   className="w-full sm:w-auto inline-flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-medium disabled:opacity-50"
                 >
                   {isCreating ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
-                  <span>{isCreating ? "Wird erstellt..." : "Benutzer speichern"}</span>
+                  <span>{isCreating ? "Wird erstellt..." : "Profil speichern"}</span>
                 </button>
               </div>
             </form>
           )}
 
-          {/* Users List Table */}
+          {/* User profile list / card */}
           <div className="divide-y divide-zinc-200 dark:divide-zinc-800">
             {data.users.map((u) => {
               const isPrimary = u.isPrimaryAdmin || u.isEnvUser || u.role === "ADMIN"
@@ -517,14 +563,14 @@ export function UserManagementSettings({
               return (
                 <div
                   key={u.id}
-                  className={`py-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 ${
+                  className={`py-3 flex flex-col sm:flex-row sm:items-center justify-between gap-3 ${
                     isPrimary ? "bg-zinc-50/70 dark:bg-zinc-800/40 -mx-2 px-2.5 rounded-lg" : ""
                   }`}
                 >
                   <div className="flex items-start sm:items-center gap-3 min-w-0">
                     <div className="w-9 h-9 rounded-full bg-zinc-100 dark:bg-zinc-800 flex items-center justify-center shrink-0 mt-0.5 sm:mt-0">
                       {isPrimary ? (
-                        <Shield className="w-5 h-5 text-amber-600 dark:text-amber-400" />
+                        <Shield className="w-5 h-5 text-blue-600 dark:text-blue-400" />
                       ) : (
                         <span className="font-semibold text-sm text-zinc-700 dark:text-zinc-300 uppercase">
                           {u.username.slice(0, 2)}
@@ -541,35 +587,19 @@ export function UserManagementSettings({
                         )}
 
                         {/* Badges */}
-                        {u.isEnvUser ? (
-                          <span className="px-2 py-0.5 rounded text-[11px] font-semibold bg-amber-100 text-amber-800 dark:bg-amber-950/60 dark:text-amber-300">
-                            Hauptnutzer (Server-Umgebung)
-                          </span>
-                        ) : u.isPrimaryAdmin || u.role === "ADMIN" ? (
-                          <span className="px-2 py-0.5 rounded text-[11px] font-semibold bg-blue-100 text-blue-800 dark:bg-blue-950/60 dark:text-blue-300">
-                            Hauptnutzer (Administrator)
-                          </span>
-                        ) : (
-                          <span className="px-2 py-0.5 rounded text-[11px] font-medium bg-zinc-100 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300">
-                            Benutzer
-                          </span>
-                        )}
+                        <span className="px-2 py-0.5 rounded text-[11px] font-semibold bg-blue-100 text-blue-800 dark:bg-blue-950/60 dark:text-blue-300">
+                          {isPrimary ? "Hauptprofil" : "Lernprofil"}
+                        </span>
 
-                        {isPrimary ? (
-                          <span className="px-2 py-0.5 rounded text-[11px] font-medium bg-green-100 text-green-800 dark:bg-green-950/60 dark:text-green-300">
-                            Aktiv (Geschützt)
-                          </span>
-                        ) : (
-                          <span
-                            className={`px-2 py-0.5 rounded text-[11px] font-medium ${
-                              u.isActive
-                                ? "bg-green-100 text-green-800 dark:bg-green-950/60 dark:text-green-300"
-                                : "bg-red-100 text-red-800 dark:bg-red-950/60 dark:text-red-300"
-                            }`}
-                          >
-                            {u.isActive ? "Aktiv" : "Deaktiviert"}
-                          </span>
-                        )}
+                        <span
+                          className={`px-2 py-0.5 rounded text-[11px] font-medium ${
+                            u.isActive
+                              ? "bg-green-100 text-green-800 dark:bg-green-950/60 dark:text-green-300"
+                              : "bg-red-100 text-red-800 dark:bg-red-950/60 dark:text-red-300"
+                          }`}
+                        >
+                          {u.isActive ? "Aktiv" : "Deaktiviert"}
+                        </span>
                       </div>
                       <div className="text-xs text-zinc-500 mt-0.5 flex items-center gap-2 flex-wrap">
                         <span>{u.deckCount} {u.deckCount === 1 ? "Stapel" : "Stapel"}</span>
@@ -613,52 +643,44 @@ export function UserManagementSettings({
                       </div>
                     ) : (
                       <>
-                        {/* Primary Environment User has no UI actions */}
-                        {u.isEnvUser ? (
-                          <span className="text-xs text-zinc-400 italic">
-                            Über Render / Docker verwaltet
-                          </span>
-                        ) : (
+                        {!u.isEnvUser && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setEditingUserId(u.id)
+                              setEditingPassword("")
+                            }}
+                            title="Passwort ändern"
+                            className="p-1.5 text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-100 rounded hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors flex items-center gap-1 text-xs"
+                          >
+                            <Key className="w-4 h-4" />
+                            <span className="inline">Passwort ändern</span>
+                          </button>
+                        )}
+
+                        {/* Secondary users only: toggle active / delete */}
+                        {!isPrimary && (
                           <>
-                            {/* Password edit button */}
                             <button
                               type="button"
-                              onClick={() => {
-                                setEditingUserId(u.id)
-                                setEditingPassword("")
-                              }}
-                              title="Passwort ändern"
-                              className="p-1.5 text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-100 rounded hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors flex items-center gap-1 text-xs"
+                              onClick={() => handleToggleActive(u)}
+                              title={u.isActive ? "Profil deaktivieren" : "Profil aktivieren"}
+                              className="p-1.5 text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-100 rounded hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
                             >
-                              <Key className="w-4 h-4" />
-                              <span className="inline">Passwort</span>
+                              {u.isActive ? (
+                                <UserX className="w-4 h-4 text-amber-600" />
+                              ) : (
+                                <UserCheck className="w-4 h-4 text-green-600" />
+                              )}
                             </button>
-
-                            {/* Secondary users only: toggle active / delete */}
-                            {!isPrimary && (
-                              <>
-                                <button
-                                  type="button"
-                                  onClick={() => handleToggleActive(u)}
-                                  title={u.isActive ? "Benutzer deaktivieren" : "Benutzer aktivieren"}
-                                  className="p-1.5 text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-100 rounded hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
-                                >
-                                  {u.isActive ? (
-                                    <UserX className="w-4 h-4 text-amber-600" />
-                                  ) : (
-                                    <UserCheck className="w-4 h-4 text-green-600" />
-                                  )}
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={() => handleDelete(u)}
-                                  title="Benutzer löschen"
-                                  className="p-1.5 text-zinc-500 hover:text-red-600 rounded hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
-                                >
-                                  <Trash2 className="w-4 h-4" />
-                                </button>
-                              </>
-                            )}
+                            <button
+                              type="button"
+                              onClick={() => handleDelete(u)}
+                              title="Profil löschen"
+                              className="p-1.5 text-zinc-500 hover:text-red-600 rounded hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
                           </>
                         )}
                       </>
@@ -668,6 +690,23 @@ export function UserManagementSettings({
               )
             })}
           </div>
+
+          {/* In Single-User Protected Mode: Discreet button to add another profile */}
+          {isSingleUserProtected && !showCreateForm && (
+            <div className="pt-2 border-t border-zinc-100 dark:border-zinc-800/80">
+              <button
+                type="button"
+                onClick={() => {
+                  setShowCreateForm(true)
+                  setMessage(null)
+                }}
+                className="inline-flex items-center gap-2 text-xs font-medium text-zinc-500 hover:text-blue-600 dark:hover:text-blue-400 transition-colors py-1"
+              >
+                <Plus className="w-4 h-4" />
+                <span>Weiteres Profil hinzufügen (optional, z. B. für Kinder)</span>
+              </button>
+            </div>
+          )}
         </div>
       )}
     </div>
