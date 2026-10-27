@@ -10,7 +10,9 @@ import {
   getAppSecret,
   isSecureRequest,
   secureCompare,
+  verifyPassword,
 } from "@/lib/auth-utils"
+import prisma from "@/lib/prisma"
 import {
   checkRateLimit,
   recordRateLimitFailure,
@@ -81,7 +83,14 @@ export async function loginApp(credentials: { username?: string; password?: stri
   const { user: envUser, password: envPassword, isConfigured } = getAppAuthCredentials()
 
   if (!isConfigured) {
-    return { success: true }
+    try {
+      const count = await prisma.user.count()
+      if (count === 0) {
+        return { success: true }
+      }
+    } catch {
+      return { success: true }
+    }
   }
 
   const clientIp = await getClientIp()
@@ -119,10 +128,42 @@ export async function loginApp(credentials: { username?: string; password?: stri
     }
   }
 
-  const isUserValid = envUser ? secureCompare(username, envUser) : true
-  const isPasswordValid = envPassword ? secureCompare(password, envPassword) : false
+  // 1. Check against Environment User (Admin from Render env)
+  let authenticatedUser: { id: string; username: string; role: string } | null = null
 
-  if (isUserValid && isPasswordValid) {
+  if (isConfigured && envUser && envPassword && secureCompare(username, envUser) && secureCompare(password, envPassword)) {
+    authenticatedUser = { id: "admin", username: envUser, role: "ADMIN" }
+  } else {
+    // 2. Check against Database Users
+    try {
+      const dbUser = await prisma.user.findUnique({
+        where: { username },
+      })
+      if (dbUser && dbUser.passwordHash) {
+        if (verifyPassword(password, dbUser.passwordHash)) {
+          if (!dbUser.isActive) {
+            return { success: false, error: "Dieser Benutzeraccount wurde deaktiviert." }
+          }
+          authenticatedUser = {
+            id: dbUser.id,
+            username: dbUser.username,
+            role: dbUser.role || "USER",
+          }
+          // Asynchronously update lastLoginAt
+          prisma.user
+            .update({
+              where: { id: dbUser.id },
+              data: { lastLoginAt: new Date() },
+            })
+            .catch(() => {})
+        }
+      }
+    } catch {
+      // ignore db errors in rate limiting context
+    }
+  }
+
+  if (authenticatedUser) {
     resetRateLimit(ipKey)
     if (userKey) {
       resetRateLimit(userKey)
@@ -131,7 +172,10 @@ export async function loginApp(credentials: { username?: string; password?: stri
     const isSecure = isSecureRequest(headersList)
     const cookieStore = await cookies()
     const secret = getAppSecret(envPassword)
-    const token = createAppSessionToken(envUser || username, secret, AUTH_COOKIE_MAX_AGE)
+    const token = createAppSessionToken(authenticatedUser.username, secret, AUTH_COOKIE_MAX_AGE, {
+      id: authenticatedUser.id,
+      role: authenticatedUser.role,
+    })
 
     cookieStore.set(AUTH_COOKIE_NAME, token, {
       httpOnly: true,
@@ -197,6 +241,12 @@ export async function isSettingsPasswordConfigured() {
 
 export async function isAppAuthRequired() {
   const { isConfigured } = getAppAuthCredentials()
-  return isConfigured
+  if (isConfigured) return true
+  try {
+    const count = await prisma.user.count()
+    return count > 0
+  } catch {
+    return false
+  }
 }
 

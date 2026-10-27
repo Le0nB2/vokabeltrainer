@@ -1,4 +1,4 @@
-import { createHash, createHmac, randomBytes, timingSafeEqual } from "crypto"
+import { createHash, createHmac, randomBytes, scryptSync, timingSafeEqual } from "crypto"
 
 export { getSafeRedirectUrl } from "./utils/url"
 
@@ -159,52 +159,110 @@ export function getAppSecret(password?: string): string {
 }
 
 /**
+ * Hash a password using NIST/OWASP approved scrypt with random salt.
+ */
+export function hashPassword(password: string): string {
+  if (!password) {
+    throw new Error("Passwort darf nicht leer sein");
+  }
+  const salt = randomBytes(16).toString("hex");
+  const derivedKey = scryptSync(password, salt, 64);
+  return `${salt}:${derivedKey.toString("hex")}`;
+}
+
+/**
+ * Verify a plaintext password against a stored scrypt hash.
+ */
+export function verifyPassword(password: string, storedHash: string): boolean {
+  if (!password || !storedHash) return false;
+  const parts = storedHash.split(":");
+  if (parts.length !== 2) return false;
+  const [salt, key] = parts;
+  if (!salt || !key) return false;
+
+  try {
+    const keyBuffer = Buffer.from(key, "hex");
+    if (keyBuffer.length === 0) return false;
+    const derivedKey = scryptSync(password, salt, keyBuffer.length);
+    if (derivedKey.length !== keyBuffer.length) return false;
+    return timingSafeEqual(derivedKey, keyBuffer);
+  } catch {
+    return false;
+  }
+}
+
+export interface AppSessionPayload {
+  u: string;
+  id?: string;
+  role?: string;
+  exp: number;
+}
+
+/**
  * Create a signed session token: <base64url(payload)>.<hmacSha256(payload, secret)>
  */
 export function createAppSessionToken(
   username: string,
   secret: string,
-  maxAgeSeconds = AUTH_COOKIE_MAX_AGE
+  maxAgeSeconds = AUTH_COOKIE_MAX_AGE,
+  metadata?: { id?: string; role?: string }
 ): string {
-  const payload = JSON.stringify({
+  const payload: Record<string, unknown> = {
     u: username,
     exp: Math.floor(Date.now() / 1000) + maxAgeSeconds,
-  })
-  const data = Buffer.from(payload).toString("base64url")
+  }
+  if (metadata?.id) payload.id = metadata.id
+  if (metadata?.role) payload.role = metadata.role
+
+  const data = Buffer.from(JSON.stringify(payload)).toString("base64url")
   const sig = createHmac("sha256", secret).update(data).digest("hex")
   return `${data}.${sig}`
 }
 
 /**
- * Verify a signed session token. Returns true if valid, matching the expected user, and not expired.
+ * Decode and verify signature & expiration of an app session token.
  */
-export function verifyAppSessionToken(
+export function decodeAppSessionToken(
   token: string | undefined | null,
-  expectedUser: string,
   secret: string
-): boolean {
-  if (!token || typeof token !== "string") return false
+): AppSessionPayload | null {
+  if (!token || typeof token !== "string") return null
   const parts = token.split(".")
-  if (parts.length !== 2) return false
+  if (parts.length !== 2) return null
 
   const [data, sig] = parts
-  if (!data || !sig) return false
+  if (!data || !sig) return null
 
   const expectedSig = createHmac("sha256", secret).update(data).digest("hex")
-  if (sig.length !== expectedSig.length) return false
-  if (!timingSafeEqual(Buffer.from(sig), Buffer.from(expectedSig))) return false
+  if (sig.length !== expectedSig.length) return null
+  if (!timingSafeEqual(Buffer.from(sig), Buffer.from(expectedSig))) return null
 
   try {
     const payload = JSON.parse(Buffer.from(data, "base64url").toString("utf-8"))
-    if (typeof payload !== "object" || payload === null) return false
-    if (expectedUser && payload.u !== expectedUser) return false
+    if (typeof payload !== "object" || payload === null) return null
+    if (typeof payload.u !== "string" || !payload.u) return null
     if (typeof payload.exp !== "number" || payload.exp < Math.floor(Date.now() / 1000)) {
-      return false
+      return null
     }
-    return true
+    return payload as AppSessionPayload
   } catch {
-    return false
+    return null
   }
+}
+
+/**
+ * Verify a signed session token. Returns true if valid, matching the expected user (if specified), and not expired.
+ */
+export function verifyAppSessionToken(
+  token: string | undefined | null,
+  expectedUser?: string | null,
+  secret?: string
+): boolean {
+  const s = secret || getAppSecret()
+  const payload = decodeAppSessionToken(token, s)
+  if (!payload) return false
+  if (expectedUser && payload.u !== expectedUser) return false
+  return true
 }
 
 /**

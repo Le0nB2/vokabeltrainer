@@ -2,9 +2,10 @@ import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import {
   AUTH_COOKIE_NAME,
+  SETTINGS_COOKIE_NAME,
   getAppAuthCredentials,
   getAppSecret,
-  verifyAppSessionToken,
+  decodeAppSessionToken,
   extractTokenFromRequest,
   verifyNotificationToken,
 } from "./lib/auth-utils";
@@ -43,7 +44,34 @@ export async function proxy(req: NextRequest) {
   }
 
   const secret = getAppSecret(authPassword);
-  const isAuthenticated = verifyAppSessionToken(sessionCookie, authUser, secret);
+  const sessionPayload = decodeAppSessionToken(sessionCookie, secret);
+  const isEnvUser = authUser ? sessionPayload?.u === authUser : false;
+  const isDbUser = Boolean(sessionPayload?.id && sessionPayload?.id !== "admin");
+  const isAuthenticated = Boolean(
+    sessionPayload && (!authUser || isEnvUser || isDbUser)
+  );
+
+  // Helper: auto-clear settings session cookie when navigating outside /settings
+  const applySettingsAutoLogout = (response: any) => {
+    if (
+      pathname !== "/settings" &&
+      !pathname.startsWith("/api/export") &&
+      !pathname.startsWith("/api/worksheet")
+    ) {
+      const rawCookie = req.headers?.get("cookie");
+      const hasSettingsCookie = Boolean(
+        req.cookies?.get(SETTINGS_COOKIE_NAME)?.value ||
+        (rawCookie && rawCookie.includes(`${SETTINGS_COOKIE_NAME}=`))
+      );
+      if (hasSettingsCookie && response && typeof response.cookies?.set === "function") {
+        response.cookies.set(SETTINGS_COOKIE_NAME, "", {
+          path: "/",
+          maxAge: 0,
+        });
+      }
+    }
+    return response;
+  };
 
   // Authenticated user
   if (isAuthenticated) {
@@ -52,9 +80,9 @@ export async function proxy(req: NextRequest) {
       const safeTarget = getSafeRedirectUrl(redirectTarget, "/");
       const finalTarget = safeTarget === "/login" ? "/" : safeTarget;
       const targetUrl = new URL(finalTarget, url.origin);
-      return NextResponse.redirect(targetUrl);
+      return applySettingsAutoLogout(NextResponse.redirect(targetUrl));
     }
-    return NextResponse.next();
+    return applySettingsAutoLogout(NextResponse.next());
   }
 
   // Home Assistant / Notification API token access

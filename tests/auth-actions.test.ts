@@ -13,7 +13,9 @@ import {
   verifyAppSessionToken,
   verifySettingsSessionToken,
   getAppSecret,
+  hashPassword,
 } from '../src/lib/auth-utils'
+import prisma from '../src/lib/prisma'
 import { resetAllRateLimits } from '../src/lib/rate-limit'
 
 if (!globalThis.__mockCookies) globalThis.__mockCookies = new Map()
@@ -324,6 +326,67 @@ describe('auth server actions', () => {
       expect(result.success).toBe(true)
       const cookie = mockCookies.get(SETTINGS_COOKIE_NAME)
       expect(cookie.secure).toBe(false)
+    })
+  })
+
+  describe('Database User Authentication', () => {
+    it('authenticates a valid database user', async () => {
+      const hash = hashPassword('childPassword123')
+      vi.spyOn(prisma.user, 'findUnique').mockResolvedValueOnce({
+        id: 'user-anna-id',
+        username: 'anna',
+        displayName: 'Anna',
+        passwordHash: hash,
+        role: 'USER',
+        isActive: true,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+        lastLoginAt: null,
+      } as any)
+      vi.spyOn(prisma.user, 'update').mockResolvedValueOnce({} as any)
+
+      const result = await loginApp({ username: 'anna', password: 'childPassword123' })
+      expect(result.success).toBe(true)
+      const cookie = mockCookies.get(AUTH_COOKIE_NAME)
+      expect(cookie).toBeDefined()
+    })
+
+    it('rejects database user with wrong password', async () => {
+      const hash = hashPassword('childPassword123')
+      vi.spyOn(prisma.user, 'findUnique').mockResolvedValueOnce({
+        id: 'user-anna-id',
+        username: 'anna',
+        displayName: 'Anna',
+        passwordHash: hash,
+        role: 'USER',
+        isActive: true,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+        lastLoginAt: null,
+      } as any)
+
+      const result = await loginApp({ username: 'anna', password: 'wrongPassword' })
+      expect(result.success).toBe(false)
+      expect(result.error).toBe('Ungültiger Benutzername oder falsches Passwort')
+    })
+
+    it('rejects deactivated database user', async () => {
+      const hash = hashPassword('childPassword123')
+      vi.spyOn(prisma.user, 'findUnique').mockResolvedValueOnce({
+        id: 'user-anna-id',
+        username: 'anna',
+        displayName: 'Anna',
+        passwordHash: hash,
+        role: 'USER',
+        isActive: false,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+        lastLoginAt: null,
+      } as any)
+
+      const result = await loginApp({ username: 'anna', password: 'childPassword123' })
+      expect(result.success).toBe(false)
+      expect(result.error).toContain('deaktiviert')
     })
   })
 })

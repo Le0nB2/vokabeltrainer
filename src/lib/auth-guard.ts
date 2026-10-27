@@ -3,7 +3,7 @@ import {
   AUTH_COOKIE_NAME,
   getAppAuthCredentials,
   getAppSecret,
-  verifyAppSessionToken,
+  decodeAppSessionToken,
 } from "./auth-utils"
 
 export class UnauthorizedError extends Error {
@@ -13,23 +13,54 @@ export class UnauthorizedError extends Error {
   }
 }
 
+export interface AuthUser {
+  id: string
+  username: string
+  role: string
+}
+
+/**
+ * Returns the currently authenticated user based on session cookie or env fallback.
+ * Returns null if authentication is required but user is not authenticated.
+ */
+export async function getCurrentUser(): Promise<AuthUser | null> {
+  const { user: authUser, password: authPassword, isConfigured } = getAppAuthCredentials()
+  const secret = getAppSecret(authPassword)
+
+  const cookieStore = await cookies()
+  const token = cookieStore.get(AUTH_COOKIE_NAME)?.value
+
+  if (token) {
+    const payload = decodeAppSessionToken(token, secret)
+    if (payload) {
+      return {
+        id: payload.id || (authUser && payload.u === authUser ? "admin" : payload.u),
+        username: payload.u,
+        role: payload.role || (authUser && payload.u === authUser ? "ADMIN" : "USER"),
+      }
+    }
+  }
+
+  // If auth is not configured in env, allow single-user local admin mode
+  if (!isConfigured) {
+    return {
+      id: "default",
+      username: "default",
+      role: "ADMIN",
+    }
+  }
+
+  return null
+}
+
 /**
  * Ensures the user has a valid authenticated session.
  * Throws UnauthorizedError if authentication is configured and user is not authenticated.
  * If authentication is not configured in environment, it allows access.
  */
 export async function requireAppAuth(): Promise<void> {
-  const { user: authUser, password: authPassword, isConfigured } = getAppAuthCredentials()
-  if (!isConfigured) {
-    return // Auth bypassed if not configured in environment
-  }
-
-  const cookieStore = await cookies()
-  const token = cookieStore.get(AUTH_COOKIE_NAME)?.value
-  const secret = getAppSecret(authPassword)
-  const isValid = verifyAppSessionToken(token, authUser, secret)
-
-  if (!isValid) {
+  const user = await getCurrentUser()
+  if (!user) {
     throw new UnauthorizedError()
   }
 }
@@ -38,13 +69,6 @@ export async function requireAppAuth(): Promise<void> {
  * Returns true if the user is authenticated or if auth is not configured.
  */
 export async function isAppAuthenticated(): Promise<boolean> {
-  const { user: authUser, password: authPassword, isConfigured } = getAppAuthCredentials()
-  if (!isConfigured) {
-    return true
-  }
-
-  const cookieStore = await cookies()
-  const token = cookieStore.get(AUTH_COOKIE_NAME)?.value
-  const secret = getAppSecret(authPassword)
-  return verifyAppSessionToken(token, authUser, secret)
+  const user = await getCurrentUser()
+  return user !== null
 }

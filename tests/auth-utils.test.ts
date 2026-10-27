@@ -13,6 +13,8 @@ import {
   verifySettingsSessionToken,
   getSessionCookieValue,
   verifySessionCookie,
+  hashPassword,
+  verifyPassword,
   SETTINGS_COOKIE_NAME,
   SETTINGS_COOKIE_MAX_AGE,
 } from '../src/lib/auth-utils'
@@ -347,6 +349,42 @@ describe('auth-utils', () => {
       ;(process.env as Record<string, string | undefined>).NODE_ENV = 'development'
       expect(isSecureRequest(null)).toBe(false)
       expect(isSecureRequest(createMockHeaders({}))).toBe(false)
+    })
+  })
+
+  describe('hashPassword & verifyPassword (scrypt)', () => {
+    it('successfully hashes and verifies a password', () => {
+      const password = 'mySecretPassword123!'
+      const hash = hashPassword(password)
+      expect(hash).toContain(':')
+      expect(verifyPassword(password, hash)).toBe(true)
+    })
+
+    it('rejects incorrect passwords against a valid hash', () => {
+      const password = 'mySecretPassword123!'
+      const hash = hashPassword(password)
+      expect(verifyPassword('wrongPassword', hash)).toBe(false)
+      expect(verifyPassword('', hash)).toBe(false)
+    })
+
+    it('generates different salts for identical passwords', () => {
+      const password = 'samePassword'
+      const hash1 = hashPassword(password)
+      const hash2 = hashPassword(password)
+      expect(hash1).not.toBe(hash2)
+      expect(verifyPassword(password, hash1)).toBe(true)
+      expect(verifyPassword(password, hash2)).toBe(true)
+    })
+
+    it('rejects invalid or corrupted hash formats safely', () => {
+      expect(verifyPassword('password', 'invalid-hash-without-colon')).toBe(false)
+      expect(verifyPassword('password', ':')).toBe(false)
+      expect(verifyPassword('password', '')).toBe(false)
+      expect(verifyPassword('password', 'salt:nothexkey')).toBe(false)
+    })
+
+    it('throws when attempting to hash an empty password', () => {
+      expect(() => hashPassword('')).toThrow()
     })
   })
 })

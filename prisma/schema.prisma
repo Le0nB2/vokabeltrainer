@@ -26,6 +26,8 @@ model Deck {
   user                User?       @relation(fields: [userId], references: [id], onDelete: Cascade)
   title               String
   description         String?
+  targetLanguage      String      @default("en")
+  sourceLanguage      String      @default("de")
   createdAt           DateTime    @default(now())
   updatedAt           DateTime    @updatedAt
   cards               Card[]
@@ -42,6 +44,7 @@ model Card {
   deck               Deck        @relation(fields: [deckId], references: [id], onDelete: Cascade)
   front              String
   back               String
+  language           String      @default("en")
   notes              String?
   mnemonic           String?
   contextSentence    String?
