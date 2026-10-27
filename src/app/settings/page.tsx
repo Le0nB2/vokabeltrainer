@@ -32,7 +32,7 @@ export default async function SettingsPage() {
 
         <header className="mb-8 flex items-center gap-3">
           <SettingsIcon className="w-8 h-8 text-blue-600 shrink-0" />
-          <h1 className="text-2xl sm:text-3xl font-bold truncate">Einstellungen & Backup</h1>
+          <h1 className="text-2xl sm:text-3xl font-bold">Einstellungen & Backup</h1>
         </header>
 
         <AudioSettings initialSettings={settings} />

@@ -82,7 +82,7 @@ export async function getUserManagementData(): Promise<UserManagementData> {
     users.push({
       id: "env-admin",
       username: envUser,
-      displayName: "Hauptnutzer (Server-Umgebung)",
+      displayName: null,
       role: "ADMIN",
       isActive: true,
       isEnvUser: true,

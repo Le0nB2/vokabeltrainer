@@ -270,18 +270,18 @@ export function UserManagementSettings({
   }
 
   return (
-    <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl p-6 mt-6">
+    <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl p-4 sm:p-6 mt-6">
       {/* Header */}
-      <div className="flex items-center justify-between gap-4 mb-4">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4 mb-4">
         <div className="flex items-center gap-3 min-w-0">
           <div className="p-2 bg-blue-100 dark:bg-blue-900/30 rounded-lg shrink-0">
             <Users className="w-6 h-6 text-blue-600 dark:text-blue-400" />
           </div>
           <div className="min-w-0">
-            <h3 className="text-lg font-semibold text-zinc-900 dark:text-zinc-100 truncate">
+            <h3 className="text-lg font-semibold text-zinc-900 dark:text-zinc-100">
               Benutzerverwaltung
             </h3>
-            <p className="text-sm text-zinc-500 truncate">
+            <p className="text-xs sm:text-sm text-zinc-500">
               {data.hasPrimaryAdmin
                 ? "Profile für dich und deine Kinder mit getrennten Vokabelstapeln verwalten."
                 : "Für die Nutzung mehrerer Profile muss zuerst ein Hauptnutzer festgelegt werden."}
@@ -296,7 +296,7 @@ export function UserManagementSettings({
               setShowCreateForm(!showCreateForm)
               setMessage(null)
             }}
-            className="shrink-0 inline-flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-3 py-1.5 rounded-lg text-sm font-medium transition-colors"
+            className="shrink-0 inline-flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-3.5 py-2 rounded-lg text-sm font-medium transition-colors w-full sm:w-auto"
           >
             <UserPlus className="w-4 h-4" />
             <span>Weiteren Nutzer anlegen</span>
@@ -392,7 +392,7 @@ export function UserManagementSettings({
                 <button
                   type="submit"
                   disabled={isSettingUpAdmin}
-                  className="inline-flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-5 py-2 rounded-lg text-sm font-medium transition-colors disabled:opacity-50"
+                  className="w-full sm:w-auto inline-flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-5 py-2 rounded-lg text-sm font-medium transition-colors disabled:opacity-50"
                 >
                   {isSettingUpAdmin ? <Loader2 className="w-4 h-4 animate-spin" /> : <Shield className="w-4 h-4" />}
                   <span>{isSettingUpAdmin ? "Wird eingerichtet..." : "Hauptnutzer anlegen & aktivieren"}</span>
@@ -428,9 +428,9 @@ export function UserManagementSettings({
       {data.hasPrimaryAdmin && (
         <div className="space-y-4">
           {/* Status info bar */}
-          <div className="p-3 rounded-lg bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800 text-xs text-blue-900 dark:text-blue-200 flex items-center gap-2">
-            <CheckCircle className="w-4 h-4 text-blue-600 dark:text-blue-400 shrink-0" />
-            <span>
+          <div className="p-3 rounded-lg bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800 text-xs text-blue-900 dark:text-blue-200 flex items-start sm:items-center gap-2">
+            <CheckCircle className="w-4 h-4 text-blue-600 dark:text-blue-400 shrink-0 mt-0.5 sm:mt-0" />
+            <span className="leading-relaxed">
               {data.primaryAdminType === "env"
                 ? "Hauptnutzer ist über die Server-Umgebung (Render / Docker) geschützt und aktiv."
                 : "Hauptnutzer ist als geschütztes Administratorkonto eingerichtet."}
@@ -489,18 +489,18 @@ export function UserManagementSettings({
                   />
                 </div>
               </div>
-              <div className="flex justify-end gap-2">
+              <div className="flex flex-col-reverse sm:flex-row sm:justify-end gap-2">
                 <button
                   type="button"
                   onClick={() => setShowCreateForm(false)}
-                  className="px-3 py-1.5 rounded-lg border border-zinc-300 dark:border-zinc-700 text-sm text-zinc-600 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-700"
+                  className="w-full sm:w-auto px-3.5 py-2 rounded-lg border border-zinc-300 dark:border-zinc-700 text-sm text-zinc-600 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-700 text-center"
                 >
                   Abbrechen
                 </button>
                 <button
                   type="submit"
                   disabled={isCreating}
-                  className="inline-flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-1.5 rounded-lg text-sm font-medium disabled:opacity-50"
+                  className="w-full sm:w-auto inline-flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-medium disabled:opacity-50"
                 >
                   {isCreating ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
                   <span>{isCreating ? "Wird erstellt..." : "Benutzer speichern"}</span>
@@ -518,11 +518,11 @@ export function UserManagementSettings({
                 <div
                   key={u.id}
                   className={`py-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 ${
-                    isPrimary ? "bg-zinc-50/70 dark:bg-zinc-800/40 -mx-2 px-2 rounded-lg" : ""
+                    isPrimary ? "bg-zinc-50/70 dark:bg-zinc-800/40 -mx-2 px-2.5 rounded-lg" : ""
                   }`}
                 >
-                  <div className="flex items-center gap-3 min-w-0">
-                    <div className="w-9 h-9 rounded-full bg-zinc-100 dark:bg-zinc-800 flex items-center justify-center shrink-0">
+                  <div className="flex items-start sm:items-center gap-3 min-w-0">
+                    <div className="w-9 h-9 rounded-full bg-zinc-100 dark:bg-zinc-800 flex items-center justify-center shrink-0 mt-0.5 sm:mt-0">
                       {isPrimary ? (
                         <Shield className="w-5 h-5 text-amber-600 dark:text-amber-400" />
                       ) : (
@@ -531,12 +531,12 @@ export function UserManagementSettings({
                         </span>
                       )}
                     </div>
-                    <div className="min-w-0">
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <span className="font-medium text-zinc-900 dark:text-zinc-100 text-sm">
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap">
+                        <span className="font-semibold text-zinc-900 dark:text-zinc-100 text-sm">
                           {u.displayName || u.username}
                         </span>
-                        {u.displayName && (
+                        {u.displayName && u.displayName !== u.username && (
                           <span className="text-xs text-zinc-400">({u.username})</span>
                         )}
 
@@ -571,20 +571,20 @@ export function UserManagementSettings({
                           </span>
                         )}
                       </div>
-                      <div className="text-xs text-zinc-500 mt-0.5">
-                        {u.deckCount} {u.deckCount === 1 ? "Stapel" : "Stapel"}
+                      <div className="text-xs text-zinc-500 mt-0.5 flex items-center gap-2 flex-wrap">
+                        <span>{u.deckCount} {u.deckCount === 1 ? "Stapel" : "Stapel"}</span>
                         {u.lastLoginAt && (
-                          <> · Letzter Login: {new Date(u.lastLoginAt).toLocaleDateString("de-DE")}</>
+                          <span>· Letzter Login: {new Date(u.lastLoginAt).toLocaleDateString("de-DE")}</span>
                         )}
                       </div>
                     </div>
                   </div>
 
                   {/* Actions */}
-                  <div className="flex items-center gap-2 self-end sm:self-center">
+                  <div className="flex items-center gap-2 self-start sm:self-center pl-12 sm:pl-0">
                     {/* Inline password edit form */}
                     {editingUserId === u.id ? (
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-2 flex-wrap">
                         <input
                           type="password"
                           placeholder="Neues Passwort"
@@ -615,7 +615,7 @@ export function UserManagementSettings({
                       <>
                         {/* Primary Environment User has no UI actions */}
                         {u.isEnvUser ? (
-                          <span className="text-xs text-zinc-400 italic px-2">
+                          <span className="text-xs text-zinc-400 italic">
                             Über Render / Docker verwaltet
                           </span>
                         ) : (
@@ -631,7 +631,7 @@ export function UserManagementSettings({
                               className="p-1.5 text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-100 rounded hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors flex items-center gap-1 text-xs"
                             >
                               <Key className="w-4 h-4" />
-                              <span className="hidden sm:inline">Passwort</span>
+                              <span className="inline">Passwort</span>
                             </button>
 
                             {/* Secondary users only: toggle active / delete */}
