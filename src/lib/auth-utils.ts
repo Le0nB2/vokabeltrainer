@@ -154,6 +154,7 @@ export function getAppSecret(password?: string): string {
     process.env.AUTH_SECRET ||
     process.env.SESSION_SECRET ||
     (password ? deriveSecretFromPassword(password) : undefined) ||
+    (process.env.SETTINGS_PASSWORD ? deriveSecretFromPassword(process.env.SETTINGS_PASSWORD) : undefined) ||
     getFallbackSecret()
   )
 }

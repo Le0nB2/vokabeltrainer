@@ -18,16 +18,6 @@ export async function proxy(req: NextRequest) {
     : new URL(req.url || "/", "http://localhost");
   const pathname = url.pathname;
 
-  // Bypass auth if credentials are not configured in environment
-  if (!isConfigured) {
-    if (pathname === "/login") {
-      url.pathname = "/";
-      url.search = "";
-      return NextResponse.redirect(url);
-    }
-    return NextResponse.next();
-  }
-
   // Get session cookie (support both NextRequest.cookies and Cookie header fallback)
   let sessionCookie = req.cookies?.get(AUTH_COOKIE_NAME)?.value;
   if (!sessionCookie) {
@@ -108,7 +98,13 @@ export async function proxy(req: NextRequest) {
     pathname === "/icon-512.png" ||
     /^\/icon-\d+x\d+\.png$/.test(pathname)
   ) {
-    return NextResponse.next();
+    return applySettingsAutoLogout(NextResponse.next());
+  }
+
+  // If env credentials are NOT configured, allow request to proceed to server components.
+  // Next.js server components / actions (via getCurrentUser) enforce authentication if DB users exist.
+  if (!isConfigured) {
+    return applySettingsAutoLogout(NextResponse.next());
   }
 
   // For API routes, return 401 JSON without WWW-Authenticate: Basic header

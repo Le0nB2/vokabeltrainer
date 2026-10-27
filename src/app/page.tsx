@@ -1,5 +1,6 @@
 import { getDecks, createDeck } from "@/actions/decks"
 import Link from "next/link"
+import { redirect } from "next/navigation"
 import { Plus, BookOpen, Settings, Brain } from "lucide-react"
 import { DeckMenu } from "@/components/DeckMenu"
 import { DeckPieChart } from "@/components/DeckPieChart"
@@ -14,6 +15,11 @@ export const dynamic = 'force-dynamic'
 
 export default async function Dashboard() {
   const user = await getCurrentUser()
+  if (!user) {
+    redirect("/login")
+  }
+
+  const isSetupMode = user.id === "default"
   const decks = await getDecks()
   const now = new Date()
 
@@ -83,7 +89,7 @@ export default async function Dashboard() {
               <Link href="/settings" className="text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-100 transition-colors p-2" title="Einstellungen">
                 <Settings className="w-6 h-6" />
               </Link>
-              {isAuthEnabled && <LogoutButton />}
+              {!isSetupMode && <LogoutButton />}
             </div>
           </div>
           {totalDueCount > 0 && (
@@ -117,15 +123,38 @@ export default async function Dashboard() {
               </button>
             </form>
             <div className="hidden sm:flex items-center gap-1 sm:gap-2">
+              {!isSetupMode && (
+                <span className="text-xs bg-zinc-200 dark:bg-zinc-800 px-2.5 py-1 rounded-full text-zinc-700 dark:text-zinc-300 font-medium">
+                  {user.username}
+                </span>
+              )}
               <Link href="/settings" className="text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-100 transition-colors p-2" title="Einstellungen">
                 <Settings className="w-5 h-5" />
               </Link>
-              {isAuthEnabled && (
+              {!isSetupMode && (
                 <LogoutButton className="inline-flex items-center text-zinc-500 hover:text-red-600 dark:hover:text-red-400 transition-colors p-2 rounded-lg" />
               )}
             </div>
           </div>
         </header>
+
+        {/* Setup mode notice if no primary admin is configured yet */}
+        {isSetupMode && (
+          <div className="mb-8 p-4 rounded-xl bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 text-amber-900 dark:text-amber-200 text-sm flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-xs">
+            <div>
+              <p className="font-semibold text-sm">💡 Einzelnutzer-Modus (Noch kein Hauptnutzer)</p>
+              <p className="text-amber-800 dark:text-amber-300 text-xs">
+                Möchtest du getrennte Profile für Kinder anlegen? Richte in den Einstellungen zuerst einen Hauptnutzer ein.
+              </p>
+            </div>
+            <Link
+              href="/settings"
+              className="shrink-0 text-xs font-semibold bg-amber-600 hover:bg-amber-700 text-white px-3.5 py-2 rounded-lg transition-colors"
+            >
+              Hauptnutzer einrichten
+            </Link>
+          </div>
+        )}
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {decks.map(deck => {

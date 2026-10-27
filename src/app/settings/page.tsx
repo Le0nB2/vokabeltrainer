@@ -7,7 +7,7 @@ import { AudioSettings } from "@/components/AudioSettings"
 import { AiModelSettings } from "@/components/AiModelSettings"
 import { UserManagementSettings } from "@/components/UserManagementSettings"
 import { getSettings, getAvailableAiModelsAction } from "@/actions/settings"
-import { getUsers } from "@/actions/users"
+import { getUserManagementData } from "@/actions/users"
 import { getApiStats } from "@/actions/api-stats"
 import { LockSettingsButton } from "@/components/LockSettingsButton"
 
@@ -19,7 +19,7 @@ export default async function SettingsPage() {
   const settings = await getSettings()
   const apiStats = await getApiStats()
   const availableModels = await getAvailableAiModelsAction()
-  const users = await getUsers()
+  const userManagementData = await getUserManagementData()
   const isSettingsProtected = Boolean(process.env.SETTINGS_PASSWORD)
 
   return (
@@ -43,7 +43,7 @@ export default async function SettingsPage() {
           initialModels={availableModels}
           apiStats={apiStats}
         />
-        <UserManagementSettings initialUsers={users} />
+        <UserManagementSettings initialData={userManagementData} />
         <ImportExport />
       </div>
     </main>

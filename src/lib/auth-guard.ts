@@ -1,4 +1,5 @@
 import { cookies } from "next/headers"
+import prisma from "./prisma"
 import {
   AUTH_COOKIE_NAME,
   getAppAuthCredentials,
@@ -41,12 +42,23 @@ export async function getCurrentUser(): Promise<AuthUser | null> {
     }
   }
 
-  // If auth is not configured in env, allow single-user local admin mode
+  // If auth is not configured in env, allow single-user setup mode ONLY IF no DB users exist
   if (!isConfigured) {
-    return {
-      id: "default",
-      username: "default",
-      role: "ADMIN",
+    try {
+      const dbUserCount = await prisma.user.count()
+      if (dbUserCount === 0) {
+        return {
+          id: "default",
+          username: "default",
+          role: "ADMIN",
+        }
+      }
+    } catch {
+      return {
+        id: "default",
+        username: "default",
+        role: "ADMIN",
+      }
     }
   }
 
