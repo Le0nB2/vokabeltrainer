@@ -13,7 +13,9 @@ Dieses Dokument beschreibt das Architektur- und Umsetzungskonzept für den Umbau
   * Jeder Benutzer besitzt seine eigenen Decks und Karten.
   * Jeder Benutzer hat seinen eigenen individuellen Lernfortschritt (Spaced Repetition / Boxen / Fälligkeiten).
   * Bereits vorhandene Decks und Karten verbleiben beim Hauptnutzer (vollständige Abwärtskompatibilität ohne Datenverlust).
-* **Sicherheit:**
+* **Sicherheit & Eltern-Administration:**
+  * Das Einstellungspasswort (`SETTINGS_PASSWORD`) bleibt ein **globales Master-Passwort**. Eltern können sich damit auf jedem beliebigen Endgerät (z. B. Tablet des Kindes) direkt in den Administrationsbereich einloggen.
+  * **Automatischer Logout beim Verlassen:** Sobald das Einstellungsmenü verlassen wird (Navigation zurück zur Übersicht, Klick auf Links, Seitenwechsel), wird die Settings-Session automatisch beendet (`logoutSettings`), sodass ein Kind nicht unbeaufsichtigt in den Einstellungen verbleiben kann.
   * Zusätzliche Benutzer werden mit gehashten Passwörtern (NIST-konformes `scrypt` via nativem `node:crypto`) in der Datenbank gespeichert.
   * Rate-Limiting gegen Brute-Force (bereits vorhanden) schützt alle Benutzer-Accounts.
   * IDOR-Schutz: Server Actions prüfen serverseitig die Besitzer-ID (`userId`) bei allen Lese- und Schreibzugriffen.
