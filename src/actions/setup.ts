@@ -95,22 +95,36 @@ export async function completeSetupSingleUser(): Promise<{ success: boolean; err
   }
 
   try {
-    await prisma.settings.upsert({
-      where: { id: "default" },
-      create: {
-        id: "default",
-        isSetupCompleted: true,
-      },
-      update: {
-        isSetupCompleted: true,
-      },
+    await prisma.$transaction(async (tx) => {
+      const adminCount = await tx.user.count({ where: { role: "ADMIN" } })
+      if (adminCount > 0) {
+        throw new Error("SETUP_ALREADY_COMPLETED")
+      }
+      const settings = await tx.settings.findUnique({ where: { id: "default" } })
+      if (settings?.isSetupCompleted) {
+        throw new Error("SETUP_ALREADY_COMPLETED")
+      }
+
+      await tx.settings.upsert({
+        where: { id: "default" },
+        create: {
+          id: "default",
+          isSetupCompleted: true,
+        },
+        update: {
+          isSetupCompleted: true,
+        },
+      })
     })
 
     resetRateLimit(rateLimitKey)
     revalidatePath("/")
     revalidatePath("/settings")
     return { success: true }
-  } catch (err) {
+  } catch (err: unknown) {
+    if (err instanceof Error && err.message === "SETUP_ALREADY_COMPLETED") {
+      return { success: false, error: "Die Ersteinrichtung wurde bereits abgeschlossen." }
+    }
     recordRateLimitFailure(rateLimitKey, { maxAttempts: 5, windowMs: 15 * 60 * 1000, blockDurationMs: 15 * 60 * 1000 })
     console.error("Error completing single-user setup:", err)
     return { success: false, error: "Fehler beim Speichern der Einstellungen." }
@@ -148,7 +162,7 @@ export async function completeSetupProtected(params: {
     return { success: false, error: passValidation.error }
   }
 
-  const username = params.username.trim()
+  const cleanUsername = (userValidation.normalized || params.username.trim()).toLowerCase()
   const password = params.password
 
   let settingsPasswordHash: string | null = null
@@ -158,25 +172,44 @@ export async function completeSetupProtected(params: {
     if (!params.customPin || params.customPin.trim().length < 4) {
       return { success: false, error: "Der PIN muss mindestens 4 Zeichen lang sein." }
     }
+    if (params.customPin.length > 128) {
+      return { success: false, error: "Der PIN darf maximal 128 Zeichen lang sein." }
+    }
     settingsPasswordHash = hashPassword(params.customPin.trim())
   } else if (params.settingsOption === "none") {
     settingsPasswordHash = "disabled"
   }
 
   try {
-    const existing = await prisma.user.findUnique({ where: { username } })
-    if (existing) {
-      return { success: false, error: `Der Benutzername "${username}" ist bereits vergeben.` }
-    }
-
-    const passwordHash = hashPassword(password)
-
-    // Atomically create admin, assign decks, and update settings
+    // Atomically create admin, assign decks, and update settings with race condition protection
     const user = await prisma.$transaction(async (tx) => {
+      const adminCount = await tx.user.count({ where: { role: "ADMIN" } })
+      if (adminCount > 0) {
+        throw new Error("SETUP_ALREADY_COMPLETED")
+      }
+      const existingSettings = await tx.settings.findUnique({ where: { id: "default" } })
+      if (existingSettings?.isSetupCompleted) {
+        throw new Error("SETUP_ALREADY_COMPLETED")
+      }
+
+      const existing = await tx.user.findFirst({
+        where: {
+          OR: [
+            { username: cleanUsername },
+            { username: params.username.trim() },
+          ],
+        },
+      })
+      if (existing) {
+        throw new Error("USERNAME_TAKEN")
+      }
+
+      const passwordHash = hashPassword(password)
+
       const newUser = await tx.user.create({
         data: {
-          username,
-          displayName: null,
+          username: cleanUsername,
+          displayName: params.username.trim(),
           passwordHash,
           role: "ADMIN",
           isActive: true,
@@ -233,7 +266,15 @@ export async function completeSetupProtected(params: {
     revalidatePath("/")
     revalidatePath("/settings")
     return { success: true }
-  } catch (err) {
+  } catch (err: unknown) {
+    if (err instanceof Error) {
+      if (err.message === "SETUP_ALREADY_COMPLETED") {
+        return { success: false, error: "Die Ersteinrichtung wurde bereits abgeschlossen." }
+      }
+      if (err.message === "USERNAME_TAKEN") {
+        return { success: false, error: `Der Benutzername "${params.username.trim()}" ist bereits vergeben.` }
+      }
+    }
     recordRateLimitFailure(rateLimitKey, { maxAttempts: 5, windowMs: 15 * 60 * 1000, blockDurationMs: 15 * 60 * 1000 })
     console.error("Error completing protected setup:", err)
     return { success: false, error: "Unerwarteter Fehler beim Einrichten des Kontos." }

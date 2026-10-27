@@ -159,20 +159,23 @@ export function getAppSecret(password?: string): string {
   )
 }
 
+export const SCRYPT_PARAMS = { N: 32768, r: 8, p: 1, maxmem: 64 * 1024 * 1024 };
+
 /**
- * Hash a password using NIST/OWASP approved scrypt with random salt.
+ * Hash a password using NIST/OWASP approved scrypt with random salt (cost N=32768).
  */
 export function hashPassword(password: string): string {
   if (!password) {
     throw new Error("Passwort darf nicht leer sein");
   }
   const salt = randomBytes(16).toString("hex");
-  const derivedKey = scryptSync(password, salt, 64);
+  const derivedKey = scryptSync(password, salt, 64, SCRYPT_PARAMS);
   return `${salt}:${derivedKey.toString("hex")}`;
 }
 
 /**
  * Verify a plaintext password against a stored scrypt hash.
+ * Supports upgraded N=32768 and legacy N=16384 for backwards compatibility.
  */
 export function verifyPassword(password: string, storedHash: string): boolean {
   if (!password || !storedHash) return false;
@@ -184,9 +187,20 @@ export function verifyPassword(password: string, storedHash: string): boolean {
   try {
     const keyBuffer = Buffer.from(key, "hex");
     if (keyBuffer.length === 0) return false;
-    const derivedKey = scryptSync(password, salt, keyBuffer.length);
-    if (derivedKey.length !== keyBuffer.length) return false;
-    return timingSafeEqual(derivedKey, keyBuffer);
+
+    // 1. Try with upgraded security parameters (N=32768)
+    const derivedKey = scryptSync(password, salt, keyBuffer.length, SCRYPT_PARAMS);
+    if (derivedKey.length === keyBuffer.length && timingSafeEqual(derivedKey, keyBuffer)) {
+      return true;
+    }
+
+    // 2. Fallback to default params (N=16384) for backwards compatibility
+    const fallbackDerivedKey = scryptSync(password, salt, keyBuffer.length);
+    if (fallbackDerivedKey.length === keyBuffer.length && timingSafeEqual(fallbackDerivedKey, keyBuffer)) {
+      return true;
+    }
+
+    return false;
   } catch {
     return false;
   }
@@ -215,7 +229,7 @@ export function getPasswordVersion(passwordHash: string): string {
  * - Only alphanumeric, underscores, hyphens, and dots
  * - Not a reserved system name ("default", "env-admin")
  */
-export function validateUsername(username: string): { valid: boolean; error?: string } {
+export function validateUsername(username: string): { valid: boolean; error?: string; normalized?: string } {
   const clean = (username || "").trim()
   if (!clean || clean.length < 2 || clean.length > 50) {
     return { valid: false, error: "Der Benutzername muss zwischen 2 und 50 Zeichen lang sein." }
@@ -223,15 +237,18 @@ export function validateUsername(username: string): { valid: boolean; error?: st
   if (!/^[a-zA-Z0-9_\-\.]+$/.test(clean)) {
     return { valid: false, error: "Der Benutzername darf nur Buchstaben, Zahlen, Bindestriche und Punkte enthalten." }
   }
-  if (clean.toLowerCase() === "default" || clean.toLowerCase() === "env-admin") {
+  const lower = clean.toLowerCase()
+  if (lower === "default" || lower === "env-admin") {
     return { valid: false, error: "Dieser Benutzername ist reserviert." }
   }
-  return { valid: true }
+  return { valid: true, normalized: lower }
 }
+
+export const MAX_PASSWORD_LENGTH = 128
 
 /**
  * Validates user passwords according to enhanced security policy:
- * - Minimum 8 characters
+ * - Minimum 8 characters, maximum 128 characters
  * - At least one special character
  */
 export function validatePasswordPolicy(password: string): { valid: boolean; error?: string } {
@@ -239,6 +256,12 @@ export function validatePasswordPolicy(password: string): { valid: boolean; erro
     return {
       valid: false,
       error: "Das Passwort muss mindestens 8 Zeichen lang sein und mindestens ein Sonderzeichen enthalten.",
+    }
+  }
+  if (password.length > MAX_PASSWORD_LENGTH) {
+    return {
+      valid: false,
+      error: `Das Passwort darf maximal ${MAX_PASSWORD_LENGTH} Zeichen lang sein.`,
     }
   }
   if (!/[^a-zA-Z0-9]/.test(password)) {

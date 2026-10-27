@@ -287,18 +287,23 @@ export async function createUser(data: {
     return { success: false, error: passValidation.error }
   }
 
-  const cleanUsername = data.username.trim()
+  const cleanUsername = (userValidation.normalized || data.username.trim()).toLowerCase()
   const cleanPassword = data.password
-  const cleanDisplayName = data.displayName?.trim() || null
+  const cleanDisplayName = data.displayName?.trim() || data.username.trim() || null
 
   const { user: envUser } = getAppAuthCredentials()
-  if (envUser && cleanUsername.toLowerCase() === envUser.toLowerCase()) {
+  if (envUser && cleanUsername === envUser.toLowerCase()) {
     return { success: false, error: "Dieser Benutzername ist für den System-Administrator reserviert." }
   }
 
-  const existingUser = await prisma.user.findUnique({
+  let existingUser = await prisma.user.findUnique({
     where: { username: cleanUsername },
   })
+  if (!existingUser && data.username.trim() !== cleanUsername) {
+    existingUser = await prisma.user.findUnique({
+      where: { username: data.username.trim() },
+    })
+  }
 
   if (existingUser) {
     return { success: false, error: "Ein Benutzer mit diesem Benutzernamen existiert bereits." }

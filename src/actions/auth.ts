@@ -85,6 +85,10 @@ export async function checkSettingsAuthenticated(): Promise<boolean> {
 }
 
 export async function checkPassword(password: string) {
+  if (typeof password !== "string" || password.length > 128) {
+    return { success: false, error: "Falsches Passwort" }
+  }
+
   const protection = await getSettingsProtection()
 
   if (!protection.isProtected) {
@@ -201,6 +205,9 @@ export async function updateSettingsPasswordAction(params: {
     if (!params.newPassword || params.newPassword.trim().length < 4) {
       return { success: false, error: "Das Kennwort bzw. die PIN muss mindestens 4 Zeichen lang sein." }
     }
+    if (params.newPassword.length > 128) {
+      return { success: false, error: "Das Kennwort bzw. die PIN darf maximal 128 Zeichen lang sein." }
+    }
 
     const newHash = hashPassword(params.newPassword.trim())
     await prisma.settings.upsert({
@@ -255,6 +262,11 @@ export async function loginApp(credentials: { username?: string; password?: stri
 
   const username = (credentials.username || "").trim()
   const password = credentials.password || ""
+
+  // Fast-reject excessively long inputs to prevent scrypt DoS
+  if (password.length > 128 || username.length > 50) {
+    return { success: false, error: "Ungültiger Benutzername oder falsches Passwort" }
+  }
 
   // Account-level rate limiting (max 10 failures per username across all IPs in 15 min window)
   const userKey = username ? `login:user:${username.toLowerCase()}` : null
@@ -315,9 +327,14 @@ export async function loginApp(credentials: { username?: string; password?: stri
   } else if (!authenticatedUser) {
     // 2. Check against Database Users
     try {
-      const dbUser = await prisma.user.findUnique({
+      let dbUser = await prisma.user.findUnique({
         where: { username },
       })
+      if (!dbUser && username.toLowerCase() !== username) {
+        dbUser = await prisma.user.findUnique({
+          where: { username: username.toLowerCase() },
+        })
+      }
       if (dbUser && dbUser.passwordHash) {
         if (verifyPassword(password, dbUser.passwordHash)) {
           if (!dbUser.isActive) {

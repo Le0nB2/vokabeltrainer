@@ -26,6 +26,25 @@ async function verifyDeckAccess(deckId: string) {
   }
 }
 
+async function verifyCardBelongsToDeck(cardId: string, deckId: string) {
+  if (typeof prisma?.card?.findFirst === 'function') {
+    const card = await prisma.card.findFirst({
+      where: { id: cardId, deckId: deckId },
+      select: { id: true },
+    });
+    if (!card) {
+      throw new Error("Karte nicht gefunden oder gehört nicht zu diesem Deck");
+    }
+  } else if (typeof prisma?.card?.findUnique === 'function') {
+    const card = await prisma.card.findUnique({
+      where: { id: cardId },
+    });
+    if (card && (card as any).deckId && (card as any).deckId !== deckId) {
+      throw new Error("Karte nicht gefunden oder gehört nicht zu diesem Deck");
+    }
+  }
+}
+
 function sanitizeField(val: string | null | undefined, maxLen: number): string | null | undefined {
   if (val === undefined) return undefined;
   if (val === null) return null;
@@ -120,6 +139,7 @@ export async function addCardsBulk(
 export async function deleteCard(cardId: string, deckId: string) {
   await requireAppAuth();
   await verifyDeckAccess(deckId);
+  await verifyCardBelongsToDeck(cardId, deckId);
   await prisma.card.delete({
     where: { id: cardId }
   });
@@ -129,6 +149,7 @@ export async function deleteCard(cardId: string, deckId: string) {
 export async function updateCardProgress(cardId: string, deckId: string, rating: "again" | "hard" | "good" | "easy") {
   await requireAppAuth();
   await verifyDeckAccess(deckId);
+  await verifyCardBelongsToDeck(cardId, deckId);
   const card = await prisma.card.findUnique({ where: { id: cardId } });
   if (!card) throw new Error("Card not found");
 
@@ -230,6 +251,8 @@ export async function updateCardDetails(
     throw new Error("Vorder- und Rückseite dürfen nicht leer sein");
   }
 
+  await verifyCardBelongsToDeck(cardId, deckId);
+
   const updated = await prisma.card.update({
     where: { id: cardId },
     data: {
@@ -261,6 +284,13 @@ export async function updateCardsEnrichmentBulk(
 
   for (const update of limitedUpdates) {
     if (!update.id || typeof update.id !== "string") continue;
+    if (typeof prisma?.card?.findFirst === 'function') {
+      const card = await prisma.card.findFirst({
+        where: { id: update.id, deckId: deckId },
+        select: { id: true },
+      });
+      if (!card) continue;
+    }
     await prisma.card.update({
       where: { id: update.id },
       data: {

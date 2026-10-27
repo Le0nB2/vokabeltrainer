@@ -2,7 +2,7 @@
 
 import prisma from "@/lib/prisma"
 import { revalidatePath } from "next/cache"
-import { requireAppAuth, UnauthorizedError } from "@/lib/auth-guard"
+import { requireAppAuth, getCurrentUser, UnauthorizedError } from "@/lib/auth-guard"
 import { MAX_IMPORT_SIZE_BYTES, validateBackupData } from "@/lib/validations/import"
 import { checkSettingsAuthenticated } from "@/actions/auth"
 
@@ -11,6 +11,7 @@ const checkSettingsAuth = checkSettingsAuthenticated
 export async function importData(jsonData: string) {
   try {
     await requireAppAuth()
+    const user = await getCurrentUser()
     const isAuth = await checkSettingsAuth()
     if (!isAuth) {
       return { success: false, error: "Nicht autorisiert. Bitte melde dich mit dem Einstellungspasswort an." }
@@ -38,11 +39,26 @@ export async function importData(jsonData: string) {
 
     const { decks, settings } = validationResult.data
 
+    // Only assign userId if the user is a persistent database user.
+    // Synthetic users ("admin", "default", "env-admin") do not have a record in the User table,
+    // which would trigger a foreign key violation (P2003 / Deck_userId_fkey) in PostgreSQL.
+    const isDbUser = Boolean(
+      user &&
+      user.id &&
+      user.id !== "default" &&
+      user.id !== "admin" &&
+      user.id !== "env-admin"
+    )
+    const targetUserId = isDbUser ? user.id : null
+
     // Wrap in a transaction to ensure all or nothing
     await prisma.$transaction(async (tx) => {
-      // Restore Settings if available
+      // Restore Settings if available (defense-in-depth: strip sensitive security fields)
       if (settings) {
-        const { id, ...settingsWithoutId } = settings
+        const { id, ...settingsWithoutId } = settings as Record<string, unknown>
+        delete (settingsWithoutId as Record<string, unknown>).isSetupCompleted
+        delete (settingsWithoutId as Record<string, unknown>).settingsPasswordHash
+
         await tx.settings.upsert({
           where: { id: "default" },
           update: settingsWithoutId,
@@ -58,6 +74,7 @@ export async function importData(jsonData: string) {
           data: {
             title: deck.title,
             description: deck.description ?? null,
+            userId: targetUserId,
             createdAt: deck.createdAt ?? undefined,
             updatedAt: deck.updatedAt ?? undefined,
             lastResultCorrect: deck.lastResultCorrect ?? null,
