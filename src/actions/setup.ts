@@ -60,6 +60,11 @@ export async function getSetupState(): Promise<{
 }
 
 export async function completeSetupSingleUser(): Promise<{ success: boolean; error?: string }> {
+  const setupState = await getSetupState()
+  if (!setupState.needsSetup) {
+    return { success: false, error: "Die Ersteinrichtung wurde bereits abgeschlossen." }
+  }
+
   try {
     await prisma.settings.upsert({
       where: { id: "default" },
@@ -87,6 +92,11 @@ export async function completeSetupProtected(params: {
   settingsOption: "same" | "pin" | "none"
   customPin?: string
 }): Promise<{ success: boolean; error?: string }> {
+  const setupState = await getSetupState()
+  if (!setupState.needsSetup) {
+    return { success: false, error: "Die Ersteinrichtung wurde bereits abgeschlossen." }
+  }
+
   const username = params.username.trim()
   const password = params.password
 

@@ -133,6 +133,22 @@ describe('Setup Wizard & Kindersicherung Settings Password', () => {
   })
 
   describe('completeSetupProtected', () => {
+    it('prevents setup replay when setup is already completed', async () => {
+      ;(vi.spyOn(prisma.user, 'count') as any).mockImplementation(async () => 1)
+
+      const res1 = await completeSetupSingleUser()
+      expect(res1.success).toBe(false)
+      expect(res1.error).toContain('Ersteinrichtung wurde bereits abgeschlossen')
+
+      const res2 = await completeSetupProtected({
+        username: 'intruder',
+        password: 'password123',
+        settingsOption: 'same',
+      })
+      expect(res2.success).toBe(false)
+      expect(res2.error).toContain('Ersteinrichtung wurde bereits abgeschlossen')
+    })
+
     it('rejects short usernames and passwords', async () => {
       const res1 = await completeSetupProtected({
         username: 'a',

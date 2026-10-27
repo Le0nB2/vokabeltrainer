@@ -2,10 +2,22 @@ import { getAllDueCards } from "@/actions/cards"
 import { getSettings } from "@/actions/settings"
 import { StudySession } from "@/components/StudySession"
 import { redirect } from "next/navigation"
+import { getCurrentUser } from "@/lib/auth-guard"
+import { getSetupState } from "@/actions/setup"
 
 export const dynamic = 'force-dynamic'
 
 export default async function GlobalStudyPage() {
+  const setupState = await getSetupState()
+  if (setupState.needsSetup) {
+    redirect("/setup")
+  }
+
+  const user = await getCurrentUser()
+  if (!user) {
+    redirect("/login")
+  }
+
   const settings = await getSettings()
   const dueCards = await getAllDueCards()
 

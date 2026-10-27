@@ -2,11 +2,14 @@
 
 import prisma from "@/lib/prisma"
 import { revalidatePath } from "next/cache"
-import { requireAppAuth, getCurrentUser } from "@/lib/auth-guard"
+import { requireAppAuth, getCurrentUser, UnauthorizedError } from "@/lib/auth-guard"
 
 async function verifyDeckAccess(deckId: string) {
   const user = await getCurrentUser();
-  if (!user || user.id === "default") return;
+  if (!user) {
+    throw new UnauthorizedError();
+  }
+  if (user.id === "default") return;
 
   const deck = await prisma.deck.findUnique({
     where: { id: deckId },
