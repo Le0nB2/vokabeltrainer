@@ -6,12 +6,14 @@ import { DeckPieChart } from "@/components/DeckPieChart"
 import { LearningStatsChart } from "@/components/LearningStatsChart"
 import { LogoutButton } from "@/components/LogoutButton"
 import { getAppAuthCredentials } from "@/lib/auth-utils"
+import { getCurrentUser } from "@/lib/auth-guard"
 import prisma from "@/lib/prisma"
 import { subDays, format } from "date-fns"
 
 export const dynamic = 'force-dynamic'
 
 export default async function Dashboard() {
+  const user = await getCurrentUser()
   const decks = await getDecks()
   const now = new Date()
 
@@ -23,11 +25,19 @@ export default async function Dashboard() {
   const sevenDaysAgo = subDays(now, 6)
   sevenDaysAgo.setHours(0,0,0,0)
 
+  const deckFilter =
+    !user || user.id === "default"
+      ? undefined
+      : user.role === "ADMIN"
+      ? { OR: [{ userId: user.id }, { userId: null }] }
+      : { userId: user.id }
+
   const logs = await prisma.reviewLog.findMany({
     where: {
       createdAt: {
         gte: sevenDaysAgo
-      }
+      },
+      ...(deckFilter && { deck: deckFilter })
     },
     select: {
       createdAt: true,

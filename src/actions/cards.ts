@@ -2,8 +2,26 @@
 
 import prisma from "@/lib/prisma"
 import { revalidatePath } from "next/cache"
-import { requireAppAuth } from "@/lib/auth-guard"
+import { requireAppAuth, getCurrentUser } from "@/lib/auth-guard"
 
+async function verifyDeckAccess(deckId: string) {
+  const user = await getCurrentUser();
+  if (!user || user.id === "default") return;
+
+  const deck = await prisma.deck.findUnique({
+    where: { id: deckId },
+    select: { userId: true },
+  });
+
+  if (!deck) {
+    throw new Error("Deck nicht gefunden");
+  }
+
+  const isOwner = deck.userId === user.id || (user.role === "ADMIN" && !deck.userId);
+  if (!isOwner) {
+    throw new Error("Keine Berechtigung für dieses Deck");
+  }
+}
 
 function sanitizeField(val: string | null | undefined, maxLen: number): string | null | undefined {
   if (val === undefined) return undefined;
@@ -21,6 +39,7 @@ export async function addCard(
   contextSentence?: string | null
 ) {
   await requireAppAuth();
+  await verifyDeckAccess(deckId);
   if (!deckId || typeof deckId !== "string" || deckId.length > 100) {
     throw new Error("Ungültige Deck-ID");
   }
@@ -39,6 +58,7 @@ export async function addCard(
       gapText: sanitizeField(gapText, 2000),
       mnemonic: sanitizeField(mnemonic, 1000),
       contextSentence: sanitizeField(contextSentence, 2000),
+      language: "en",
     }
   });
   revalidatePath(`/decks/${deckId}`);
@@ -58,6 +78,7 @@ export async function addCardsBulk(
   }[]
 ) {
   await requireAppAuth();
+  await verifyDeckAccess(deckId);
   if (!deckId || typeof deckId !== "string" || deckId.length > 100) {
     throw new Error("Ungültige Deck-ID");
   }
@@ -84,6 +105,7 @@ export async function addCardsBulk(
           contextSentence: sanitizeField(c.contextSentence, 2000),
           box: 1,
           dueDate: new Date(),
+          language: "en",
         };
       })
       .filter(c => c.front && c.back)
@@ -94,6 +116,7 @@ export async function addCardsBulk(
 
 export async function deleteCard(cardId: string, deckId: string) {
   await requireAppAuth();
+  await verifyDeckAccess(deckId);
   await prisma.card.delete({
     where: { id: cardId }
   });
@@ -102,6 +125,7 @@ export async function deleteCard(cardId: string, deckId: string) {
 
 export async function updateCardProgress(cardId: string, deckId: string, rating: "again" | "hard" | "good" | "easy") {
   await requireAppAuth();
+  await verifyDeckAccess(deckId);
   const card = await prisma.card.findUnique({ where: { id: cardId } });
   if (!card) throw new Error("Card not found");
 
@@ -158,12 +182,24 @@ export async function updateCardProgress(cardId: string, deckId: string, rating:
 
 export async function getAllDueCards() {
   await requireAppAuth();
+  const user = await getCurrentUser();
   const now = new Date();
+
+  const deckCondition =
+    !user || user.id === "default"
+      ? undefined
+      : user.role === "ADMIN"
+      ? {
+          OR: [{ userId: user.id }, { userId: null }],
+        }
+      : { userId: user.id };
+
   const dueCards = await prisma.card.findMany({
     where: {
       dueDate: {
         lte: now
-      }
+      },
+      ...(deckCondition && { deck: deckCondition }),
     },
     include: { deck: true }
   });
@@ -181,6 +217,7 @@ export async function updateCardDetails(
   contextSentence?: string | null
 ) {
   await requireAppAuth();
+  await verifyDeckAccess(deckId);
   if (!cardId || typeof cardId !== "string" || cardId.length > 100) {
     throw new Error("Ungültige Card-ID");
   }
@@ -215,6 +252,7 @@ export async function updateCardsEnrichmentBulk(
   }[]
 ) {
   await requireAppAuth();
+  await verifyDeckAccess(deckId);
   if (!Array.isArray(updates) || updates.length === 0) return;
   const limitedUpdates = updates.slice(0, 500);
 

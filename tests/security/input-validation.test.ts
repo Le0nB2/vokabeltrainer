@@ -27,6 +27,7 @@ vi.mock('next/cache', () => ({
 
 vi.mock('../../src/lib/auth-guard', () => ({
   requireAppAuth: vi.fn(async () => {}),
+  getCurrentUser: vi.fn(async () => ({ id: 'default', username: 'default', role: 'ADMIN' })),
 }))
 
 describe('Security Audit: Injection & Input Validation Defenses', () => {
@@ -51,10 +52,10 @@ describe('Security Audit: Injection & Input Validation Defenses', () => {
         const deck = await createDeck(payload, 'Test Description')
         expect(deck.title).toBe(payload)
         expect(prisma.deck.create).toHaveBeenCalledWith({
-          data: {
+          data: expect.objectContaining({
             title: payload,
             description: 'Test Description',
-          },
+          }),
         })
       })
 
