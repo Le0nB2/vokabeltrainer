@@ -2,17 +2,11 @@
 
 import prisma from "@/lib/prisma"
 import { revalidatePath } from "next/cache"
-import { cookies } from "next/headers"
-import { verifySettingsSessionToken, SETTINGS_COOKIE_NAME } from "@/lib/auth-utils"
 import { requireAppAuth, UnauthorizedError } from "@/lib/auth-guard"
 import { MAX_IMPORT_SIZE_BYTES, validateBackupData } from "@/lib/validations/import"
+import { checkSettingsAuthenticated } from "@/actions/auth"
 
-async function checkSettingsAuth(): Promise<boolean> {
-  const envPassword = process.env.SETTINGS_PASSWORD
-  if (!envPassword) return true
-  const cookieStore = await cookies()
-  return verifySettingsSessionToken(cookieStore.get(SETTINGS_COOKIE_NAME)?.value, envPassword)
-}
+const checkSettingsAuth = checkSettingsAuthenticated
 
 export async function importData(jsonData: string) {
   try {

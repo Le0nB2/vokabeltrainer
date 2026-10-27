@@ -1,8 +1,7 @@
 import { NextResponse } from 'next/server'
-import { cookies } from 'next/headers'
 import prisma from '@/lib/prisma'
-import { verifySettingsSessionToken, SETTINGS_COOKIE_NAME } from '@/lib/auth-utils'
 import { requireAppAuth, UnauthorizedError } from '@/lib/auth-guard'
+import { checkSettingsAuthenticated } from '@/actions/auth'
 
 async function handleExport() {
   try {
@@ -10,16 +9,9 @@ async function handleExport() {
     await requireAppAuth()
 
     // 2. Enforce Settings Auth if configured
-    const envPassword = process.env.SETTINGS_PASSWORD
-    if (envPassword) {
-      const cookieStore = await cookies()
-      const isAuthenticated = verifySettingsSessionToken(
-        cookieStore.get(SETTINGS_COOKIE_NAME)?.value,
-        envPassword
-      )
-      if (!isAuthenticated) {
-        return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
-      }
+    const isAuth = await checkSettingsAuthenticated()
+    if (!isAuth) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 
     const settings = await prisma.settings.findUnique({

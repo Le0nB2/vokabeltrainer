@@ -4,7 +4,6 @@ import prisma from "@/lib/prisma"
 import { revalidatePath } from "next/cache"
 import { cookies, headers } from "next/headers"
 import {
-  verifySettingsSessionToken,
   SETTINGS_COOKIE_NAME,
   AUTH_COOKIE_NAME,
   AUTH_COOKIE_MAX_AGE,
@@ -15,13 +14,9 @@ import {
   hashPassword,
 } from "@/lib/auth-utils"
 import { requireAppAuth } from "@/lib/auth-guard"
+import { checkSettingsAuthenticated } from "@/actions/auth"
 
-async function checkSettingsAuth(): Promise<boolean> {
-  const envPassword = process.env.SETTINGS_PASSWORD
-  if (!envPassword) return true
-  const cookieStore = await cookies()
-  return verifySettingsSessionToken(cookieStore.get(SETTINGS_COOKIE_NAME)?.value, envPassword)
-}
+const checkSettingsAuth = checkSettingsAuthenticated
 
 export interface UserSummary {
   id: string

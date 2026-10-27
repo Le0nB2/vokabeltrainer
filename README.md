@@ -82,21 +82,18 @@ Wenn du gleich auf den Deploy-Button klickst, leitet Render dich zum automatisch
    Ganz oben im Feld **"Blueprint Name"** einen beliebigen Projektnamen eingeben (z. B. `vokabeltrainer`).
 
 3. **Nach unten scrollen zu den Umgebungsvariablen:**  
-   Scrolle auf der Render-Seite etwas nach unten zum Bereich **"Environment Variables"** unter dem Service *vokabeltrainer*. Trage dort in die entsprechenden Eingabefelder die folgenden Zugangsdaten ein:
+   Scrolle auf der Render-Seite etwas nach unten zum Bereich **"Environment Variables"** unter dem Service *vokabeltrainer*. Trage dort in die entsprechenden Eingabefelder die folgenden beiden Schlüssel ein:
 
    | Feld | Was du eintragen musst |
    | :--- | :--- |
    | **`DATABASE_URL`** | Der kopierte Connection String von Neon aus Schritt 2 |
    | **`GEMINI_API_KEY`** | Dein Google Gemini API Key aus Schritt 1 |
-   | **`AUTH_USER`** | Dein gewünschter Benutzername für den Website-Login (Schutz vor Fremdzugriff) |
-   | **`AUTH_PASSWORD`** | Dein gewünschtes Passwort für den Website-Login |
-   | **`SETTINGS_PASSWORD`** | Ein Passwort zum Schutz des Einstellungsbereichs (Für Eltern) |
 
 4. **Was ist mit weiteren Variablen?**  
-   Du musst **ausschließlich** die 5 oben genannten Felder ausfüllen. Automatische Werte (wie `AUTH_SECRET` oder `NOTIFICATION_API_TOKEN`) lässt du einfach unverändert – Render generiert diese Sicherheitsschlüssel beim ersten Starten vollautomatisch für dich.
+   Du musst **ausschließlich** die 2 oben genannten Felder ausfüllen. Benutzername und Passwörter vergibst du nach dem Starten ganz bequem und sicher direkt im Browser. Automatische Werte (wie `AUTH_SECRET` oder `NOTIFICATION_API_TOKEN`) lässt du einfach unverändert – Render generiert diese Sicherheitsschlüssel beim ersten Starten vollautomatisch für dich.
 
 5. **Bereitstellung starten:**  
-   Klicke ganz unten auf **"Apply"** (bzw. **"Deploy"**). Render richtet den Service und alle Sicherheitsschlüssel vollautomatisch ein. Nach ca. 5 Minuten siehst du den grünen Status **"Live"** und deine persönliche Web-Adresse (z. B. `https://vokabeltrainer-xxxx.onrender.com`). **Fertig!** Wenn du die Seite aufrufst, wirst du direkt durch deine Login-Maske geschützt.
+   Klicke ganz unten auf **"Apply"** (bzw. **"Deploy"**). Render richtet den Service und alle Sicherheitsschlüssel vollautomatisch ein. Nach ca. 5 Minuten siehst du den grünen Status **"Live"** und deine persönliche Web-Adresse (z. B. `https://vokabeltrainer-xxxx.onrender.com`).
 
 #### Jetzt das Deployment starten:
 
@@ -114,7 +111,26 @@ Klicke auf den Button, um die Bereitstellung auf Render zu starten:
 
 ---
 
-### Schritt 4: 📱 Als App auf dem Homescreen nutzen (PWA)
+### Schritt 4: Ersteinrichtung im Web-Browser (`/setup`)
+
+Beim ersten Aufrufen deiner Web-Adresse startet automatisch der Einrichtungs-Assistent:
+
+1. **Modus wählen:**
+   - **Geschützter Modus (Empfohlen):** Schützt deine Vokabeln auf dem öffentlichen Server zuverlässig mit Benutzername und Passwort und ermöglicht getrennte Profile für Eltern und Kinder.
+   - **Einzelnutzer-Modus:** Nur für rein private Heimnetzwerke ohne Passwort gedacht.
+
+2. **Eltern-Konto anlegen:**
+   - Gib einen gewünschten Anmeldenamen (z. B. deinen Vornamen oder `eltern`) und ein Passwort ein.
+
+3. **Kindersicherung einstellen:**
+   - Wähle, ob die Einstellungen mit dem gleichen Anmeldepasswort, einer kurzen PIN (z. B. 4 Ziffern) oder ungeschützt zugänglich sein sollen (*„Kindersicherung: Verhindert, dass Kinder beim Vokabellernen Einstellungen verändern“*).
+   - *Tipp:* Das Einstellungskennwort kann jederzeit auch mit dem Eltern-Anmeldepasswort entsperrt werden.
+
+> 🛡️ **Schutz vor Aussperren:** Solltest du dein Eltern-Passwort einmal vergessen, kannst du in Render unter **Environment** einfach die Variable `ADMIN_PASSWORD` mit einem neuen Passwort setzen und dich sofort wieder einloggen.
+
+---
+
+### Schritt 5: 📱 Als App auf dem Homescreen nutzen (PWA)
 
 Die Web-App kann ohne App Store direkt als App auf dem Homescreen des Smartphones installiert werden (sogenannte Progressive Web App (PWA)):
 
@@ -146,17 +162,19 @@ Die Web-App kann ohne App Store direkt als App auf dem Homescreen des Smartphone
 Die App ist vollständig containerisiert und kann ohne lokale Node.js Installation ausgeführt werden.
 
 ### 1. Umgebungsvariablen konfigurieren
-Erstelle eine `.env` Datei im Hauptverzeichnis (falls nicht vorhanden) und füge deinen Gemini API Key und den Passwortschutz (falls benötigt) ein:
+Erstelle eine `.env` Datei im Hauptverzeichnis (falls nicht vorhanden) und füge deinen Gemini API Key ein:
 
 ```env
-# Optional: Mehrere Schlüssel kommasepariert, falls das Limit oft erreicht wird
+# Google Gemini API-Key für Foto-Scan & Beispielsätze
 GEMINI_API_KEY="DEIN_GEMINI_API_KEY_HIER"
-# Optional: Passwortschutz für die Einstellungen
-SETTINGS_PASSWORD="DEIN_PASSWORT_HIER"
-# Optional: Globaler Zugriffsschutz (Login-Seite mit Session-Cookie)
-AUTH_USER="benutzername"
-AUTH_PASSWORD="dein_sicheres_passwort"
-# (Alternativ werden auch BASIC_AUTH_USER und BASIC_AUTH_PASSWORD weiterhin unterstützt)
+
+# Optional: Verbindung zu einer externen PostgreSQL/Neon-Datenbank
+# (Wird keine DATABASE_URL angegeben, nutzt Docker automatisch die interne SQLite-Datei)
+# DATABASE_URL="postgresql://user:pass@host/db?sslmode=require"
+
+# Hinweis: Benutzerkonten und Passwörter richtest du beim ersten Aufruf direkt im Browser ein.
+# Bestehende Umgebungsvariablen (AUTH_USER, AUTH_PASSWORD, SETTINGS_PASSWORD) werden zur
+# Abwärtskompatibilität weiterhin uneingeschränkt unterstützt.
 ```
 
 Den **kostenlosen** API Key erhältst du im [Google AI Studio](https://aistudio.google.com/).

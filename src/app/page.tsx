@@ -8,12 +8,18 @@ import { LearningStatsChart } from "@/components/LearningStatsChart"
 import { LogoutButton } from "@/components/LogoutButton"
 import { getAppAuthCredentials } from "@/lib/auth-utils"
 import { getCurrentUser } from "@/lib/auth-guard"
+import { getSetupState } from "@/actions/setup"
 import prisma from "@/lib/prisma"
 import { subDays, format } from "date-fns"
 
 export const dynamic = 'force-dynamic'
 
 export default async function Dashboard() {
+  const setupState = await getSetupState()
+  if (setupState.needsSetup) {
+    redirect("/setup")
+  }
+
   const user = await getCurrentUser()
   if (!user) {
     redirect("/login")

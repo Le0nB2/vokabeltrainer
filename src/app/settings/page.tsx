@@ -6,9 +6,11 @@ import { NotificationSettings } from "@/components/NotificationSettings"
 import { AudioSettings } from "@/components/AudioSettings"
 import { AiModelSettings } from "@/components/AiModelSettings"
 import { UserManagementSettings } from "@/components/UserManagementSettings"
+import { SettingsPasswordSettings } from "@/components/SettingsPasswordSettings"
 import { getSettings, getAvailableAiModelsAction } from "@/actions/settings"
 import { getUserManagementData } from "@/actions/users"
 import { getApiStats } from "@/actions/api-stats"
+import { isSettingsPasswordConfigured } from "@/actions/auth"
 import { LockSettingsButton } from "@/components/LockSettingsButton"
 
 export const metadata = {
@@ -20,7 +22,7 @@ export default async function SettingsPage() {
   const apiStats = await getApiStats()
   const availableModels = await getAvailableAiModelsAction()
   const userManagementData = await getUserManagementData()
-  const isSettingsProtected = Boolean(process.env.SETTINGS_PASSWORD)
+  const isSettingsProtected = await isSettingsPasswordConfigured()
 
   return (
     <main className="min-h-screen bg-zinc-50 dark:bg-zinc-950 text-zinc-900 dark:text-zinc-100 px-4 pt-8 pb-12 sm:p-8">
@@ -35,6 +37,7 @@ export default async function SettingsPage() {
           <h1 className="text-2xl sm:text-3xl font-bold">Einstellungen & Backup</h1>
         </header>
 
+        <SettingsPasswordSettings isProtected={isSettingsProtected} />
         <AudioSettings initialSettings={settings} />
         <MinigameSettings initialSettings={settings} />
         <NotificationSettings initialSettings={settings} />

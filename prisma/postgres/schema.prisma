@@ -73,6 +73,8 @@ model ReviewLog {
 
 model Settings {
   id                    String  @id @default("default")
+  isSetupCompleted      Boolean @default(false)
+  settingsPasswordHash  String?
   minigamesEnabled      Boolean @default(true)
   minigameIntervalMin   Int     @default(50)
   minigameIntervalMax   Int     @default(75)

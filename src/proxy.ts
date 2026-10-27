@@ -84,9 +84,10 @@ export async function proxy(req: NextRequest) {
   }
 
   // Unauthenticated user:
-  // Allow access to login page, static icons, and app manifest
+  // Allow access to login page, setup page, static icons, and app manifest
   if (
     pathname === "/login" ||
+    pathname === "/setup" ||
     pathname === "/apple-icon" ||
     pathname === "/apple-touch-icon.png" ||
     pathname === "/apple-touch-icon-precomposed.png" ||

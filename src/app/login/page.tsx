@@ -1,12 +1,21 @@
 import { Suspense } from "react"
+import { redirect } from "next/navigation"
 import { LoginForm } from "@/components/LoginForm"
+import { getSetupState } from "@/actions/setup"
+
+export const dynamic = 'force-dynamic'
 
 export const metadata = {
   title: "Anmelden | Vokabeltrainer",
   description: "Anmeldung zum Vokabeltrainer",
 }
 
-export default function LoginPage() {
+export default async function LoginPage() {
+  const setupState = await getSetupState()
+  if (setupState.needsSetup) {
+    redirect("/setup")
+  }
+
   return (
     <main className="min-h-screen bg-zinc-50 dark:bg-zinc-950 flex flex-col items-center justify-center p-4">
       <Suspense
