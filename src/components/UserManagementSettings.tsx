@@ -11,7 +11,6 @@ import {
   UserCheck,
   Loader2,
   AlertTriangle,
-  HelpCircle,
   CheckCircle,
 } from "lucide-react"
 import {
@@ -338,14 +337,11 @@ export function UserManagementSettings({
             </p>
           </div>
 
-          {/* Option 1: Create directly in Settings (Recommended) */}
+          {/* Create directly in Settings */}
           <div className="bg-zinc-50 dark:bg-zinc-800/50 border border-zinc-200 dark:border-zinc-700 rounded-xl p-5">
-            <div className="flex items-center gap-2 mb-2">
-              <span className="flex items-center justify-center w-6 h-6 rounded-full bg-blue-600 text-white text-xs font-bold">1</span>
-              <h4 className="font-semibold text-sm text-zinc-900 dark:text-zinc-100">
-                Möglichkeit 1: Hauptnutzer direkt hier anlegen (Empfohlen)
-              </h4>
-            </div>
+            <h4 className="font-semibold text-sm text-zinc-900 dark:text-zinc-100 mb-1">
+              Hauptnutzer anlegen
+            </h4>
             <p className="text-xs text-zinc-500 dark:text-zinc-400 mb-4">
               Gib einen Benutzernamen und ein sicheres Passwort ein. Mit diesen Daten loggst du dich künftig als Eltern- bzw. Administrator-Konto ein.
             </p>
@@ -425,39 +421,6 @@ export function UserManagementSettings({
               </div>
             )}
           </div>
-
-          {/* Option 2: Server Environment Variables explanation */}
-          <details className="border border-zinc-200 dark:border-zinc-700 rounded-xl p-4 text-sm bg-zinc-50 dark:bg-zinc-800/30">
-            <summary className="font-semibold text-zinc-900 dark:text-zinc-100 cursor-pointer flex items-center gap-2">
-              <HelpCircle className="w-4 h-4 text-zinc-500" />
-              <span>Möglichkeit 2: Über Umgebungsvariablen (Render.com oder Docker)</span>
-            </summary>
-            <div className="mt-3 pt-3 border-t border-zinc-200 dark:border-zinc-700 space-y-3 text-xs text-zinc-600 dark:text-zinc-300 leading-relaxed">
-              <p>
-                Falls du den Vokabeltrainer auf einem Server (wie <strong>Render.com</strong>) hostest, kannst du den Hauptnutzer auch über die Server-Einstellungen festlegen. Sobald diese Variablen gesetzt sind, ist der Hauptnutzer automatisch aktiv:
-              </p>
-              <div className="bg-white dark:bg-zinc-900 p-3 rounded-lg border border-zinc-200 dark:border-zinc-800 space-y-2">
-                <p className="font-semibold text-zinc-900 dark:text-zinc-100">Schritte auf Render.com:</p>
-                <ol className="list-decimal list-inside space-y-1 pl-1">
-                  <li>Öffne dein Render Dashboard auf <strong>render.com</strong> und wähle deinen Vokabeltrainer.</li>
-                  <li>Klicke links auf <strong>Environment</strong>.</li>
-                  <li>Füge zwei neue Umgebungsvariablen hinzu:
-                    <ul className="list-disc list-inside pl-4 mt-1 space-y-0.5">
-                      <li><code className="text-blue-600 dark:text-blue-400 font-bold">AUTH_USER</code> = Dein gewünschter Benutzername (z. B. <code>admin</code>)</li>
-                      <li><code className="text-blue-600 dark:text-blue-400 font-bold">AUTH_PASSWORD</code> = Dein gewünschtes sicheres Passwort</li>
-                    </ul>
-                  </li>
-                  <li>Klicke auf <strong>Save Changes</strong>. Die App startet neu und der Hauptnutzer ist aktiv.</li>
-                </ol>
-              </div>
-              <div className="bg-white dark:bg-zinc-900 p-3 rounded-lg border border-zinc-200 dark:border-zinc-800 space-y-1">
-                <p className="font-semibold text-zinc-900 dark:text-zinc-100">Bei lokalem Docker:</p>
-                <p>
-                  Trage in die Datei <code>.env</code> im Projektordner die Zeilen <code>AUTH_USER=admin</code> und <code>AUTH_PASSWORD=dein-passwort</code> ein und führe <code>docker compose up -d</code> aus.
-                </p>
-              </div>
-            </div>
-          </details>
         </div>
       )}
 

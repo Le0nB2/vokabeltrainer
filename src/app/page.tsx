@@ -138,24 +138,6 @@ export default async function Dashboard() {
           </div>
         </header>
 
-        {/* Setup mode notice if no primary admin is configured yet */}
-        {isSetupMode && (
-          <div className="mb-8 p-4 rounded-xl bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 text-amber-900 dark:text-amber-200 text-sm flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-xs">
-            <div>
-              <p className="font-semibold text-sm">💡 Einzelnutzer-Modus (Noch kein Hauptnutzer)</p>
-              <p className="text-amber-800 dark:text-amber-300 text-xs">
-                Möchtest du getrennte Profile für Kinder anlegen? Richte in den Einstellungen zuerst einen Hauptnutzer ein.
-              </p>
-            </div>
-            <Link
-              href="/settings"
-              className="shrink-0 text-xs font-semibold bg-amber-600 hover:bg-amber-700 text-white px-3.5 py-2 rounded-lg transition-colors"
-            >
-              Hauptnutzer einrichten
-            </Link>
-          </div>
-        )}
-
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {decks.map(deck => {
             const dueCount = deck.cards.filter(c => c.dueDate <= now).length
