@@ -47,7 +47,7 @@ export const CardImportSchema = z.object({
     .number()
     .int()
     .min(0, "Box-Nummer muss mindestens 0 sein")
-    .max(50, "Box-Nummer darf maximal 50 sein")
+    .max(100000, "Box-Nummer darf maximal 100000 sein")
     .optional()
     .default(1),
   consecutiveCorrect: z.number().int().min(0).max(100000).optional().default(0),

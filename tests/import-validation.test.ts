@@ -155,6 +155,38 @@ describe('SEC-05: Backup import validation (validateBackupData)', () => {
     }
   })
 
+  it('accepts cards with large box numbers from spaced repetition intervals (> 50)', () => {
+    const res = validateBackupData([
+      {
+        title: 'SRS Deck',
+        cards: [
+          { front: 'f1', back: 'b1', box: 78 },
+          { front: 'f2', back: 'b2', box: 218 },
+          { front: 'f3', back: 'b3', box: 1000 },
+        ],
+      },
+    ])
+    expect(res.success).toBe(true)
+    if (res.success) {
+      expect(res.data.decks[0].cards[0].box).toBe(78)
+      expect(res.data.decks[0].cards[1].box).toBe(218)
+      expect(res.data.decks[0].cards[2].box).toBe(1000)
+    }
+  })
+
+  it('rejects box number greater than 100000', () => {
+    const res = validateBackupData([
+      {
+        title: 'Valid Title',
+        cards: [{ front: 'f', back: 'b', box: 100001 }],
+      },
+    ])
+    expect(res.success).toBe(false)
+    if (!res.success) {
+      expect(res.error).toContain('Box-Nummer')
+    }
+  })
+
   it('rejects import with more than 100 decks', () => {
     const decks = Array.from({ length: MAX_DECKS_PER_IMPORT + 1 }, (_, i) => ({
       title: `Deck ${i + 1}`,
