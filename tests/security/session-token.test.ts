@@ -50,8 +50,8 @@ describe('Security Audit: Session Token & Cryptographic Integrity', () => {
       const originalToken = createAppSessionToken('alice', secretKey)
       const [payloadB64, signature] = originalToken.split('.')
 
-      // 1. Bit flip in signature
-      const corruptedSig = signature.substring(0, signature.length - 2) + 'ab'
+      // 1. Bit flip in signature (guaranteed to differ)
+      const corruptedSig = signature.substring(0, signature.length - 2) + (signature.endsWith('ab') ? 'cd' : 'ab')
       expect(verifyAppSessionToken(`${payloadB64}.${corruptedSig}`, 'alice', secretKey)).toBe(false)
 
       // 2. Truncated signature

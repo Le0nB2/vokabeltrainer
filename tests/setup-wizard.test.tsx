@@ -85,8 +85,19 @@ describe('SetupWizard Component', () => {
           }),
         })
       )
-      expect(mockPush).toHaveBeenCalledWith('/')
     })
+
+    // Step 4: Completion and Share screen is shown
+    await waitFor(() => {
+      expect(screen.getByText('Fast geschafft! So legt Leon los 🎉')).toBeDefined()
+      expect(screen.getByText('leon')).toBeDefined()
+      expect(screen.getByText(/Teile das Kennwort deinem Kind persönlich mit/)).toBeDefined()
+      expect(screen.getByText('Infos an Kind teilen')).toBeDefined()
+    })
+
+    // Click "Weiter zum Trainer" to finalize
+    fireEvent.click(screen.getByText('Weiter zum Trainer'))
+    expect(mockPush).toHaveBeenCalledWith('/')
   })
 
   it('allows opting out of child account creation on step 3', async () => {

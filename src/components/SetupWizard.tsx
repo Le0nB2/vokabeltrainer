@@ -14,6 +14,7 @@ import {
   UserPlus,
 } from "lucide-react"
 import { completeSetupSingleUser, completeSetupProtected } from "@/actions/setup"
+import { ChildShareInfoCard } from "@/components/ChildShareInfoCard"
 
 interface SetupWizardProps {
   isPublicOrRender: boolean
@@ -21,7 +22,7 @@ interface SetupWizardProps {
 
 export function SetupWizard({ isPublicOrRender }: SetupWizardProps) {
   const router = useRouter()
-  const [step, setStep] = useState<1 | 2 | 3>(1)
+  const [step, setStep] = useState<1 | 2 | 3 | 4>(1)
   const [showSingleUserModal, setShowSingleUserModal] = useState(false)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -193,10 +194,15 @@ export function SetupWizard({ isPublicOrRender }: SetupWizardProps) {
       })
 
       if (res.success) {
-        router.push("/")
-        router.refresh()
-        if (typeof window !== "undefined") {
-          window.location.href = "/"
+        if (createChild) {
+          setLoading(false)
+          setStep(4)
+        } else {
+          router.push("/")
+          router.refresh()
+          if (typeof window !== "undefined") {
+            window.location.href = "/"
+          }
         }
       } else {
         setError(res.error || "Fehler beim Einrichten.")
@@ -208,22 +214,42 @@ export function SetupWizard({ isPublicOrRender }: SetupWizardProps) {
     }
   }
 
+  const handleFinalRedirect = () => {
+    router.push("/")
+    router.refresh()
+    if (typeof window !== "undefined") {
+      window.location.href = "/"
+    }
+  }
+
   return (
     <div className="w-full max-w-2xl mx-auto">
       {/* Top Header */}
       <div className="text-center mb-8">
         <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-blue-100 dark:bg-blue-900/40 text-blue-600 dark:text-blue-400 mb-3 shadow-sm">
-          {step === 3 ? <UserPlus className="w-7 h-7" /> : <Sparkles className="w-7 h-7" />}
+          {step === 4 ? (
+            <CheckCircle2 className="w-7 h-7 text-emerald-600 dark:text-emerald-400" />
+          ) : step === 3 ? (
+            <UserPlus className="w-7 h-7" />
+          ) : (
+            <Sparkles className="w-7 h-7" />
+          )}
         </div>
         <h1 className="text-2xl sm:text-3xl font-extrabold text-zinc-900 dark:text-zinc-100 tracking-tight">
-          {step === 3 ? "Kinder-Konto einrichten" : "Willkommen beim Vokabeltrainer! 👋"}
+          {step === 4
+            ? "Einrichtung abgeschlossen! 🎉"
+            : step === 3
+            ? "Kinder-Konto einrichten"
+            : "Willkommen beim Vokabeltrainer! 👋"}
         </h1>
         <p className="text-sm sm:text-base text-zinc-600 dark:text-zinc-400 mt-2 max-w-md mx-auto">
           {step === 1
             ? "Wähle bitte, wie du den Vokabeltrainer auf diesem System nutzen möchtest:"
             : step === 2
             ? "Richte dein Eltern-Konto und die Einstellungs-PIN ein (Schritt 1 von 2)."
-            : "Möchtest du direkt ein Profil für dein Kind anlegen (Schritt 2 von 2)?"}
+            : step === 3
+            ? "Möchtest du direkt ein Profil für dein Kind anlegen (Schritt 2 von 2)?"
+            : "Alles ist bereit. Hier sind die wichtigsten Informationen für dein Kind:"}
         </p>
       </div>
 
@@ -623,6 +649,15 @@ export function SetupWizard({ isPublicOrRender }: SetupWizardProps) {
             </div>
           </form>
         </div>
+      )}
+
+      {/* Screen 4: Child Account Sharing & Completion */}
+      {step === 4 && (
+        <ChildShareInfoCard
+          childName={childDisplayName || childUsername}
+          childUsername={childUsername.trim()}
+          onFinish={handleFinalRedirect}
+        />
       )}
 
       {/* Modal for Single-User Mode Settings PIN */}
