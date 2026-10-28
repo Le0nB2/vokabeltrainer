@@ -177,7 +177,7 @@ export function ChildShareInfoCard({
             <div className="min-w-0">
               <span className="block text-[11px] text-zinc-500 dark:text-zinc-400">Passwort</span>
               <span className="block text-xs sm:text-sm font-medium text-zinc-700 dark:text-zinc-300">
-                Teile das Kennwort deinem Kind persönlich mit 🤫
+                Teile das Kennwort deinem Kind persönlich mit
               </span>
             </div>
           </div>
