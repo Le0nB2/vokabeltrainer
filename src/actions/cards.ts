@@ -3,6 +3,7 @@
 import prisma from "@/lib/prisma"
 import { revalidatePath } from "next/cache"
 import { requireAppAuth, getCurrentUser, UnauthorizedError } from "@/lib/auth-guard"
+import { MAX_SRS_INTERVAL_DAYS } from "@/lib/constants"
 
 async function verifyDeckAccess(deckId: string) {
   const user = await getCurrentUser();
@@ -178,6 +179,9 @@ export async function updateCardProgress(cardId: string, deckId: string, rating:
     newEaseFactor += 0.15;
     newConsecutive += 1;
   }
+
+  // Cap interval at MAX_SRS_INTERVAL_DAYS (365 days / 1 year) so mastered cards are reviewed at least once a year
+  newBox = Math.min(MAX_SRS_INTERVAL_DAYS, newBox);
 
   const dueDate = new Date(now.getTime() + Math.round(newBox) * 24 * 60 * 60 * 1000);
 

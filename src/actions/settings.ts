@@ -6,6 +6,7 @@ import { requireAppAuth, getCurrentUser, UnauthorizedError } from "@/lib/auth-gu
 import { MAX_IMPORT_SIZE_BYTES, validateBackupData } from "@/lib/validations/import"
 import { checkSettingsAuthenticated } from "@/actions/auth"
 import { hashPassword, validateUsername, validatePasswordPolicy } from "@/lib/auth-utils"
+import { MAX_SRS_INTERVAL_DAYS } from "@/lib/constants"
 
 const checkSettingsAuth = checkSettingsAuthenticated
 
@@ -160,7 +161,13 @@ export async function importData(
         })
 
         if (deck.cards && deck.cards.length > 0) {
+          const maxDueTime = Date.now() + MAX_SRS_INTERVAL_DAYS * 24 * 60 * 60 * 1000
           for (const card of deck.cards) {
+            const clampedBox = Math.min(MAX_SRS_INTERVAL_DAYS, card.box)
+            const clampedDueDate = card.dueDate
+              ? new Date(Math.min(card.dueDate.getTime(), maxDueTime))
+              : undefined
+
             const createdCard = await tx.card.create({
               data: {
                 deckId: createdDeck.id,
@@ -171,9 +178,9 @@ export async function importData(
                 contextSentence: card.contextSentence ?? null,
                 easeFactor: card.easeFactor,
                 lapses: card.lapses,
-                box: card.box,
+                box: clampedBox,
                 consecutiveCorrect: card.consecutiveCorrect,
-                dueDate: card.dueDate ?? undefined,
+                dueDate: clampedDueDate,
                 lastReviewed: card.lastReviewed ?? null,
                 createdAt: card.createdAt ?? undefined,
                 updatedAt: card.updatedAt ?? undefined,

@@ -405,6 +405,37 @@ describe('SEC-02: Server Actions Authentication Protection', () => {
       )
     })
 
+    it('clamps box to 365 days maximum during importData', async () => {
+      setValidSessionCookie()
+      const futureDate = new Date(Date.now() + 500 * 24 * 60 * 60 * 1000)
+      const payload = {
+        version: 2,
+        decks: [
+          {
+            title: 'Capped Deck',
+            cards: [
+              {
+                front: 'word',
+                back: 'wort',
+                box: 600,
+                dueDate: futureDate.toISOString(),
+              },
+            ],
+          },
+        ],
+      }
+      const res = await importData(JSON.stringify(payload))
+      expect(res.success).toBe(true)
+      expect(mockPrisma.card.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            front: 'word',
+            box: 365,
+          }),
+        })
+      )
+    })
+
     it('blocks getApiStats when unauthenticated', async () => {
       await expect(getApiStats()).rejects.toThrow(UnauthorizedError)
     })
