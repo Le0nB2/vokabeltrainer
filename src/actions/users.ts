@@ -405,6 +405,159 @@ export async function setupFamilySystem(data: {
   }
 }
 
+export async function convertSingleUserToFamily(data: {
+  parentUsername: string
+  parentPassword: string
+  secondChildUsername: string
+  secondChildPassword: string
+  secondChildDisplayName?: string
+}) {
+  await requireAppAuth()
+  const isAuth = await checkSettingsAuth()
+  if (!isAuth) {
+    return { success: false, error: "Nicht autorisiert. Bitte melde dich mit dem Einstellungspasswort an." }
+  }
+
+  const { isConfigured } = getAppAuthCredentials()
+  if (isConfigured) {
+    return { success: false, error: "Ein Hauptnutzer ist bereits über die Server-Umgebungsvariablen konfiguriert." }
+  }
+
+  // Find the single existing user/admin in the database
+  const existingAdmins = await prisma.user.findMany({
+    where: { role: "ADMIN" },
+  })
+  if (existingAdmins.length === 0) {
+    return { success: false, error: "Kein bisheriger Hauptnutzer in der Datenbank gefunden." }
+  }
+  const previousUser = existingAdmins[0]
+
+  // Validate Parent Credentials
+  const parentUserVal = validateUsername(data.parentUsername)
+  if (!parentUserVal.valid) {
+    return { success: false, error: `Eltern-Konto: ${parentUserVal.error}` }
+  }
+  const parentPassVal = validatePasswordPolicy(data.parentPassword)
+  if (!parentPassVal.valid) {
+    return { success: false, error: `Eltern-Konto: ${parentPassVal.error}` }
+  }
+
+  // Validate Second Child Credentials
+  const childUserVal = validateUsername(data.secondChildUsername)
+  if (!childUserVal.valid) {
+    return { success: false, error: `Zweites Kind: ${childUserVal.error}` }
+  }
+  const childPassVal = validatePasswordPolicy(data.secondChildPassword)
+  if (!childPassVal.valid) {
+    return { success: false, error: `Zweites Kind: ${childPassVal.error}` }
+  }
+
+  const cleanParentUsername = data.parentUsername.trim().toLowerCase()
+  const cleanSecondChildUsername = data.secondChildUsername.trim().toLowerCase()
+
+  if (cleanParentUsername === cleanSecondChildUsername) {
+    return { success: false, error: "Eltern-Konto und zweites Kind müssen unterschiedliche Benutzernamen haben." }
+  }
+
+  if (cleanParentUsername === previousUser.username.toLowerCase()) {
+    return { success: false, error: `Der Benutzername "${previousUser.username}" wird bereits vom bisherigen Profil verwendet.` }
+  }
+
+  if (cleanSecondChildUsername === previousUser.username.toLowerCase()) {
+    return { success: false, error: `Der Benutzername "${previousUser.username}" wird bereits vom bisherigen Profil verwendet.` }
+  }
+
+  const existingUsers = await prisma.user.findMany({
+    where: {
+      username: { in: [cleanParentUsername, cleanSecondChildUsername] },
+    },
+  })
+  if (existingUsers.length > 0) {
+    return { success: false, error: "Einer der gewählten Benutzernamen existiert bereits." }
+  }
+
+  const parentHash = hashPassword(data.parentPassword)
+  const secondChildHash = hashPassword(data.secondChildPassword)
+
+  // Atomically:
+  // 1. Create parent as ADMIN
+  // 2. Downgrade previousUser to USER (their decks stay completely intact with their userId!)
+  // 3. Create second child as USER
+  // 4. Update settings password hash to parent's password
+  const result = await prisma.$transaction(async (tx) => {
+    const parent = await tx.user.create({
+      data: {
+        username: cleanParentUsername,
+        displayName: "Eltern",
+        passwordHash: parentHash,
+        role: "ADMIN",
+        isActive: true,
+      },
+    })
+
+    const updatedPreviousUser = await tx.user.update({
+      where: { id: previousUser.id },
+      data: { role: "USER" },
+    })
+
+    const secondChild = await tx.user.create({
+      data: {
+        username: cleanSecondChildUsername,
+        displayName: data.secondChildDisplayName?.trim() || data.secondChildUsername.trim(),
+        passwordHash: secondChildHash,
+        role: "USER",
+        isActive: true,
+      },
+    })
+
+    await tx.settings.upsert({
+      where: { id: "default" },
+      create: {
+        id: "default",
+        isSetupCompleted: true,
+        settingsPasswordHash: parentHash,
+      },
+      update: {
+        isSetupCompleted: true,
+        settingsPasswordHash: parentHash,
+      },
+    })
+
+    return { parent, updatedPreviousUser, secondChild }
+  })
+
+  // Set session cookie for the new parent admin so they are logged in as admin
+  try {
+    const secret = getAppSecret()
+    const token = createAppSessionToken(result.parent.username, secret, AUTH_COOKIE_MAX_AGE, {
+      id: result.parent.id,
+      role: result.parent.role,
+      pv: getPasswordVersion(result.parent.passwordHash),
+    })
+    const cookieStore = await cookies()
+    const headersList = await headers()
+    const isSecure = isSecureRequest(headersList)
+    cookieStore.set(AUTH_COOKIE_NAME, token, {
+      httpOnly: true,
+      secure: isSecure,
+      path: "/",
+      sameSite: "lax",
+      maxAge: AUTH_COOKIE_MAX_AGE,
+    })
+  } catch {
+    // Graceful fallback in test or headless environments
+  }
+
+  revalidatePath("/settings")
+  revalidatePath("/")
+  return {
+    success: true,
+    parentId: result.parent.id,
+    previousUserId: result.updatedPreviousUser.id,
+    secondChildId: result.secondChild.id,
+  }
+}
+
 export async function createUser(data: {
   username: string
   password: string

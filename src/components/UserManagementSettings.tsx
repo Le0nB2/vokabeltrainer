@@ -26,6 +26,7 @@ import {
   toggleUserActive,
   setupPrimaryAdmin,
   setupFamilySystem,
+  convertSingleUserToFamily,
   changeUserRole,
   UserSummary,
   UserManagementData,
@@ -80,6 +81,15 @@ export function UserManagementSettings({
   const [newDisplayName, setNewDisplayName] = useState("")
   const [newPassword, setNewPassword] = useState("")
   const [showCreateForm, setShowCreateForm] = useState(false)
+
+  // Single User to Family Conversion State (when 1 user exists and adding 2nd child)
+  const [convertParentUsername, setConvertParentUsername] = useState("eltern")
+  const [convertParentPassword, setConvertParentPassword] = useState("")
+  const [convertParentPasswordConfirm, setConvertParentPasswordConfirm] = useState("")
+  const [convertChildUsername, setConvertChildUsername] = useState("")
+  const [convertChildDisplayName, setConvertChildDisplayName] = useState("")
+  const [convertChildPassword, setConvertChildPassword] = useState("")
+  const [isConverting, setIsConverting] = useState(false)
 
   // Password Reset State
   const [editingUserId, setEditingUserId] = useState<string | null>(null)
@@ -248,6 +258,108 @@ export function UserManagementSettings({
       setMessage({ type: "error", text: "Netzwerkfehler beim Einrichten des Hauptnutzers." })
     } finally {
       setIsSettingUpAdmin(false)
+    }
+  }
+
+  // Handle converting single protected user to family (creates Parent ADMIN, downgrades child to USER, adds 2nd child)
+  const handleConvertFamily = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setMessage(null)
+
+    if (convertParentPassword !== convertParentPasswordConfirm) {
+      setMessage({ type: "error", text: "Die Eltern-Passwörter stimmen nicht überein." })
+      return
+    }
+
+    if (convertParentPassword.length < 8 || !/[^a-zA-Z0-9]/.test(convertParentPassword)) {
+      setMessage({
+        type: "error",
+        text: "Das Eltern-Passwort muss mindestens 8 Zeichen lang sein und mindestens ein Sonderzeichen enthalten.",
+      })
+      return
+    }
+
+    if (convertChildPassword.length < 8 || !/[^a-zA-Z0-9]/.test(convertChildPassword)) {
+      setMessage({
+        type: "error",
+        text: "Das Passwort für das zweite Kind muss mindestens 8 Zeichen lang sein und mindestens ein Sonderzeichen enthalten.",
+      })
+      return
+    }
+
+    if (convertParentUsername.trim().toLowerCase() === convertChildUsername.trim().toLowerCase()) {
+      setMessage({ type: "error", text: "Eltern- und Kinder-Benutzername müssen unterschiedlich sein." })
+      return
+    }
+
+    setIsConverting(true)
+    try {
+      const res = await convertSingleUserToFamily({
+        parentUsername: convertParentUsername,
+        parentPassword: convertParentPassword,
+        secondChildUsername: convertChildUsername,
+        secondChildDisplayName: convertChildDisplayName || undefined,
+        secondChildPassword: convertChildPassword,
+      })
+
+      if (res.success) {
+        setMessage({
+          type: "success",
+          text: `Familien-System erfolgreich aktiviert! Eltern-Konto "${convertParentUsername}" angelegt, bisheriges Profil zum Kinder-Profil geändert und "${
+            convertChildDisplayName || convertChildUsername
+          }" als 2. Kind hinzugefügt.`,
+        })
+
+        const previousUser = data.users[0]
+        setData((prev) => ({
+          ...prev,
+          hasPrimaryAdmin: true,
+          primaryAdminType: "db",
+          primaryAdminUsername: convertParentUsername,
+          users: [
+            {
+              id: res.parentId || "parent",
+              username: convertParentUsername,
+              displayName: "Eltern",
+              role: "ADMIN",
+              isActive: true,
+              isEnvUser: false,
+              isPrimaryAdmin: true,
+              createdAt: new Date(),
+              deckCount: 0,
+            },
+            ...(previousUser
+              ? [
+                  {
+                    ...previousUser,
+                    role: "USER" as const,
+                    isPrimaryAdmin: false,
+                  },
+                ]
+              : []),
+            {
+              id: res.secondChildId || "second-child",
+              username: convertChildUsername,
+              displayName: convertChildDisplayName || convertChildUsername,
+              role: "USER",
+              isActive: true,
+              isEnvUser: false,
+              isPrimaryAdmin: false,
+              createdAt: new Date(),
+              deckCount: 0,
+            },
+          ],
+        }))
+
+        setShowCreateForm(false)
+        router.refresh()
+      } else {
+        setMessage({ type: "error", text: res.error || "Fehler bei der Umstellung auf das Familien-System." })
+      }
+    } catch {
+      setMessage({ type: "error", text: "Netzwerkfehler bei der Umstellung auf das Familien-System." })
+    } finally {
+      setIsConverting(false)
     }
   }
 
@@ -819,77 +931,217 @@ export function UserManagementSettings({
         <div className="space-y-4">
           {/* Create form (when active) */}
           {showCreateForm && (
-            <form
-              onSubmit={handleCreate}
-              className="p-4 rounded-xl bg-zinc-50 dark:bg-zinc-800/60 border border-zinc-200 dark:border-zinc-700 space-y-4"
-            >
-              <div>
-                <h4 className="text-sm font-semibold text-zinc-900 dark:text-zinc-100">
-                  Neues Profil anlegen
-                </h4>
-                <p className="text-xs text-zinc-500 mt-0.5">
-                  Dieses Profil erhält einen eigenen Lernbereich mit separaten Vokabelstapeln und eigenem Lernfortschritt.
-                </p>
-              </div>
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            isSingleUserProtected ? (
+              <form
+                onSubmit={handleConvertFamily}
+                className="p-4 rounded-xl bg-zinc-50 dark:bg-zinc-800/60 border border-zinc-200 dark:border-zinc-700 space-y-4"
+              >
                 <div>
-                  <label className="block text-xs font-medium text-zinc-600 dark:text-zinc-400 mb-1">
-                    Anmeldename *
-                  </label>
-                  <input
-                    type="text"
-                    required
-                    placeholder="z. B. leon"
-                    value={newUsername}
-                    onChange={(e) => setNewUsername(e.target.value)}
-                    className="w-full px-3 py-2 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  />
+                  <h4 className="text-sm font-semibold text-zinc-900 dark:text-zinc-100 flex items-center gap-1.5">
+                    <Sparkles className="w-4 h-4 text-blue-600 dark:text-blue-400" />
+                    <span>Auf Familien-System umstellen & zweites Kind hinzufügen</span>
+                  </h4>
+                  <div className="mt-2 p-3 bg-blue-50/70 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-900/50 rounded-lg text-xs text-blue-900 dark:text-blue-200 space-y-1">
+                    <p className="font-semibold">
+                      Trennung von Eltern- und Kinder-Rechten
+                    </p>
+                    <p className="text-zinc-600 dark:text-zinc-300">
+                      Aktuell nutzt <strong>{data.users[0]?.displayName || data.users[0]?.username}</strong> das einzige Profil und besitzt Administrator-Rechte. Durch das Anlegen deines Eltern-Kontos werden die Admin-Rechte auf die Eltern übertragen und das bisherige Profil wird zu einem Kinder-Profil ohne Zugriff auf die Einstellungen herabgestuft. Alle Vokabelstapel von {data.users[0]?.displayName || data.users[0]?.username} bleiben vollständig erhalten!
+                    </p>
+                  </div>
                 </div>
+
+                {/* Section 1: Parents */}
+                <div className="space-y-2">
+                  <div className="font-semibold text-xs text-zinc-700 dark:text-zinc-300 uppercase tracking-wider flex items-center gap-1.5">
+                    <Shield className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" />
+                    <span>1. Neues Eltern-Hauptkonto (Kindersicherung &amp; Einstellungen)</span>
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    <div>
+                      <label className="block text-xs font-medium text-zinc-600 dark:text-zinc-400 mb-1">
+                        Eltern-Anmeldename *
+                      </label>
+                      <input
+                        type="text"
+                        required
+                        placeholder="z. B. eltern"
+                        value={convertParentUsername}
+                        onChange={(e) => setConvertParentUsername(e.target.value)}
+                        className="w-full px-3 py-2 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-zinc-600 dark:text-zinc-400 mb-1">
+                        Eltern-Passwort *
+                      </label>
+                      <input
+                        type="password"
+                        required
+                        minLength={8}
+                        placeholder="Mind. 8 Z. & 1 S.-Z."
+                        value={convertParentPassword}
+                        onChange={(e) => setConvertParentPassword(e.target.value)}
+                        className="w-full px-3 py-2 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-zinc-600 dark:text-zinc-400 mb-1">
+                        Passwort wiederholen *
+                      </label>
+                      <input
+                        type="password"
+                        required
+                        minLength={8}
+                        placeholder="Passwort wiederholen"
+                        value={convertParentPasswordConfirm}
+                        onChange={(e) => setConvertParentPasswordConfirm(e.target.value)}
+                        className="w-full px-3 py-2 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {/* Section 2: Second Child */}
+                <div className="space-y-2 pt-2 border-t border-zinc-200 dark:border-zinc-700">
+                  <div className="font-semibold text-xs text-zinc-700 dark:text-zinc-300 uppercase tracking-wider flex items-center gap-1.5">
+                    <User className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
+                    <span>2. Zweites Kind (erhält eigenen Lernbereich)</span>
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    <div>
+                      <label className="block text-xs font-medium text-zinc-600 dark:text-zinc-400 mb-1">
+                        Anmeldename des 2. Kindes *
+                      </label>
+                      <input
+                        type="text"
+                        required
+                        placeholder="z. B. anna oder max"
+                        value={convertChildUsername}
+                        onChange={(e) => setConvertChildUsername(e.target.value)}
+                        className="w-full px-3 py-2 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-zinc-600 dark:text-zinc-400 mb-1">
+                        Rufname (optional)
+                      </label>
+                      <input
+                        type="text"
+                        placeholder="z. B. Anna"
+                        value={convertChildDisplayName}
+                        onChange={(e) => setConvertChildDisplayName(e.target.value)}
+                        className="w-full px-3 py-2 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-zinc-600 dark:text-zinc-400 mb-1">
+                        Passwort für das 2. Kind *
+                      </label>
+                      <input
+                        type="password"
+                        required
+                        minLength={8}
+                        placeholder="Mind. 8 Z. & 1 S.-Z."
+                        value={convertChildPassword}
+                        onChange={(e) => setConvertChildPassword(e.target.value)}
+                        className="w-full px-3 py-2 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                <div className="flex flex-col-reverse sm:flex-row sm:justify-end gap-2 pt-2">
+                  <button
+                    type="button"
+                    onClick={() => setShowCreateForm(false)}
+                    className="w-full sm:w-auto px-3.5 py-2 rounded-lg border border-zinc-300 dark:border-zinc-700 text-sm text-zinc-600 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-700 text-center"
+                  >
+                    Abbrechen
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={isConverting}
+                    className="w-full sm:w-auto inline-flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-5 py-2 rounded-lg text-sm font-medium transition-colors disabled:opacity-50"
+                  >
+                    {isConverting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
+                    <span>{isConverting ? "Wird umgestellt..." : "Eltern-Konto anlegen & zweites Kind hinzufügen"}</span>
+                  </button>
+                </div>
+              </form>
+            ) : (
+              <form
+                onSubmit={handleCreate}
+                className="p-4 rounded-xl bg-zinc-50 dark:bg-zinc-800/60 border border-zinc-200 dark:border-zinc-700 space-y-4"
+              >
                 <div>
-                  <label className="block text-xs font-medium text-zinc-600 dark:text-zinc-400 mb-1">
-                    Rufname / Vorname (optional)
-                  </label>
-                  <input
-                    type="text"
-                    placeholder="z. B. Leon"
-                    value={newDisplayName}
-                    onChange={(e) => setNewDisplayName(e.target.value)}
-                    className="w-full px-3 py-2 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  />
+                  <h4 className="text-sm font-semibold text-zinc-900 dark:text-zinc-100">
+                    Neues Profil anlegen
+                  </h4>
+                  <p className="text-xs text-zinc-500 mt-0.5">
+                    Dieses Profil erhält einen eigenen Lernbereich mit separaten Vokabelstapeln und eigenem Lernfortschritt.
+                  </p>
                 </div>
-                <div>
-                  <label className="block text-xs font-medium text-zinc-600 dark:text-zinc-400 mb-1">
-                    Passwort *
-                  </label>
-                  <input
-                    type="password"
-                    required
-                    minLength={8}
-                    placeholder="Mind. 8 Z. & 1 S.-Z."
-                    value={newPassword}
-                    onChange={(e) => setNewPassword(e.target.value)}
-                    className="w-full px-3 py-2 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  />
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  <div>
+                    <label className="block text-xs font-medium text-zinc-600 dark:text-zinc-400 mb-1">
+                      Anmeldename *
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      placeholder="z. B. leon"
+                      value={newUsername}
+                      onChange={(e) => setNewUsername(e.target.value)}
+                      className="w-full px-3 py-2 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-zinc-600 dark:text-zinc-400 mb-1">
+                      Rufname / Vorname (optional)
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="z. B. Leon"
+                      value={newDisplayName}
+                      onChange={(e) => setNewDisplayName(e.target.value)}
+                      className="w-full px-3 py-2 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-zinc-600 dark:text-zinc-400 mb-1">
+                      Passwort *
+                    </label>
+                    <input
+                      type="password"
+                      required
+                      minLength={8}
+                      placeholder="Mind. 8 Z. & 1 S.-Z."
+                      value={newPassword}
+                      onChange={(e) => setNewPassword(e.target.value)}
+                      className="w-full px-3 py-2 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    />
+                  </div>
                 </div>
-              </div>
-              <div className="flex flex-col-reverse sm:flex-row sm:justify-end gap-2">
-                <button
-                  type="button"
-                  onClick={() => setShowCreateForm(false)}
-                  className="w-full sm:w-auto px-3.5 py-2 rounded-lg border border-zinc-300 dark:border-zinc-700 text-sm text-zinc-600 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-700 text-center"
-                >
-                  Abbrechen
-                </button>
-                <button
-                  type="submit"
-                  disabled={isCreating}
-                  className="w-full sm:w-auto inline-flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-medium disabled:opacity-50"
-                >
-                  {isCreating ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
-                  <span>{isCreating ? "Wird erstellt..." : "Profil speichern"}</span>
-                </button>
-              </div>
-            </form>
+                <div className="flex flex-col-reverse sm:flex-row sm:justify-end gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setShowCreateForm(false)}
+                    className="w-full sm:w-auto px-3.5 py-2 rounded-lg border border-zinc-300 dark:border-zinc-700 text-sm text-zinc-600 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-700 text-center"
+                  >
+                    Abbrechen
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={isCreating}
+                    className="w-full sm:w-auto inline-flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-medium disabled:opacity-50"
+                  >
+                    {isCreating ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
+                    <span>{isCreating ? "Wird erstellt..." : "Profil speichern"}</span>
+                  </button>
+                </div>
+              </form>
+            )
           )}
 
           {/* User profile list / card */}

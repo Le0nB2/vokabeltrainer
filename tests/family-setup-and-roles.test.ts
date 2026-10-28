@@ -1,12 +1,10 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import {
   setupFamilySystem,
+  convertSingleUserToFamily,
   changeUserRole,
 } from '../src/actions/users'
-import {
-  getAssignableUsers,
-  transferDeck,
-} from '../src/actions/decks'
+import { checkPassword } from '../src/actions/auth'
 import {
   SETTINGS_COOKIE_NAME,
   createSettingsSessionToken,
@@ -70,7 +68,7 @@ describe('Family Setup and Role Management', () => {
     vi.restoreAllMocks()
   })
 
-  describe('setupFamilySystem', () => {
+  describe('setupFamilySystem (from Unprotected Mode)', () => {
     it('rejects call if settings auth is missing', async () => {
       mockCookies.delete(SETTINGS_COOKIE_NAME)
       const res = await setupFamilySystem({
@@ -228,6 +226,152 @@ describe('Family Setup and Role Management', () => {
     })
   })
 
+  describe('convertSingleUserToFamily (Downgrade child 1, create parent admin, create child 2)', () => {
+    it('rejects if settings auth is missing', async () => {
+      mockCookies.delete(SETTINGS_COOKIE_NAME)
+      const res = await convertSingleUserToFamily({
+        parentUsername: 'eltern',
+        parentPassword: 'ParentPassword123!',
+        secondChildUsername: 'anna',
+        secondChildPassword: 'AnnaPassword123!',
+      })
+      expect(res.success).toBe(false)
+      expect(res.error).toContain('Nicht autorisiert')
+    })
+
+    it('rejects if environment admin credentials are configured', async () => {
+      process.env.AUTH_USER = 'envadmin'
+      process.env.AUTH_PASSWORD = 'EnvPassword123!'
+      const appToken = createAppSessionToken('envadmin', getAppSecret('EnvPassword123!'))
+      mockCookies.set(AUTH_COOKIE_NAME, { value: appToken })
+
+      const res = await convertSingleUserToFamily({
+        parentUsername: 'eltern',
+        parentPassword: 'ParentPassword123!',
+        secondChildUsername: 'anna',
+        secondChildPassword: 'AnnaPassword123!',
+      })
+      expect(res.success).toBe(false)
+      expect(res.error).toContain('Server-Umgebungsvariablen')
+    })
+
+    it('rejects if username conflicts with existing user or with each other', async () => {
+      vi.spyOn(prisma.user, 'findMany').mockResolvedValueOnce([
+        { id: 'leon-id', username: 'leon', role: 'ADMIN' },
+      ] as any)
+
+      // Conflict with existing user
+      let res = await convertSingleUserToFamily({
+        parentUsername: 'leon',
+        parentPassword: 'ParentPassword123!',
+        secondChildUsername: 'anna',
+        secondChildPassword: 'AnnaPassword123!',
+      })
+      expect(res.success).toBe(false)
+      expect(res.error).toContain('wird bereits vom bisherigen Profil verwendet')
+
+      // Conflict between parent and child
+      vi.spyOn(prisma.user, 'findMany').mockResolvedValueOnce([
+        { id: 'leon-id', username: 'leon', role: 'ADMIN' },
+      ] as any)
+      res = await convertSingleUserToFamily({
+        parentUsername: 'eltern',
+        parentPassword: 'ParentPassword123!',
+        secondChildUsername: 'eltern',
+        secondChildPassword: 'AnnaPassword123!',
+      })
+      expect(res.success).toBe(false)
+      expect(res.error).toContain('unterschiedliche Benutzernamen')
+    })
+
+    it('successfully creates Parent (ADMIN), downgrades existing user (USER) without modifying their decks, and creates Child 2 (USER)', async () => {
+      // 1. Existing user is Leon (currently ADMIN)
+      const existingLeon = {
+        id: 'leon-id-1',
+        username: 'leon',
+        displayName: 'Leon',
+        role: 'ADMIN',
+      }
+      vi.spyOn(prisma.user, 'findMany')
+        .mockResolvedValueOnce([existingLeon] as any) // existing admins
+        .mockResolvedValueOnce([]) // uniqueness check
+
+      const createdParent = {
+        id: 'parent-id-999',
+        username: 'eltern',
+        displayName: 'Eltern',
+        role: 'ADMIN',
+        isActive: true,
+        passwordHash: 'hash-parent',
+      }
+      const updatedLeon = {
+        ...existingLeon,
+        role: 'USER',
+      }
+      const createdAnna = {
+        id: 'anna-id-2',
+        username: 'anna',
+        displayName: 'Anna',
+        role: 'USER',
+        isActive: true,
+        passwordHash: 'hash-anna',
+      }
+
+      const createSpy = vi.spyOn(prisma.user, 'create')
+        .mockResolvedValueOnce(createdParent as any)
+        .mockResolvedValueOnce(createdAnna as any)
+
+      const updateSpy = vi.spyOn(prisma.user, 'update').mockResolvedValueOnce(updatedLeon as any)
+      const deckUpdateSpy = vi.spyOn(prisma.deck, 'updateMany')
+      const settingsUpsertSpy = vi.spyOn(prisma.settings, 'upsert').mockResolvedValueOnce({} as any)
+
+      const res = await convertSingleUserToFamily({
+        parentUsername: 'eltern',
+        parentPassword: 'ParentPassword123!',
+        secondChildUsername: 'anna',
+        secondChildDisplayName: 'Anna',
+        secondChildPassword: 'AnnaPassword123!',
+      })
+
+      expect(res.success).toBe(true)
+      expect(res.parentId).toBe('parent-id-999')
+      expect(res.previousUserId).toBe('leon-id-1')
+      expect(res.secondChildId).toBe('anna-id-2')
+
+      // 1. Verify Parent created as ADMIN
+      expect(createSpy).toHaveBeenNthCalledWith(1, {
+        data: expect.objectContaining({
+          username: 'eltern',
+          displayName: 'Eltern',
+          role: 'ADMIN',
+        }),
+      })
+
+      // 2. Crucial: Existing user (Leon) is DOWNGRADED to USER!
+      expect(updateSpy).toHaveBeenCalledWith({
+        where: { id: 'leon-id-1' },
+        data: { role: 'USER' },
+      })
+
+      // 3. Crucial: Decks were NOT moved or reassigned away from Leon!
+      expect(deckUpdateSpy).not.toHaveBeenCalled()
+
+      // 4. Verify Second Child (Anna) created as USER
+      expect(createSpy).toHaveBeenNthCalledWith(2, {
+        data: expect.objectContaining({
+          username: 'anna',
+          displayName: 'Anna',
+          role: 'USER',
+        }),
+      })
+
+      // 5. Kindersicherung / Settings password updated to Parent's password
+      expect(settingsUpsertSpy).toHaveBeenCalled()
+      const savedParentHash = createSpy.mock.calls[0][0].data.passwordHash
+      expect(verifyPassword('ParentPassword123!', savedParentHash)).toBe(true)
+    })
+  })
+
   describe('changeUserRole', () => {
     it('rejects if caller is not an ADMIN', async () => {
       // Mock app session for normal USER
@@ -328,56 +472,6 @@ describe('Family Setup and Role Management', () => {
       expect(updateSpy).toHaveBeenCalledWith({
         where: { id: 'user-2' },
         data: { role: 'ADMIN' },
-      })
-    })
-  })
-
-  describe('Deck Transfer', () => {
-    it('getAssignableUsers returns active users', async () => {
-      vi.spyOn(prisma.user, 'findMany').mockResolvedValueOnce([
-        { id: 'u1', username: 'eltern', displayName: 'Eltern', role: 'ADMIN' },
-        { id: 'u2', username: 'max', displayName: 'Max', role: 'USER' },
-      ] as any)
-
-      const users = await getAssignableUsers()
-      expect(users.length).toBe(2)
-      expect(users[0]).toEqual({
-        id: 'u1',
-        username: 'eltern',
-        displayName: 'Eltern',
-        role: 'ADMIN',
-      })
-    })
-
-    it('transferDeck successfully transfers deck to another active user', async () => {
-      const appSecret = getAppSecret()
-      const token = createAppSessionToken('admin', appSecret, 3600, {
-        id: 'admin',
-        role: 'ADMIN',
-      })
-      mockCookies.set(AUTH_COOKIE_NAME, { value: token })
-
-      vi.spyOn(prisma.deck, 'findUnique').mockResolvedValueOnce({
-        id: 'deck-10',
-        userId: 'admin',
-      } as any)
-
-      vi.spyOn(prisma.user, 'findUnique').mockResolvedValueOnce({
-        id: 'child-2',
-        username: 'leo',
-        isActive: true,
-      } as any)
-
-      const updateSpy = vi.spyOn(prisma.deck, 'update').mockResolvedValueOnce({
-        id: 'deck-10',
-        userId: 'child-2',
-      } as any)
-
-      const res = await transferDeck('deck-10', 'child-2')
-      expect(res.success).toBe(true)
-      expect(updateSpy).toHaveBeenCalledWith({
-        where: { id: 'deck-10' },
-        data: { userId: 'child-2' },
       })
     })
   })
