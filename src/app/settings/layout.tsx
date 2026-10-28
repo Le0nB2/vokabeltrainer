@@ -1,20 +1,29 @@
-import { cookies } from "next/headers"
-import { verifySettingsSessionToken, SETTINGS_COOKIE_NAME } from "@/lib/auth-utils"
+import { checkSettingsAuthenticated } from "@/actions/auth"
 import { PasswordPrompt } from "@/components/PasswordPrompt"
+import { getCurrentUser } from "@/lib/auth-guard"
+import { getSetupState } from "@/actions/setup"
+import { redirect } from "next/navigation"
+
+export const dynamic = 'force-dynamic'
 
 export default async function SettingsLayout({
   children,
 }: {
   children: React.ReactNode
 }) {
-  const envPassword = process.env.SETTINGS_PASSWORD
-  const cookieStore = await cookies()
-  const isAuthenticated = verifySettingsSessionToken(
-    cookieStore.get(SETTINGS_COOKIE_NAME)?.value,
-    envPassword
-  )
+  const setupState = await getSetupState()
+  if (setupState.needsSetup) {
+    redirect("/setup")
+  }
 
-  if (envPassword && !isAuthenticated) {
+  const user = await getCurrentUser()
+  if (!user) {
+    redirect("/login")
+  }
+
+  const isAuthenticated = await checkSettingsAuthenticated()
+
+  if (!isAuthenticated) {
     return <PasswordPrompt />
   }
 

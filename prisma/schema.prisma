@@ -7,16 +7,35 @@ datasource db {
   url      = "file:./dev.db"
 }
 
+model User {
+  id           String    @id @default(uuid())
+  username     String    @unique
+  displayName  String?
+  passwordHash String
+  role         String    @default("USER")
+  isActive     Boolean   @default(true)
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+  lastLoginAt  DateTime?
+  decks        Deck[]
+}
+
 model Deck {
   id                  String      @id @default(uuid())
+  userId              String?
+  user                User?       @relation(fields: [userId], references: [id], onDelete: Cascade)
   title               String
   description         String?
+  targetLanguage      String      @default("en")
+  sourceLanguage      String      @default("de")
   createdAt           DateTime    @default(now())
   updatedAt           DateTime    @updatedAt
   cards               Card[]
   reviewLogs          ReviewLog[]
   lastResultCorrect   Int?
   lastResultIncorrect Int?
+
+  @@index([userId])
 }
 
 model Card {
@@ -25,6 +44,7 @@ model Card {
   deck               Deck        @relation(fields: [deckId], references: [id], onDelete: Cascade)
   front              String
   back               String
+  language           String      @default("en")
   notes              String?
   mnemonic           String?
   contextSentence    String?
@@ -52,6 +72,8 @@ model ReviewLog {
 
 model Settings {
   id                    String  @id @default("default")
+  isSetupCompleted      Boolean @default(false)
+  settingsPasswordHash  String?
   minigamesEnabled      Boolean @default(true)
   minigameIntervalMin   Int     @default(50)
   minigameIntervalMax   Int     @default(75)

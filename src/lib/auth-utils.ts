@@ -1,4 +1,4 @@
-import { createHash, createHmac, randomBytes, timingSafeEqual } from "crypto"
+import { createHash, createHmac, randomBytes, scryptSync, timingSafeEqual } from "crypto"
 
 export { getSafeRedirectUrl } from "./utils/url"
 
@@ -154,8 +154,123 @@ export function getAppSecret(password?: string): string {
     process.env.AUTH_SECRET ||
     process.env.SESSION_SECRET ||
     (password ? deriveSecretFromPassword(password) : undefined) ||
+    (process.env.SETTINGS_PASSWORD ? deriveSecretFromPassword(process.env.SETTINGS_PASSWORD) : undefined) ||
     getFallbackSecret()
   )
+}
+
+export const SCRYPT_PARAMS = { N: 32768, r: 8, p: 1, maxmem: 64 * 1024 * 1024 };
+
+/**
+ * Hash a password using NIST/OWASP approved scrypt with random salt (cost N=32768).
+ */
+export function hashPassword(password: string): string {
+  if (!password) {
+    throw new Error("Passwort darf nicht leer sein");
+  }
+  const salt = randomBytes(16).toString("hex");
+  const derivedKey = scryptSync(password, salt, 64, SCRYPT_PARAMS);
+  return `${salt}:${derivedKey.toString("hex")}`;
+}
+
+/**
+ * Verify a plaintext password against a stored scrypt hash.
+ * Supports upgraded N=32768 and legacy N=16384 for backwards compatibility.
+ */
+export function verifyPassword(password: string, storedHash: string): boolean {
+  if (!password || !storedHash) return false;
+  const parts = storedHash.split(":");
+  if (parts.length !== 2) return false;
+  const [salt, key] = parts;
+  if (!salt || !key) return false;
+
+  try {
+    const keyBuffer = Buffer.from(key, "hex");
+    if (keyBuffer.length === 0) return false;
+
+    // 1. Try with upgraded security parameters (N=32768)
+    const derivedKey = scryptSync(password, salt, keyBuffer.length, SCRYPT_PARAMS);
+    if (derivedKey.length === keyBuffer.length && timingSafeEqual(derivedKey, keyBuffer)) {
+      return true;
+    }
+
+    // 2. Fallback to default params (N=16384) for backwards compatibility
+    const fallbackDerivedKey = scryptSync(password, salt, keyBuffer.length);
+    if (fallbackDerivedKey.length === keyBuffer.length && timingSafeEqual(fallbackDerivedKey, keyBuffer)) {
+      return true;
+    }
+
+    return false;
+  } catch {
+    return false;
+  }
+}
+
+export interface AppSessionPayload {
+  u: string;
+  id?: string;
+  role?: string;
+  pv?: string;
+  exp: number;
+}
+
+/**
+ * Generates a short version fingerprint of a password hash to detect password changes
+ * and revoke active sessions.
+ */
+export function getPasswordVersion(passwordHash: string): string {
+  if (!passwordHash) return ""
+  return createHash("sha256").update(passwordHash).digest("hex").slice(0, 12)
+}
+
+/**
+ * Validates a username according to application security guidelines:
+ * - 2 to 50 characters
+ * - Only alphanumeric, underscores, hyphens, and dots
+ * - Not a reserved system name ("default", "env-admin")
+ */
+export function validateUsername(username: string): { valid: boolean; error?: string; normalized?: string } {
+  const clean = (username || "").trim()
+  if (!clean || clean.length < 2 || clean.length > 50) {
+    return { valid: false, error: "Der Benutzername muss zwischen 2 und 50 Zeichen lang sein." }
+  }
+  if (!/^[a-zA-Z0-9_\-\.]+$/.test(clean)) {
+    return { valid: false, error: "Der Benutzername darf nur Buchstaben, Zahlen, Bindestriche und Punkte enthalten." }
+  }
+  const lower = clean.toLowerCase()
+  if (lower === "default" || lower === "env-admin") {
+    return { valid: false, error: "Dieser Benutzername ist reserviert." }
+  }
+  return { valid: true, normalized: lower }
+}
+
+export const MAX_PASSWORD_LENGTH = 128
+
+/**
+ * Validates user passwords according to enhanced security policy:
+ * - Minimum 8 characters, maximum 128 characters
+ * - At least one special character
+ */
+export function validatePasswordPolicy(password: string): { valid: boolean; error?: string } {
+  if (!password || password.length < 8) {
+    return {
+      valid: false,
+      error: "Das Passwort muss mindestens 8 Zeichen lang sein und mindestens ein Sonderzeichen enthalten.",
+    }
+  }
+  if (password.length > MAX_PASSWORD_LENGTH) {
+    return {
+      valid: false,
+      error: `Das Passwort darf maximal ${MAX_PASSWORD_LENGTH} Zeichen lang sein.`,
+    }
+  }
+  if (!/[^a-zA-Z0-9]/.test(password)) {
+    return {
+      valid: false,
+      error: "Das Passwort muss mindestens 8 Zeichen lang sein und mindestens ein Sonderzeichen enthalten.",
+    }
+  }
+  return { valid: true }
 }
 
 /**
@@ -164,47 +279,66 @@ export function getAppSecret(password?: string): string {
 export function createAppSessionToken(
   username: string,
   secret: string,
-  maxAgeSeconds = AUTH_COOKIE_MAX_AGE
+  maxAgeSeconds = AUTH_COOKIE_MAX_AGE,
+  metadata?: { id?: string; role?: string; pv?: string }
 ): string {
-  const payload = JSON.stringify({
+  const payload: Record<string, unknown> = {
     u: username,
     exp: Math.floor(Date.now() / 1000) + maxAgeSeconds,
-  })
-  const data = Buffer.from(payload).toString("base64url")
+  }
+  if (metadata?.id) payload.id = metadata.id
+  if (metadata?.role) payload.role = metadata.role
+  if (metadata?.pv) payload.pv = metadata.pv
+
+  const data = Buffer.from(JSON.stringify(payload)).toString("base64url")
   const sig = createHmac("sha256", secret).update(data).digest("hex")
   return `${data}.${sig}`
 }
 
 /**
- * Verify a signed session token. Returns true if valid, matching the expected user, and not expired.
+ * Decode and verify signature & expiration of an app session token.
  */
-export function verifyAppSessionToken(
+export function decodeAppSessionToken(
   token: string | undefined | null,
-  expectedUser: string,
   secret: string
-): boolean {
-  if (!token || typeof token !== "string") return false
+): AppSessionPayload | null {
+  if (!token || typeof token !== "string") return null
   const parts = token.split(".")
-  if (parts.length !== 2) return false
+  if (parts.length !== 2) return null
 
   const [data, sig] = parts
-  if (!data || !sig) return false
+  if (!data || !sig) return null
 
   const expectedSig = createHmac("sha256", secret).update(data).digest("hex")
-  if (sig.length !== expectedSig.length) return false
-  if (!timingSafeEqual(Buffer.from(sig), Buffer.from(expectedSig))) return false
+  if (sig.length !== expectedSig.length) return null
+  if (!timingSafeEqual(Buffer.from(sig), Buffer.from(expectedSig))) return null
 
   try {
     const payload = JSON.parse(Buffer.from(data, "base64url").toString("utf-8"))
-    if (typeof payload !== "object" || payload === null) return false
-    if (expectedUser && payload.u !== expectedUser) return false
+    if (typeof payload !== "object" || payload === null) return null
+    if (typeof payload.u !== "string" || !payload.u) return null
     if (typeof payload.exp !== "number" || payload.exp < Math.floor(Date.now() / 1000)) {
-      return false
+      return null
     }
-    return true
+    return payload as AppSessionPayload
   } catch {
-    return false
+    return null
   }
+}
+
+/**
+ * Verify a signed session token. Returns true if valid, matching the expected user (if specified), and not expired.
+ */
+export function verifyAppSessionToken(
+  token: string | undefined | null,
+  expectedUser?: string | null,
+  secret?: string
+): boolean {
+  const s = secret || getAppSecret()
+  const payload = decodeAppSessionToken(token, s)
+  if (!payload) return false
+  if (expectedUser && payload.u !== expectedUser) return false
+  return true
 }
 
 /**

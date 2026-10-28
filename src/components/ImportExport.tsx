@@ -79,7 +79,7 @@ export function ImportExport() {
   }
 
   return (
-    <div className="space-y-6 mt-6">
+    <div className="space-y-6 mt-8">
       {message && (
         <div className={`p-4 rounded-lg ${message.type === 'success' ? 'bg-green-100 text-green-800 border border-green-200' : 'bg-red-100 text-red-800 border border-red-200'}`}>
           {message.text}

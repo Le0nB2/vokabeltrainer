@@ -1,7 +1,7 @@
 "use client"
 
 import { useState } from "react"
-import { Lock, ArrowLeft } from "lucide-react"
+import { ShieldCheck, ArrowLeft, Info } from "lucide-react"
 import { checkPassword } from "@/actions/auth"
 import Link from "next/link"
 
@@ -25,7 +25,7 @@ export function PasswordPrompt() {
         setIsLoading(false)
       }
     } catch {
-      setError("Ein Unerwarteter Fehler ist aufgetreten")
+      setError("Ein unerwarteter Fehler ist aufgetreten")
       setIsLoading(false)
     }
   }
@@ -37,13 +37,13 @@ export function PasswordPrompt() {
           <ArrowLeft className="w-4 h-4" /> Zurück zur Übersicht
         </Link>
 
-        <div className="flex flex-col items-center mb-8">
-          <div className="w-16 h-16 bg-blue-100 dark:bg-blue-900/30 rounded-full flex items-center justify-center mb-4">
-            <Lock className="w-8 h-8 text-blue-600 dark:text-blue-400" />
+        <div className="flex flex-col items-center mb-6">
+          <div className="w-16 h-16 bg-blue-100 dark:bg-blue-900/30 rounded-full flex items-center justify-center mb-4 text-blue-600 dark:text-blue-400">
+            <ShieldCheck className="w-8 h-8" />
           </div>
-          <h1 className="text-2xl font-bold text-zinc-900 dark:text-zinc-100">Geschützter Bereich</h1>
-          <p className="text-zinc-500 text-center mt-2">
-            Bitte gib das Passwort ein, um auf die Einstellungen zuzugreifen.
+          <h1 className="text-2xl font-bold text-zinc-900 dark:text-zinc-100">Kindersicherung</h1>
+          <p className="text-zinc-600 dark:text-zinc-400 text-center mt-2 text-sm leading-relaxed">
+            Kindersicherung: Verhindert, dass Kinder beim Vokabellernen Einstellungen verändern.
           </p>
         </div>
 
@@ -53,9 +53,10 @@ export function PasswordPrompt() {
               type="password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              placeholder="Passwort"
+              placeholder="PIN oder Kennwort"
               required
-              className="w-full px-4 py-3 rounded-xl border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-shadow"
+              autoFocus
+              className="w-full px-4 py-3 rounded-xl border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-shadow text-center tracking-wider text-lg"
             />
           </div>
 
@@ -66,11 +67,16 @@ export function PasswordPrompt() {
           <button
             type="submit"
             disabled={isLoading || !password}
-            className="w-full bg-blue-600 hover:bg-blue-700 text-white font-medium py-3 rounded-xl transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            className="w-full bg-blue-600 hover:bg-blue-700 text-white font-medium py-3 rounded-xl transition-colors disabled:opacity-50 disabled:cursor-not-allowed shadow-sm"
           >
             {isLoading ? "Überprüfe..." : "Entsperren"}
           </button>
         </form>
+
+        <div className="mt-6 pt-5 border-t border-zinc-100 dark:border-zinc-800 flex items-start gap-2.5 text-xs text-zinc-500 dark:text-zinc-400">
+          <Info className="w-4 h-4 shrink-0 mt-0.5 text-blue-500" />
+          <span>Tipp: Du kannst diesen Bereich auch mit deinem Eltern-Anmeldekennwort entsperren.</span>
+        </div>
       </div>
     </main>
   )

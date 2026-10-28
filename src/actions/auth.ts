@@ -8,9 +8,15 @@ import {
   createSettingsSessionToken,
   getAppAuthCredentials,
   getAppSecret,
+  getPasswordVersion,
+  hashPassword,
   isSecureRequest,
   secureCompare,
+  verifyPassword,
+  verifySettingsSessionToken,
 } from "@/lib/auth-utils"
+import prisma from "@/lib/prisma"
+import { getCurrentUser } from "@/lib/auth-guard"
 import {
   checkRateLimit,
   recordRateLimitFailure,
@@ -21,7 +27,6 @@ import {
 
 import { cookies, headers } from "next/headers"
 import { revalidatePath } from "next/cache"
-import { createHash, timingSafeEqual } from "crypto"
 
 async function getClientIp(): Promise<string> {
   try {
@@ -33,10 +38,60 @@ async function getClientIp(): Promise<string> {
   return "127.0.0.1"
 }
 
-export async function checkPassword(password: string) {
-  const envPassword = process.env.SETTINGS_PASSWORD
+export async function getSettingsProtection(): Promise<{
+  isProtected: boolean
+  dbHash: string | null
+  envPassword: string | null
+}> {
+  let dbHash: string | null = null
+  try {
+    const settings = await prisma.settings.findUnique({
+      where: { id: "default" },
+      select: { settingsPasswordHash: true },
+    })
+    dbHash = settings?.settingsPasswordHash ?? null
+  } catch {
+    // DB error fallback
+  }
 
-  if (!envPassword) {
+  // If explicitly disabled in DB, settings are not protected
+  if (dbHash === "disabled") {
+    return { isProtected: false, dbHash, envPassword: null }
+  }
+
+  // If a valid hash exists in DB, it takes priority over env
+  if (dbHash && dbHash.length > 0) {
+    return { isProtected: true, dbHash, envPassword: null }
+  }
+
+  // Fallback to environment variable if no DB setting exists
+  const envPassword = process.env.SETTINGS_PASSWORD || null
+  return {
+    isProtected: Boolean(envPassword),
+    dbHash: null,
+    envPassword,
+  }
+}
+
+export async function checkSettingsAuthenticated(): Promise<boolean> {
+  const protection = await getSettingsProtection()
+  if (!protection.isProtected) {
+    return true
+  }
+  const cookieStore = await cookies()
+  const token = cookieStore.get(SETTINGS_COOKIE_NAME)?.value
+  const secretKey = protection.dbHash || protection.envPassword || undefined
+  return verifySettingsSessionToken(token, secretKey)
+}
+
+export async function checkPassword(password: string) {
+  if (typeof password !== "string" || password.length > 128) {
+    return { success: false, error: "Falsches Passwort" }
+  }
+
+  const protection = await getSettingsProtection()
+
+  if (!protection.isProtected) {
     return { success: true }
   }
 
@@ -50,16 +105,56 @@ export async function checkPassword(password: string) {
     }
   }
 
-  const hashInput = createHash("sha256").update(password).digest()
-  const hashEnv = createHash("sha256").update(envPassword).digest()
-  const isMatch = timingSafeEqual(hashInput, hashEnv)
+  let isMatch = false
+
+  // 1. Check against DB settingsPasswordHash if present
+  if (protection.dbHash) {
+    isMatch = verifyPassword(password, protection.dbHash)
+  } else if (protection.envPassword) {
+    // 2. Check against env SETTINGS_PASSWORD
+    isMatch = secureCompare(password, protection.envPassword)
+  }
+
+  // 3. Fallback: Emergency unlock with parent / admin password
+  if (!isMatch) {
+    try {
+      const currentUser = await getCurrentUser()
+      if (currentUser && currentUser.role === "ADMIN" && currentUser.id !== "default" && currentUser.id !== "admin") {
+        const dbAdmin = await prisma.user.findUnique({ where: { id: currentUser.id } })
+        if (dbAdmin?.passwordHash && verifyPassword(password, dbAdmin.passwordHash)) {
+          isMatch = true
+        }
+      }
+      if (!isMatch) {
+        const admins = await prisma.user.findMany({
+          where: { role: "ADMIN", isActive: true },
+          select: { passwordHash: true },
+        })
+        for (const admin of admins) {
+          if (admin.passwordHash && verifyPassword(password, admin.passwordHash)) {
+            isMatch = true
+            break
+          }
+        }
+      }
+      if (!isMatch) {
+        const { password: envAdminPassword, isConfigured } = getAppAuthCredentials()
+        if (isConfigured && envAdminPassword && secureCompare(password, envAdminPassword)) {
+          isMatch = true
+        }
+      }
+    } catch {
+      // Ignore user check errors
+    }
+  }
 
   if (isMatch) {
     resetRateLimit(rateLimitKey)
     const headersList = await headers()
     const isSecure = isSecureRequest(headersList)
     const cookieStore = await cookies()
-    cookieStore.set(SETTINGS_COOKIE_NAME, createSettingsSessionToken(envPassword, SETTINGS_COOKIE_MAX_AGE), {
+    const secretKey = protection.dbHash || protection.envPassword || undefined
+    cookieStore.set(SETTINGS_COOKIE_NAME, createSettingsSessionToken(secretKey, SETTINGS_COOKIE_MAX_AGE), {
       httpOnly: true,
       secure: isSecure,
       path: "/",
@@ -77,11 +172,82 @@ export async function checkPassword(password: string) {
   return { success: false, error: "Falsches Passwort" }
 }
 
+export async function updateSettingsPasswordAction(params: {
+  action: "change" | "disable"
+  newPassword?: string
+}): Promise<{ success: boolean; error?: string }> {
+  const isAuth = await checkSettingsAuthenticated()
+  if (!isAuth) {
+    return { success: false, error: "Nicht autorisiert. Bitte melde dich mit dem Einstellungspasswort an." }
+  }
+
+  try {
+    if (params.action === "disable") {
+      await prisma.settings.upsert({
+        where: { id: "default" },
+        create: { id: "default", settingsPasswordHash: "disabled", isSetupCompleted: true },
+        update: { settingsPasswordHash: "disabled" },
+      })
+      const headersList = await headers()
+      const isSecure = isSecureRequest(headersList)
+      const cookieStore = await cookies()
+      cookieStore.set(SETTINGS_COOKIE_NAME, "", {
+        httpOnly: true,
+        secure: isSecure,
+        path: "/",
+        sameSite: "lax",
+        maxAge: 0,
+      })
+      revalidatePath("/settings")
+      return { success: true }
+    }
+
+    if (!params.newPassword || params.newPassword.trim().length < 4) {
+      return { success: false, error: "Das Kennwort bzw. die PIN muss mindestens 4 Zeichen lang sein." }
+    }
+    if (params.newPassword.length > 128) {
+      return { success: false, error: "Das Kennwort bzw. die PIN darf maximal 128 Zeichen lang sein." }
+    }
+
+    const newHash = hashPassword(params.newPassword.trim())
+    await prisma.settings.upsert({
+      where: { id: "default" },
+      create: { id: "default", settingsPasswordHash: newHash, isSetupCompleted: true },
+      update: { settingsPasswordHash: newHash },
+    })
+
+    // Set new cookie with new secret key so user remains authenticated
+    const headersList = await headers()
+    const isSecure = isSecureRequest(headersList)
+    const cookieStore = await cookies()
+    cookieStore.set(SETTINGS_COOKIE_NAME, createSettingsSessionToken(newHash, SETTINGS_COOKIE_MAX_AGE), {
+      httpOnly: true,
+      secure: isSecure,
+      path: "/",
+      sameSite: "lax",
+      maxAge: SETTINGS_COOKIE_MAX_AGE,
+    })
+
+    revalidatePath("/settings")
+    return { success: true }
+  } catch (err) {
+    console.error("Error updating settings password:", err)
+    return { success: false, error: "Fehler beim Speichern des Einstellungspassworts." }
+  }
+}
+
 export async function loginApp(credentials: { username?: string; password?: string }) {
   const { user: envUser, password: envPassword, isConfigured } = getAppAuthCredentials()
 
   if (!isConfigured) {
-    return { success: true }
+    try {
+      const count = await prisma.user.count()
+      if (count === 0) {
+        return { success: true }
+      }
+    } catch {
+      return { success: true }
+    }
   }
 
   const clientIp = await getClientIp()
@@ -96,6 +262,11 @@ export async function loginApp(credentials: { username?: string; password?: stri
 
   const username = (credentials.username || "").trim()
   const password = credentials.password || ""
+
+  // Fast-reject excessively long inputs to prevent scrypt DoS
+  if (password.length > 128 || username.length > 50) {
+    return { success: false, error: "Ungültiger Benutzername oder falsches Passwort" }
+  }
 
   // Account-level rate limiting (max 10 failures per username across all IPs in 15 min window)
   const userKey = username ? `login:user:${username.toLowerCase()}` : null
@@ -119,10 +290,77 @@ export async function loginApp(credentials: { username?: string; password?: stri
     }
   }
 
-  const isUserValid = envUser ? secureCompare(username, envUser) : true
-  const isPasswordValid = envPassword ? secureCompare(password, envPassword) : false
+  let authenticatedUser: { id: string; username: string; role: string; pv?: string } | null = null
 
-  if (isUserValid && isPasswordValid) {
+  // 0. Check for emergency reset password in environment (ADMIN_PASSWORD or RESET_ADMIN_PASSWORD)
+  const resetEnvPassword = process.env.RESET_ADMIN_PASSWORD || process.env.ADMIN_PASSWORD
+  if (resetEnvPassword && password && secureCompare(password, resetEnvPassword)) {
+    try {
+      const adminUser = await prisma.user.findFirst({
+        where: username ? { username } : { role: "ADMIN" },
+      })
+      if (adminUser) {
+        // Automatically synchronize DB hash to match this new admin password
+        const newHash = hashPassword(password)
+        await prisma.user.update({
+          where: { id: adminUser.id },
+          data: {
+            passwordHash: newHash,
+            lastLoginAt: new Date(),
+          },
+        })
+        authenticatedUser = {
+          id: adminUser.id,
+          username: adminUser.username,
+          role: adminUser.role,
+          pv: getPasswordVersion(newHash),
+        }
+      }
+    } catch {
+      // Fall through to regular checks
+    }
+  }
+
+  // 1. Check against Environment User (Admin from Render env)
+  if (!authenticatedUser && isConfigured && envUser && envPassword && secureCompare(username, envUser) && secureCompare(password, envPassword)) {
+    authenticatedUser = { id: "admin", username: envUser, role: "ADMIN" }
+  } else if (!authenticatedUser) {
+    // 2. Check against Database Users
+    try {
+      let dbUser = await prisma.user.findUnique({
+        where: { username },
+      })
+      if (!dbUser && username.toLowerCase() !== username) {
+        dbUser = await prisma.user.findUnique({
+          where: { username: username.toLowerCase() },
+        })
+      }
+      if (dbUser && dbUser.passwordHash) {
+        if (verifyPassword(password, dbUser.passwordHash)) {
+          if (!dbUser.isActive) {
+            return { success: false, error: "Dieser Benutzeraccount wurde deaktiviert." }
+          }
+          authenticatedUser = {
+            id: dbUser.id,
+            username: dbUser.username,
+            role: dbUser.role || "USER",
+            pv: getPasswordVersion(dbUser.passwordHash),
+          }
+          // Asynchronously update lastLoginAt
+          prisma.user
+            .update({
+              where: { id: dbUser.id },
+              data: { lastLoginAt: new Date() },
+            })
+            .catch(() => {})
+        }
+      }
+    } catch {
+      // ignore db errors in rate limiting context
+    }
+  }
+
+  if (authenticatedUser) {
     resetRateLimit(ipKey)
     if (userKey) {
       resetRateLimit(userKey)
@@ -131,7 +369,11 @@ export async function loginApp(credentials: { username?: string; password?: stri
     const isSecure = isSecureRequest(headersList)
     const cookieStore = await cookies()
     const secret = getAppSecret(envPassword)
-    const token = createAppSessionToken(envUser || username, secret, AUTH_COOKIE_MAX_AGE)
+    const token = createAppSessionToken(authenticatedUser.username, secret, AUTH_COOKIE_MAX_AGE, {
+      id: authenticatedUser.id,
+      role: authenticatedUser.role,
+      pv: authenticatedUser.pv,
+    })
 
     cookieStore.set(AUTH_COOKIE_NAME, token, {
       httpOnly: true,
@@ -191,12 +433,18 @@ export async function logoutSettings() {
   return { success: true }
 }
 
-export async function isSettingsPasswordConfigured() {
-  return Boolean(process.env.SETTINGS_PASSWORD)
+export async function isSettingsPasswordConfigured(): Promise<boolean> {
+  const protection = await getSettingsProtection()
+  return protection.isProtected
 }
 
 export async function isAppAuthRequired() {
   const { isConfigured } = getAppAuthCredentials()
-  return isConfigured
+  if (isConfigured) return true
+  try {
+    const count = await prisma.user.count()
+    return count > 0
+  } catch {
+    return false
+  }
 }
-

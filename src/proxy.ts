@@ -2,9 +2,10 @@ import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import {
   AUTH_COOKIE_NAME,
+  SETTINGS_COOKIE_NAME,
   getAppAuthCredentials,
   getAppSecret,
-  verifyAppSessionToken,
+  decodeAppSessionToken,
   extractTokenFromRequest,
   verifyNotificationToken,
 } from "./lib/auth-utils";
@@ -16,16 +17,6 @@ export async function proxy(req: NextRequest) {
     ? new URL(req.nextUrl.toString())
     : new URL(req.url || "/", "http://localhost");
   const pathname = url.pathname;
-
-  // Bypass auth if credentials are not configured in environment
-  if (!isConfigured) {
-    if (pathname === "/login") {
-      url.pathname = "/";
-      url.search = "";
-      return NextResponse.redirect(url);
-    }
-    return NextResponse.next();
-  }
 
   // Get session cookie (support both NextRequest.cookies and Cookie header fallback)
   let sessionCookie = req.cookies?.get(AUTH_COOKIE_NAME)?.value;
@@ -43,7 +34,34 @@ export async function proxy(req: NextRequest) {
   }
 
   const secret = getAppSecret(authPassword);
-  const isAuthenticated = verifyAppSessionToken(sessionCookie, authUser, secret);
+  const sessionPayload = decodeAppSessionToken(sessionCookie, secret);
+  const isEnvUser = authUser ? sessionPayload?.u === authUser : false;
+  const isDbUser = Boolean(sessionPayload?.id && sessionPayload?.id !== "admin");
+  const isAuthenticated = Boolean(
+    sessionPayload && (!authUser || isEnvUser || isDbUser)
+  );
+
+  // Helper: auto-clear settings session cookie when navigating outside /settings
+  const applySettingsAutoLogout = (response: any) => {
+    if (
+      pathname !== "/settings" &&
+      !pathname.startsWith("/api/export") &&
+      !pathname.startsWith("/api/worksheet")
+    ) {
+      const rawCookie = req.headers?.get("cookie");
+      const hasSettingsCookie = Boolean(
+        req.cookies?.get(SETTINGS_COOKIE_NAME)?.value ||
+        (rawCookie && rawCookie.includes(`${SETTINGS_COOKIE_NAME}=`))
+      );
+      if (hasSettingsCookie && response && typeof response.cookies?.set === "function") {
+        response.cookies.set(SETTINGS_COOKIE_NAME, "", {
+          path: "/",
+          maxAge: 0,
+        });
+      }
+    }
+    return response;
+  };
 
   // Authenticated user
   if (isAuthenticated) {
@@ -52,9 +70,9 @@ export async function proxy(req: NextRequest) {
       const safeTarget = getSafeRedirectUrl(redirectTarget, "/");
       const finalTarget = safeTarget === "/login" ? "/" : safeTarget;
       const targetUrl = new URL(finalTarget, url.origin);
-      return NextResponse.redirect(targetUrl);
+      return applySettingsAutoLogout(NextResponse.redirect(targetUrl));
     }
-    return NextResponse.next();
+    return applySettingsAutoLogout(NextResponse.next());
   }
 
   // Home Assistant / Notification API token access
@@ -66,9 +84,10 @@ export async function proxy(req: NextRequest) {
   }
 
   // Unauthenticated user:
-  // Allow access to login page, static icons, and app manifest
+  // Allow access to login page, setup page, static icons, and app manifest
   if (
     pathname === "/login" ||
+    pathname === "/setup" ||
     pathname === "/apple-icon" ||
     pathname === "/apple-touch-icon.png" ||
     pathname === "/apple-touch-icon-precomposed.png" ||
@@ -80,7 +99,13 @@ export async function proxy(req: NextRequest) {
     pathname === "/icon-512.png" ||
     /^\/icon-\d+x\d+\.png$/.test(pathname)
   ) {
-    return NextResponse.next();
+    return applySettingsAutoLogout(NextResponse.next());
+  }
+
+  // If env credentials are NOT configured, allow request to proceed to server components.
+  // Next.js server components / actions (via getCurrentUser) enforce authentication if DB users exist.
+  if (!isConfigured) {
+    return applySettingsAutoLogout(NextResponse.next());
   }
 
   // For API routes, return 401 JSON without WWW-Authenticate: Basic header

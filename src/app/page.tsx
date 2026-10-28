@@ -1,17 +1,31 @@
 import { getDecks, createDeck } from "@/actions/decks"
 import Link from "next/link"
+import { redirect } from "next/navigation"
 import { Plus, BookOpen, Settings, Brain } from "lucide-react"
 import { DeckMenu } from "@/components/DeckMenu"
 import { DeckPieChart } from "@/components/DeckPieChart"
 import { LearningStatsChart } from "@/components/LearningStatsChart"
 import { LogoutButton } from "@/components/LogoutButton"
 import { getAppAuthCredentials } from "@/lib/auth-utils"
+import { getCurrentUser } from "@/lib/auth-guard"
+import { getSetupState } from "@/actions/setup"
 import prisma from "@/lib/prisma"
 import { subDays, format } from "date-fns"
 
 export const dynamic = 'force-dynamic'
 
 export default async function Dashboard() {
+  const setupState = await getSetupState()
+  if (setupState.needsSetup) {
+    redirect("/setup")
+  }
+
+  const user = await getCurrentUser()
+  if (!user) {
+    redirect("/login")
+  }
+
+  const isSetupMode = user.id === "default"
   const decks = await getDecks()
   const now = new Date()
 
@@ -23,11 +37,19 @@ export default async function Dashboard() {
   const sevenDaysAgo = subDays(now, 6)
   sevenDaysAgo.setHours(0,0,0,0)
 
+  const deckFilter =
+    !user || user.id === "default"
+      ? undefined
+      : user.role === "ADMIN"
+      ? { OR: [{ userId: user.id }, { userId: null }] }
+      : { userId: user.id }
+
   const logs = await prisma.reviewLog.findMany({
     where: {
       createdAt: {
         gte: sevenDaysAgo
-      }
+      },
+      ...(deckFilter && { deck: deckFilter })
     },
     select: {
       createdAt: true,
@@ -73,7 +95,7 @@ export default async function Dashboard() {
               <Link href="/settings" className="text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-100 transition-colors p-2" title="Einstellungen">
                 <Settings className="w-6 h-6" />
               </Link>
-              {isAuthEnabled && <LogoutButton />}
+              {!isSetupMode && <LogoutButton />}
             </div>
           </div>
           {totalDueCount > 0 && (
@@ -93,8 +115,14 @@ export default async function Dashboard() {
           <div className="flex gap-2 sm:gap-3 items-center w-full sm:w-auto">
             <form action={async (formData) => {
               "use server"
-              const title = formData.get("title") as string
-              if (title) await createDeck(title)
+              const title = (formData.get("title") as string)?.trim()
+              if (title) {
+                try {
+                  await createDeck(title)
+                } catch (err) {
+                  console.error("Fehler beim Erstellen des Decks:", err)
+                }
+              }
             }} className="flex gap-2 w-full sm:w-auto">
               <input
                 name="title"
@@ -107,10 +135,15 @@ export default async function Dashboard() {
               </button>
             </form>
             <div className="hidden sm:flex items-center gap-1 sm:gap-2">
+              {!isSetupMode && (
+                <span className="text-xs bg-zinc-200 dark:bg-zinc-800 px-2.5 py-1 rounded-full text-zinc-700 dark:text-zinc-300 font-medium">
+                  {user.username}
+                </span>
+              )}
               <Link href="/settings" className="text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-100 transition-colors p-2" title="Einstellungen">
                 <Settings className="w-5 h-5" />
               </Link>
-              {isAuthEnabled && (
+              {!isSetupMode && (
                 <LogoutButton className="inline-flex items-center text-zinc-500 hover:text-red-600 dark:hover:text-red-400 transition-colors p-2 rounded-lg" />
               )}
             </div>
