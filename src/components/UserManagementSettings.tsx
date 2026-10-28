@@ -18,7 +18,10 @@ import {
   ChevronDown,
   ChevronUp,
   Sparkles,
+  Share2,
+  X,
 } from "lucide-react"
+import { ChildShareInfoCard } from "@/components/ChildShareInfoCard"
 import {
   createUser,
   deleteUser,
@@ -107,6 +110,7 @@ export function UserManagementSettings({
 
   // Settings PIN Modal state
   const [showPinModal, setShowPinModal] = useState(false)
+  const [shareUser, setShareUser] = useState<UserSummary | null>(null)
   const [newPin, setNewPin] = useState("")
   const [newPinConfirm, setNewPinConfirm] = useState("")
   const [isSavingPin, setIsSavingPin] = useState(false)
@@ -1397,6 +1401,19 @@ export function UserManagementSettings({
                           )
                         )}
 
+                        {/* Child / Normal user: Share credentials & instructions */}
+                        {u.role !== "ADMIN" && !u.isEnvUser && (
+                          <button
+                            type="button"
+                            onClick={() => setShareUser(u)}
+                            title="Zugangsdaten & App-Anleitung für dieses Kind teilen"
+                            className="p-1.5 text-zinc-500 hover:text-blue-600 dark:hover:text-blue-400 rounded hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors flex items-center gap-1 text-xs"
+                          >
+                            <Share2 className="w-3.5 h-3.5 text-blue-500" />
+                            <span className="hidden sm:inline">Teilen</span>
+                          </button>
+                        )}
+
                         {/* Secondary users only: toggle active / delete */}
                         {u.role !== "ADMIN" && !u.isEnvUser && (
                           <>
@@ -1528,6 +1545,33 @@ export function UserManagementSettings({
                 </div>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Modal for Sharing Child Account Credentials & Instructions */}
+      {shareUser && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto">
+          <div className="bg-white dark:bg-zinc-900 rounded-3xl max-w-2xl w-full p-4 sm:p-6 shadow-2xl border border-zinc-200 dark:border-zinc-800 my-8 max-h-[90vh] overflow-y-auto">
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-base font-bold text-zinc-900 dark:text-zinc-100 flex items-center gap-2">
+                <Share2 className="w-4 h-4 text-blue-600" />
+                Zugangsdaten & Anleitung
+              </h3>
+              <button
+                type="button"
+                onClick={() => setShareUser(null)}
+                className="p-1.5 rounded-lg text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
+                title="Schließen"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <ChildShareInfoCard
+              childName={shareUser.displayName || shareUser.username}
+              childUsername={shareUser.username}
+              onFinish={() => setShareUser(null)}
+            />
           </div>
         </div>
       )}

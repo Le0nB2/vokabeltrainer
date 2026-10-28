@@ -1,4 +1,5 @@
 import { redirect } from "next/navigation"
+import { headers } from "next/headers"
 import { getSetupState } from "@/actions/setup"
 import { SetupWizard } from "@/components/SetupWizard"
 
@@ -11,8 +12,10 @@ export const metadata = {
 
 export default async function SetupPage() {
   const setupState = await getSetupState()
+  const headersList = await headers()
+  const isServerAction = Boolean(headersList.get("next-action"))
 
-  if (!setupState.needsSetup) {
+  if (!setupState.needsSetup && !isServerAction) {
     redirect("/")
   }
 

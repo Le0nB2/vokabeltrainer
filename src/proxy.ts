@@ -117,7 +117,7 @@ export async function proxy(req: NextRequest) {
   }
 
   // Automatically clear stale auth cookies when visiting /setup (e.g. after database reset)
-  if (pathname === "/setup") {
+  if (pathname === "/setup" && req.method === "GET" && !req.headers?.get("next-action")) {
     const rawCookie = req.headers?.get("cookie");
     const hasAuthCookie = Boolean(
       req.cookies?.get(AUTH_COOKIE_NAME)?.value ||
