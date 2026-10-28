@@ -10,6 +10,7 @@ import {
   validatePasswordPolicy,
   AUTH_COOKIE_NAME,
   AUTH_COOKIE_MAX_AGE,
+  SETTINGS_COOKIE_NAME,
   hashPassword,
   isSecureRequest,
 } from "@/lib/auth-utils"
@@ -131,6 +132,32 @@ export async function completeSetupSingleUser(params?: {
           ...(settingsPasswordHash ? { settingsPasswordHash } : {}),
         },
       })
+    })
+
+    // Establish clean single-user session and remove any stale cookies
+    const headersList = await headers()
+    const isSecure = isSecureRequest(headersList)
+    const cookieStore = await cookies()
+    const secret = getAppSecret()
+    const token = createAppSessionToken("default", secret, AUTH_COOKIE_MAX_AGE, {
+      id: "default",
+      role: "ADMIN",
+    })
+
+    cookieStore.set(AUTH_COOKIE_NAME, token, {
+      httpOnly: true,
+      secure: isSecure,
+      path: "/",
+      sameSite: "lax",
+      maxAge: AUTH_COOKIE_MAX_AGE,
+    })
+
+    cookieStore.set(SETTINGS_COOKIE_NAME, "", {
+      httpOnly: true,
+      secure: isSecure,
+      path: "/",
+      sameSite: "lax",
+      maxAge: 0,
     })
 
     resetRateLimit(rateLimitKey)

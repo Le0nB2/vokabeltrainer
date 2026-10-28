@@ -49,12 +49,17 @@ export function SetupWizard({ isPublicOrRender }: SetupWizardProps) {
     if (e) e.preventDefault()
     setError(null)
 
-    if (singleUserPin.trim().length > 0) {
-      if (singleUserPin.trim().length < 4) {
+    const cleanPin = singleUserPin.trim()
+    if (cleanPin.length > 0) {
+      if (cleanPin.length < 4) {
         setError("Die Einstellungs-PIN muss mindestens 4 Zeichen lang sein.")
         return
       }
-      if (singleUserPin !== singleUserPinConfirm) {
+      if (cleanPin.length > 128) {
+        setError("Die Einstellungs-PIN darf maximal 128 Zeichen lang sein.")
+        return
+      }
+      if (cleanPin !== singleUserPinConfirm.trim()) {
         setError("Die Einstellungs-PINs stimmen nicht überein.")
         return
       }
@@ -63,11 +68,14 @@ export function SetupWizard({ isPublicOrRender }: SetupWizardProps) {
     setLoading(true)
     try {
       const res = await completeSetupSingleUser({
-        settingsPin: singleUserPin.trim() || undefined,
+        settingsPin: cleanPin || undefined,
       })
       if (res.success) {
         router.push("/")
         router.refresh()
+        if (typeof window !== "undefined") {
+          window.location.href = "/"
+        }
       } else {
         setError(res.error || "Fehler beim Abschließen der Einrichtung.")
         setLoading(false)
@@ -187,6 +195,9 @@ export function SetupWizard({ isPublicOrRender }: SetupWizardProps) {
       if (res.success) {
         router.push("/")
         router.refresh()
+        if (typeof window !== "undefined") {
+          window.location.href = "/"
+        }
       } else {
         setError(res.error || "Fehler beim Einrichten.")
         setLoading(false)
@@ -627,20 +638,19 @@ export function SetupWizard({ isPublicOrRender }: SetupWizardProps) {
             </h3>
 
             <p className="text-xs sm:text-sm text-zinc-600 dark:text-zinc-400 mb-4 leading-relaxed">
-              Zum Vokabellernen ist kein Login nötig. Bitte lege eine <strong>PIN für das Einstellungsmenü</strong> fest, um deine Einstellungen zu schützen.
+              Zum Vokabellernen ist kein Login nötig. Du kannst deine Einstellungen optional mit einer <strong>PIN für das Einstellungsmenü</strong> schützen.
             </p>
 
             <form onSubmit={handleStartSingleUser} className="space-y-4">
               <div>
                 <label className="block text-xs font-medium text-zinc-700 dark:text-zinc-300 mb-1">
-                  Einstellungs-PIN *
+                  Einstellungs-PIN (optional)
                 </label>
                 <input
                   type="password"
                   value={singleUserPin}
                   onChange={(e) => setSingleUserPin(e.target.value)}
                   placeholder="z. B. 1234 (mind. 4 Zeichen)"
-                  required
                   minLength={4}
                   autoFocus
                   className="w-full px-3 py-2 rounded-xl border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
@@ -649,18 +659,24 @@ export function SetupWizard({ isPublicOrRender }: SetupWizardProps) {
 
               <div>
                 <label className="block text-xs font-medium text-zinc-700 dark:text-zinc-300 mb-1">
-                  PIN bestätigen *
+                  PIN bestätigen {singleUserPin.trim().length > 0 ? "*" : "(optional)"}
                 </label>
                 <input
                   type="password"
                   value={singleUserPinConfirm}
                   onChange={(e) => setSingleUserPinConfirm(e.target.value)}
                   placeholder="PIN wiederholen"
-                  required
-                  minLength={4}
+                  required={singleUserPin.trim().length > 0}
+                  minLength={singleUserPin.trim().length > 0 ? 4 : undefined}
                   className="w-full px-3 py-2 rounded-xl border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
               </div>
+
+              <p className="text-xs text-zinc-500 dark:text-zinc-400">
+                {singleUserPin.trim().length > 0
+                  ? "🔒 Dein Einstellungsmenü wird durch diese PIN geschützt."
+                  : "🔓 Ohne PIN wird kein Kennwort vergeben (jederzeit in den Einstellungen änderbar)."}
+              </p>
 
               <div className="flex flex-col sm:flex-row items-center gap-2 pt-2">
                 <button

@@ -2,6 +2,9 @@ import { Suspense } from "react"
 import { redirect } from "next/navigation"
 import { LoginForm } from "@/components/LoginForm"
 import { getSetupState } from "@/actions/setup"
+import { getCurrentUser } from "@/lib/auth-guard"
+import { getAppAuthCredentials } from "@/lib/auth-utils"
+import prisma from "@/lib/prisma"
 
 export const dynamic = 'force-dynamic'
 
@@ -14,6 +17,17 @@ export default async function LoginPage() {
   const setupState = await getSetupState()
   if (setupState.needsSetup) {
     redirect("/setup")
+  }
+
+  const { isConfigured } = getAppAuthCredentials()
+  const dbUserCount = await prisma.user.count().catch(() => 0)
+  if (!isConfigured && dbUserCount === 0) {
+    redirect("/")
+  }
+
+  const user = await getCurrentUser()
+  if (user && user.id !== "default") {
+    redirect("/")
   }
 
   return (

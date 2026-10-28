@@ -153,4 +153,24 @@ describe('SetupWizard Component', () => {
       expect(mockPush).toHaveBeenCalledWith('/')
     })
   })
+
+  it('sets up single-user mode without PIN / password (optional PIN left empty)', async () => {
+    vi.spyOn(setupActions, 'completeSetupSingleUser').mockResolvedValue({ success: true })
+
+    render(<SetupWizard isPublicOrRender={false} />)
+
+    fireEvent.click(screen.getByText('Als Einzelnutzer starten'))
+
+    expect(screen.getByText('Einzelnutzer-Modus einrichten')).toBeDefined()
+
+    // Leave PIN inputs empty and click submit
+    fireEvent.click(screen.getByText('Einzelnutzer-Modus starten 🚀'))
+
+    await waitFor(() => {
+      expect(setupActions.completeSetupSingleUser).toHaveBeenCalledWith({
+        settingsPin: undefined,
+      })
+      expect(mockPush).toHaveBeenCalledWith('/')
+    })
+  })
 })

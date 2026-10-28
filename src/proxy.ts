@@ -63,9 +63,19 @@ export async function proxy(req: NextRequest) {
     return response;
   };
 
+  // Explicit session clearing when arriving at /login?clear=1 (e.g. from stale session detection)
+  if (pathname === "/login" && url.searchParams.get("clear") === "1") {
+    const res = NextResponse.next();
+    res.cookies.set(AUTH_COOKIE_NAME, "", { path: "/", maxAge: 0 });
+    res.cookies.set(SETTINGS_COOKIE_NAME, "", { path: "/", maxAge: 0 });
+    return applySettingsAutoLogout(res);
+  }
+
   // Authenticated user
   if (isAuthenticated) {
-    if (pathname === "/login") {
+    // Only redirect away from /login if authenticated via environment credentials.
+    // For database users, Server Component /login verifies DB existence to avoid infinite redirect loops with stale cookies.
+    if (pathname === "/login" && isEnvUser) {
       const redirectTarget = url.searchParams.get("redirect");
       const safeTarget = getSafeRedirectUrl(redirectTarget, "/");
       const finalTarget = safeTarget === "/login" ? "/" : safeTarget;

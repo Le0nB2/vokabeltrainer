@@ -6,11 +6,12 @@ import { DeckMenu } from "@/components/DeckMenu"
 import { DeckPieChart } from "@/components/DeckPieChart"
 import { LearningStatsChart } from "@/components/LearningStatsChart"
 import { LogoutButton } from "@/components/LogoutButton"
-import { getAppAuthCredentials } from "@/lib/auth-utils"
+import { getAppAuthCredentials, AUTH_COOKIE_NAME } from "@/lib/auth-utils"
 import { getCurrentUser } from "@/lib/auth-guard"
 import { getSetupState } from "@/actions/setup"
 import prisma from "@/lib/prisma"
 import { subDays, format } from "date-fns"
+import { cookies } from "next/headers"
 
 export const dynamic = 'force-dynamic'
 
@@ -22,6 +23,11 @@ export default async function Dashboard() {
 
   const user = await getCurrentUser()
   if (!user) {
+    const cookieStore = await cookies()
+    const hasStaleCookie = Boolean(cookieStore.get(AUTH_COOKIE_NAME)?.value)
+    if (hasStaleCookie) {
+      redirect("/login?clear=1")
+    }
     redirect("/login")
   }
 
