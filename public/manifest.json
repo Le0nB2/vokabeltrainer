@@ -1,6 +1,6 @@
 {
-  "name": "Vokabeltrainer",
-  "short_name": "Vokabeltrainer",
+  "name": "N30 Vokabeltrainer",
+  "short_name": "N30 Vokabeltrainer",
   "description": "Moderner Vokabeltrainer mit KI Bilderkennung",
   "start_url": "/",
   "display": "standalone",

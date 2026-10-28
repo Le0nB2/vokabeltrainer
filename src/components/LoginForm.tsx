@@ -3,6 +3,7 @@
 import { useState } from "react"
 import { useSearchParams } from "next/navigation"
 import { Lock, User, KeyRound, AlertCircle, Eye, EyeOff, Loader2 } from "lucide-react"
+import { AppLogo } from "@/components/AppLogo"
 import { loginApp } from "@/actions/auth"
 import { getSafeRedirectUrl } from "@/lib/utils/url"
 
@@ -41,12 +42,9 @@ export function LoginForm() {
   return (
     <div className="w-full max-w-md bg-white dark:bg-zinc-900 rounded-2xl shadow-xl border border-zinc-200 dark:border-zinc-800 p-8">
       <div className="flex flex-col items-center mb-8">
-        <div className="w-16 h-16 bg-blue-100 dark:bg-blue-900/30 rounded-2xl flex items-center justify-center mb-4 shadow-inner">
-          <Lock className="w-8 h-8 text-blue-600 dark:text-blue-400" />
-        </div>
-        <h1 className="text-2xl font-bold text-zinc-900 dark:text-zinc-100">Vokabeltrainer</h1>
-        <p className="text-zinc-500 dark:text-zinc-400 text-center mt-2 text-sm">
-          Bitte melde dich an, um auf deinen Vokabeltrainer zuzugreifen.
+        <AppLogo asHeading size="lg" className="mb-3" />
+        <p className="text-zinc-500 dark:text-zinc-400 text-center mt-1 text-sm">
+          Bitte melde dich an, um auf deinen N30 Vokabeltrainer zuzugreifen.
         </p>
       </div>
 

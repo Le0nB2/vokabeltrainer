@@ -240,11 +240,11 @@ export function SetupWizard({ isPublicOrRender }: SetupWizardProps) {
             ? "Einrichtung abgeschlossen! 🎉"
             : step === 3
             ? "Kinder-Konto einrichten"
-            : "Willkommen beim Vokabeltrainer! 👋"}
+            : "Willkommen beim N30 Vokabeltrainer! 👋"}
         </h1>
         <p className="text-sm sm:text-base text-zinc-600 dark:text-zinc-400 mt-2 max-w-md mx-auto">
           {step === 1
-            ? "Wähle bitte, wie du den Vokabeltrainer auf diesem System nutzen möchtest:"
+            ? "Wähle bitte, wie du den N30 Vokabeltrainer auf diesem System nutzen möchtest:"
             : step === 2
             ? "Richte dein Eltern-Konto und die Einstellungs-PIN ein (Schritt 1 von 2)."
             : step === 3
@@ -644,7 +644,7 @@ export function SetupWizard({ isPublicOrRender }: SetupWizardProps) {
                 disabled={loading}
                 className="py-2.5 px-6 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-medium text-xs sm:text-sm transition-colors flex items-center justify-center gap-2 shadow-sm disabled:opacity-50"
               >
-                {loading ? "Richte Vokabeltrainer ein..." : "Einrichtung abschließen 🚀"}
+                {loading ? "Richte N30 Vokabeltrainer ein..." : "Einrichtung abschließen 🚀"}
               </button>
             </div>
           </form>

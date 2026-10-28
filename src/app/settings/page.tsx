@@ -13,7 +13,7 @@ import { isSettingsPasswordConfigured } from "@/actions/auth"
 import { LockSettingsButton } from "@/components/LockSettingsButton"
 
 export const metadata = {
-  title: 'Einstellungen | Vokabeltrainer',
+  title: 'Einstellungen',
 }
 
 export default async function SettingsPage() {

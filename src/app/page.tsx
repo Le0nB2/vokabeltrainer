@@ -2,6 +2,7 @@ import { getDecks, createDeck } from "@/actions/decks"
 import Link from "next/link"
 import { redirect } from "next/navigation"
 import { Plus, BookOpen, Settings, Brain } from "lucide-react"
+import { AppLogo } from "@/components/AppLogo"
 import { DeckMenu } from "@/components/DeckMenu"
 import { DeckPieChart } from "@/components/DeckPieChart"
 import { LearningStatsChart } from "@/components/LearningStatsChart"
@@ -93,10 +94,7 @@ export default async function Dashboard() {
       <div className="max-w-5xl mx-auto">
         <header className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-12">
           <div className="flex justify-between items-center w-full sm:w-auto">
-            <div className="flex items-center gap-3">
-              <BookOpen className="w-8 h-8 text-blue-600 shrink-0" />
-              <h1 className="text-2xl sm:text-3xl font-bold truncate">Vokabeltrainer</h1>
-            </div>
+            <AppLogo asHeading size="lg" />
             <div className="flex items-center gap-1 sm:hidden">
               <Link href="/settings" className="text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-100 transition-colors p-2" title="Einstellungen">
                 <Settings className="w-6 h-6" />

@@ -6,7 +6,10 @@ import { Providers } from "./providers";
 const inter = Inter({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
-  title: "Vokabeltrainer",
+  title: {
+    default: "N30 Vokabeltrainer",
+    template: "%s | N30 Vokabeltrainer",
+  },
   description: "Moderner Vokabeltrainer mit KI Bilderkennung",
   icons: {
     icon: [
@@ -23,7 +26,7 @@ export const metadata: Metadata = {
   appleWebApp: {
     capable: true,
     statusBarStyle: "default",
-    title: "Vokabeltrainer",
+    title: "N30 Vokabeltrainer",
   },
 };
 

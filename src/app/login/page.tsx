@@ -9,8 +9,8 @@ import prisma from "@/lib/prisma"
 export const dynamic = 'force-dynamic'
 
 export const metadata = {
-  title: "Anmelden | Vokabeltrainer",
-  description: "Anmeldung zum Vokabeltrainer",
+  title: "Anmelden",
+  description: "Anmeldung zum N30 Vokabeltrainer",
 }
 
 export default async function LoginPage() {

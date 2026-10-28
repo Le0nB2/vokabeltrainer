@@ -39,13 +39,13 @@ export function ChildShareInfoCard({
     const name = childName.trim() || childUsername
     return [
       `Hallo ${name}! 👋`,
-      `Hier sind deine Zugangsdaten für deinen Vokabeltrainer:`,
+      `Hier sind deine Zugangsdaten für deinen N30 Vokabeltrainer:`,
       ``,
       `🌐 Adresse: ${appUrl}`,
       `👤 Benutzername: ${childUsername}`,
       `🔑 Passwort: (Wie mit deinen Eltern vereinbart)`,
       ``,
-      `📱 So legst du den Vokabeltrainer als App auf deinem Smartphone/Tablet ab:`,
+      `📱 So legst du den N30 Vokabeltrainer als App auf deinem Smartphone/Tablet ab:`,
       `• iPhone/iPad (Safari): Tippe unten auf das Teilen-Symbol (Viereck mit Pfeil nach oben) und wähle „Zum Home-Bildschirm“.`,
       `• Android (Chrome): Tippe oben rechts auf das Menü (⋮) und wähle „App installieren“ oder „Zum Startbildschirm hinzufügen“.`,
       ``,
@@ -70,7 +70,7 @@ export function ChildShareInfoCard({
     if (typeof navigator !== "undefined" && navigator.share) {
       try {
         await navigator.share({
-          title: `Vokabeltrainer für ${childName.trim() || childUsername}`,
+          title: `N30 Vokabeltrainer für ${childName.trim() || childUsername}`,
           text: shareText,
           url: appUrl,
         })

@@ -6,8 +6,8 @@ import { SetupWizard } from "@/components/SetupWizard"
 export const dynamic = 'force-dynamic'
 
 export const metadata = {
-  title: "Ersteinrichtung | Vokabeltrainer",
-  description: "Ersteinrichtung des Vokabeltrainers",
+  title: "Ersteinrichtung",
+  description: "Ersteinrichtung des N30 Vokabeltrainers",
 }
 
 export default async function SetupPage() {

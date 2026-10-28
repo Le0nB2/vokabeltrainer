@@ -22,8 +22,8 @@ export default function Icon() {
       >
         <svg
           xmlns="http://www.w3.org/2000/svg"
-          width="80"
-          height="80"
+          width="88"
+          height="88"
           viewBox="0 0 24 24"
           fill="none"
           stroke="white"
@@ -31,7 +31,8 @@ export default function Icon() {
           strokeLinecap="round"
           strokeLinejoin="round"
         >
-          <path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H20v20H6.5a2.5 2.5 0 0 1 0-5H20" />
+          <path d="M20.001 19A2 2 0 0022 17V5a2 2 0 00-1.999-2L16 3.002A5 5 0 0012 5a5 5 0 00-4-2H4a2 2 0 00-2 2v12a2 2 0 001.999 2H8a5 5 0 014 2 5 5 0 014-2z" />
+          <line x1="12" y1="5" x2="12" y2="21" />
         </svg>
       </div>
     ),
