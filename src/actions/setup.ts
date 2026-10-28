@@ -73,8 +73,13 @@ export async function getSetupState(): Promise<{
     }
 
     return { needsSetup: true, isPublicOrRender }
-  } catch (err) {
+  } catch (err: unknown) {
     console.error("Error checking setup state:", err)
+    const errCode = (err as { code?: string })?.code
+    const errMsg = String((err as { message?: string })?.message || "")
+    if (errCode === "P2021" || errMsg.includes("does not exist")) {
+      return { needsSetup: true, isPublicOrRender }
+    }
     return { needsSetup: false, isPublicOrRender }
   }
 }

@@ -93,6 +93,20 @@ export async function proxy(req: NextRequest) {
     }
   }
 
+  // Automatically clear stale auth cookies when visiting /setup (e.g. after database reset)
+  if (pathname === "/setup") {
+    const rawCookie = req.headers?.get("cookie");
+    const hasAuthCookie = Boolean(
+      req.cookies?.get(AUTH_COOKIE_NAME)?.value ||
+      (rawCookie && rawCookie.includes(`${AUTH_COOKIE_NAME}=`))
+    );
+    const res = applySettingsAutoLogout(NextResponse.next());
+    if (hasAuthCookie) {
+      res.cookies.set(AUTH_COOKIE_NAME, "", { path: "/", maxAge: 0 });
+    }
+    return res;
+  }
+
   // Unauthenticated user:
   // Allow access to login page, setup page, static icons, and app manifest
   if (
