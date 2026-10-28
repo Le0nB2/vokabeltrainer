@@ -16,7 +16,7 @@ import {
   isSecureRequest,
   hashPassword,
 } from "@/lib/auth-utils"
-import { requireAppAuth } from "@/lib/auth-guard"
+import { requireAppAuth, getCurrentUser } from "@/lib/auth-guard"
 import { checkSettingsAuthenticated } from "@/actions/auth"
 
 const checkSettingsAuth = checkSettingsAuthenticated
@@ -257,6 +257,154 @@ export async function setupPrimaryAdmin(data: {
   return { success: true, userId: newAdmin.id }
 }
 
+export async function setupFamilySystem(data: {
+  parentUsername: string
+  parentPassword: string
+  childUsername: string
+  childPassword: string
+  childDisplayName?: string
+}) {
+  await requireAppAuth()
+  const isAuth = await checkSettingsAuth()
+  if (!isAuth) {
+    return { success: false, error: "Nicht autorisiert. Bitte melde dich mit dem Einstellungspasswort an." }
+  }
+
+  const { isConfigured } = getAppAuthCredentials()
+  if (isConfigured) {
+    return { success: false, error: "Ein Hauptnutzer ist bereits über die Server-Umgebungsvariablen konfiguriert." }
+  }
+
+  const existingAdmin = await prisma.user.findFirst({
+    where: { role: "ADMIN" },
+  })
+  if (existingAdmin) {
+    return { success: false, error: "Es ist bereits ein Hauptnutzer in der Datenbank eingerichtet." }
+  }
+
+  // Validate Parent Credentials
+  const parentUserVal = validateUsername(data.parentUsername)
+  if (!parentUserVal.valid) {
+    return { success: false, error: `Eltern-Konto: ${parentUserVal.error}` }
+  }
+  const parentPassVal = validatePasswordPolicy(data.parentPassword)
+  if (!parentPassVal.valid) {
+    return { success: false, error: `Eltern-Konto: ${parentPassVal.error}` }
+  }
+
+  // Validate Child Credentials
+  const childUserVal = validateUsername(data.childUsername)
+  if (!childUserVal.valid) {
+    return { success: false, error: `Kinder-Profil: ${childUserVal.error}` }
+  }
+  const childPassVal = validatePasswordPolicy(data.childPassword)
+  if (!childPassVal.valid) {
+    return { success: false, error: `Kinder-Profil: ${childPassVal.error}` }
+  }
+
+  const cleanParentUsername = data.parentUsername.trim().toLowerCase()
+  const cleanChildUsername = data.childUsername.trim().toLowerCase()
+
+  if (cleanParentUsername === cleanChildUsername) {
+    return { success: false, error: "Eltern-Konto und Kinder-Profil müssen unterschiedliche Benutzernamen haben." }
+  }
+
+  const existingUsers = await prisma.user.findMany({
+    where: {
+      username: { in: [cleanParentUsername, cleanChildUsername] },
+    },
+  })
+  if (existingUsers.length > 0) {
+    return { success: false, error: "Einer der gewählten Benutzernamen existiert bereits." }
+  }
+
+  const parentHash = hashPassword(data.parentPassword)
+  const childHash = hashPassword(data.childPassword)
+
+  // Atomically create Parent Admin, Child User, and reassign all existing unassigned decks to Child!
+  const result = await prisma.$transaction(async (tx) => {
+    const parent = await tx.user.create({
+      data: {
+        username: cleanParentUsername,
+        displayName: "Eltern",
+        passwordHash: parentHash,
+        role: "ADMIN",
+        isActive: true,
+      },
+    })
+
+    const child = await tx.user.create({
+      data: {
+        username: cleanChildUsername,
+        displayName: data.childDisplayName?.trim() || data.childUsername.trim(),
+        passwordHash: childHash,
+        role: "USER",
+        isActive: true,
+      },
+    })
+
+    // Assign all existing decks to the CHILD profile so that their learning progress stays with the child!
+    await tx.deck.updateMany({
+      where: {
+        OR: [{ userId: null }, { userId: "default" }, { userId: "admin" }],
+      },
+      data: {
+        userId: child.id,
+      },
+    })
+
+    // Also update settings password hash to the parent password if not yet configured,
+    // ensuring the parent is the master of settings
+    const settings = await tx.settings.findUnique({ where: { id: "default" } })
+    if (!settings || !settings.settingsPasswordHash || settings.settingsPasswordHash === "disabled") {
+      await tx.settings.upsert({
+        where: { id: "default" },
+        create: {
+          id: "default",
+          isSetupCompleted: true,
+          settingsPasswordHash: parentHash,
+        },
+        update: {
+          isSetupCompleted: true,
+          settingsPasswordHash: parentHash,
+        },
+      })
+    }
+
+    return { parent, child }
+  })
+
+  // Set session cookie for the parent admin so they remain logged in
+  try {
+    const secret = getAppSecret()
+    const token = createAppSessionToken(result.parent.username, secret, AUTH_COOKIE_MAX_AGE, {
+      id: result.parent.id,
+      role: result.parent.role,
+      pv: getPasswordVersion(result.parent.passwordHash),
+    })
+    const cookieStore = await cookies()
+    const headersList = await headers()
+    const isSecure = isSecureRequest(headersList)
+    cookieStore.set(AUTH_COOKIE_NAME, token, {
+      httpOnly: true,
+      secure: isSecure,
+      path: "/",
+      sameSite: "lax",
+      maxAge: AUTH_COOKIE_MAX_AGE,
+    })
+  } catch {
+    // Graceful fallback in test or headless environments
+  }
+
+  revalidatePath("/settings")
+  revalidatePath("/")
+  return {
+    success: true,
+    parentId: result.parent.id,
+    childId: result.child.id,
+  }
+}
+
 export async function createUser(data: {
   username: string
   password: string
@@ -416,5 +564,62 @@ export async function toggleUserActive(userId: string) {
   })
 
   revalidatePath("/settings")
+  return { success: true }
+}
+
+export async function changeUserRole(userId: string, newRole: "ADMIN" | "USER") {
+  await requireAppAuth()
+  const isAuth = await checkSettingsAuth()
+  if (!isAuth) {
+    return { success: false, error: "Nicht autorisiert. Bitte melde dich mit dem Einstellungspasswort an." }
+  }
+
+  const currentUser = await getCurrentUser()
+  if (!currentUser || currentUser.role !== "ADMIN") {
+    return { success: false, error: "Nur Administratoren können Rollen verwalten." }
+  }
+
+  if (userId === "env-admin" || userId === "default" || userId === "admin") {
+    return { success: false, error: "Die Rolle des System-Administrators kann nicht geändert werden." }
+  }
+
+  const targetUser = await prisma.user.findUnique({
+    where: { id: userId },
+  })
+  if (!targetUser) {
+    return { success: false, error: "Benutzer nicht gefunden." }
+  }
+
+  if (targetUser.role === newRole) {
+    return { success: true }
+  }
+
+  // If demoting to USER, ensure there is at least one OTHER active ADMIN in DB or env
+  if (newRole === "USER") {
+    const { isConfigured } = getAppAuthCredentials()
+    if (!isConfigured) {
+      const otherAdmins = await prisma.user.count({
+        where: {
+          role: "ADMIN",
+          isActive: true,
+          id: { not: userId },
+        },
+      })
+      if (otherAdmins === 0) {
+        return {
+          success: false,
+          error: "Es muss mindestens ein aktives Eltern-/Administratorkonto im System verbleiben.",
+        }
+      }
+    }
+  }
+
+  await prisma.user.update({
+    where: { id: userId },
+    data: { role: newRole },
+  })
+
+  revalidatePath("/settings")
+  revalidatePath("/")
   return { success: true }
 }

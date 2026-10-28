@@ -8,6 +8,8 @@ import {
   Key,
   Trash2,
   Shield,
+  ShieldAlert,
+  ShieldCheck,
   UserX,
   UserCheck,
   Loader2,
@@ -15,6 +17,7 @@ import {
   Plus,
   ChevronDown,
   ChevronUp,
+  Sparkles,
 } from "lucide-react"
 import {
   createUser,
@@ -22,6 +25,8 @@ import {
   resetUserPassword,
   toggleUserActive,
   setupPrimaryAdmin,
+  setupFamilySystem,
+  changeUserRole,
   UserSummary,
   UserManagementData,
 } from "@/actions/users"
@@ -50,7 +55,19 @@ export function UserManagementSettings({
 
   const [data, setData] = useState<UserManagementData>(defaultData)
 
-  // Setup Primary Admin State (Option 1)
+  // Setup mode in single-user view: "family" (recommended) vs "single"
+  const [setupMode, setSetupMode] = useState<"family" | "single">("family")
+
+  // Family Setup State
+  const [familyParentUsername, setFamilyParentUsername] = useState("eltern")
+  const [familyParentPassword, setFamilyParentPassword] = useState("")
+  const [familyParentPasswordConfirm, setFamilyParentPasswordConfirm] = useState("")
+  const [familyChildUsername, setFamilyChildUsername] = useState("")
+  const [familyChildDisplayName, setFamilyChildDisplayName] = useState("")
+  const [familyChildPassword, setFamilyChildPassword] = useState("")
+  const [isSettingUpFamily, setIsSettingUpFamily] = useState(false)
+
+  // Setup Primary Admin State (Single User Mode)
   const [setupUsername, setSetupUsername] = useState("")
   const [setupPassword, setSetupPassword] = useState("")
   const [setupPasswordConfirm, setSetupPasswordConfirm] = useState("")
@@ -69,10 +86,106 @@ export function UserManagementSettings({
   const [editingPassword, setEditingPassword] = useState("")
   const [isResetting, setIsResetting] = useState(false)
 
+  // Role Change Loading State
+  const [roleChangingUserId, setRoleChangingUserId] = useState<string | null>(null)
+
   // Feedback Message
   const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null)
 
-  // Handle setting up the primary admin
+  // Handle setting up family system (atomic Parent ADMIN + Child USER + Reassign decks)
+  const handleSetupFamily = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setMessage(null)
+
+    if (familyParentPassword !== familyParentPasswordConfirm) {
+      setMessage({ type: "error", text: "Die Eltern-Passwörter stimmen nicht überein." })
+      return
+    }
+
+    if (familyParentPassword.length < 8 || !/[^a-zA-Z0-9]/.test(familyParentPassword)) {
+      setMessage({
+        type: "error",
+        text: "Das Eltern-Passwort muss mindestens 8 Zeichen lang sein und mindestens ein Sonderzeichen enthalten.",
+      })
+      return
+    }
+
+    if (familyChildPassword.length < 8 || !/[^a-zA-Z0-9]/.test(familyChildPassword)) {
+      setMessage({
+        type: "error",
+        text: "Das Kinder-Passwort muss mindestens 8 Zeichen lang sein und mindestens ein Sonderzeichen enthalten.",
+      })
+      return
+    }
+
+    if (familyParentUsername.trim().toLowerCase() === familyChildUsername.trim().toLowerCase()) {
+      setMessage({ type: "error", text: "Eltern- und Kinder-Benutzername müssen unterschiedlich sein." })
+      return
+    }
+
+    setIsSettingUpFamily(true)
+    try {
+      const res = await setupFamilySystem({
+        parentUsername: familyParentUsername,
+        parentPassword: familyParentPassword,
+        childUsername: familyChildUsername,
+        childDisplayName: familyChildDisplayName || undefined,
+        childPassword: familyChildPassword,
+      })
+
+      if (res.success) {
+        setMessage({
+          type: "success",
+          text: `Familien-System erfolgreich eingerichtet! Eltern-Konto "${familyParentUsername}" und Kinder-Profil "${
+            familyChildDisplayName || familyChildUsername
+          }" wurden erstellt.`,
+        })
+
+        const totalDecks = data.users.reduce((acc, u) => acc + u.deckCount, 0)
+
+        setData((prev) => ({
+          ...prev,
+          hasPrimaryAdmin: true,
+          primaryAdminType: "db",
+          primaryAdminUsername: familyParentUsername,
+          users: [
+            {
+              id: res.parentId || "parent",
+              username: familyParentUsername,
+              displayName: "Eltern",
+              role: "ADMIN",
+              isActive: true,
+              isEnvUser: false,
+              isPrimaryAdmin: true,
+              createdAt: new Date(),
+              deckCount: 0,
+            },
+            {
+              id: res.childId || "child",
+              username: familyChildUsername,
+              displayName: familyChildDisplayName || familyChildUsername,
+              role: "USER",
+              isActive: true,
+              isEnvUser: false,
+              isPrimaryAdmin: false,
+              createdAt: new Date(),
+              deckCount: totalDecks,
+            },
+          ],
+        }))
+
+        router.refresh()
+      } else {
+        setMessage({ type: "error", text: res.error || "Fehler beim Einrichten des Familien-Systems." })
+      }
+    } catch {
+      setMessage({ type: "error", text: "Netzwerkfehler beim Einrichten des Familien-Systems." })
+    } finally {
+      setIsSettingUpFamily(false)
+    }
+  }
+
+  // Handle setting up the primary admin (Single account mode)
   const handleSetupAdmin = async (e: React.FormEvent) => {
     e.preventDefault()
     setMessage(null)
@@ -83,7 +196,10 @@ export function UserManagementSettings({
     }
 
     if (setupPassword.length < 8 || !/[^a-zA-Z0-9]/.test(setupPassword)) {
-      setMessage({ type: "error", text: "Das Passwort muss mindestens 8 Zeichen lang sein und mindestens ein Sonderzeichen enthalten." })
+      setMessage({
+        type: "error",
+        text: "Das Passwort muss mindestens 8 Zeichen lang sein und mindestens ein Sonderzeichen enthalten.",
+      })
       return
     }
 
@@ -103,7 +219,6 @@ export function UserManagementSettings({
         setSetupPassword("")
         setSetupPasswordConfirm("")
 
-        // Update local state so view switches immediately
         setData((prev) => ({
           ...prev,
           hasPrimaryAdmin: true,
@@ -133,6 +248,55 @@ export function UserManagementSettings({
       setMessage({ type: "error", text: "Netzwerkfehler beim Einrichten des Hauptnutzers." })
     } finally {
       setIsSettingUpAdmin(false)
+    }
+  }
+
+  // Handle changing user role
+  const handleChangeRole = async (user: UserSummary, newRole: "ADMIN" | "USER") => {
+    setMessage(null)
+
+    if (newRole === "USER") {
+      const confirmed = window.confirm(
+        `Möchtest du das Profil "${user.displayName || user.username}" wirklich zum Kinder-Profil ändern?\n\nMit dem Passwort dieses Profils kann der Einstellungsbereich anschließend NICHT mehr entsperrt werden. Nur noch Eltern-Konten haben Zugriff auf die Einstellungen.`
+      )
+      if (!confirmed) return
+    } else {
+      const confirmed = window.confirm(
+        `Möchtest du das Profil "${user.displayName || user.username}" zum Eltern-Profil befördern?\n\nDieses Profil erhält vollen Zugriff auf alle Einstellungen und die Kindersicherung.`
+      )
+      if (!confirmed) return
+    }
+
+    setRoleChangingUserId(user.id)
+    try {
+      const res = await changeUserRole(user.id, newRole)
+      if (res.success) {
+        setData((prev) => ({
+          ...prev,
+          users: prev.users.map((u) =>
+            u.id === user.id
+              ? {
+                  ...u,
+                  role: newRole,
+                  isPrimaryAdmin: newRole === "ADMIN" ? u.isPrimaryAdmin : false,
+                }
+              : u
+          ),
+        }))
+        setMessage({
+          type: "success",
+          text: `Rolle für "${user.displayName || user.username}" erfolgreich zu ${
+            newRole === "ADMIN" ? "Eltern / Admin" : "Kinder-Profil"
+          } geändert.`,
+        })
+        router.refresh()
+      } else {
+        setMessage({ type: "error", text: res.error || "Fehler beim Ändern der Rolle." })
+      }
+    } catch {
+      setMessage({ type: "error", text: "Netzwerkfehler beim Ändern der Rolle." })
+    } finally {
+      setRoleChangingUserId(null)
     }
   }
 
@@ -188,13 +352,13 @@ export function UserManagementSettings({
   // Handle deleting a secondary user
   const handleDelete = async (user: UserSummary) => {
     if (user.isPrimaryAdmin || user.isEnvUser || user.role === "ADMIN") {
-      alert("Der Hauptnutzer kann nicht gelöscht werden.")
+      alert("Ein Administrator- bzw. Eltern-Profil kann nicht gelöscht werden.")
       return
     }
 
     if (
       !confirm(
-        `Möchtest du den Benutzer "${user.username}" wirklich löschen? Alle zugehörigen Vokabelstapel werden dabei unwiderruflich gelöscht.`
+        `Möchtest du das Profil "${user.displayName || user.username}" wirklich löschen? Alle zugehörigen Vokabelstapel werden dabei unwiderruflich gelöscht.`
       )
     ) {
       return
@@ -208,7 +372,7 @@ export function UserManagementSettings({
           ...prev,
           users: prev.users.filter((u) => u.id !== user.id),
         }))
-        setMessage({ type: "success", text: `Benutzer "${user.username}" wurde gelöscht.` })
+        setMessage({ type: "success", text: `Profil "${user.displayName || user.username}" wurde gelöscht.` })
         router.refresh()
       } else {
         setMessage({ type: "error", text: res.error || "Fehler beim Löschen des Benutzers." })
@@ -221,7 +385,7 @@ export function UserManagementSettings({
   // Handle toggling active state of a secondary user
   const handleToggleActive = async (user: UserSummary) => {
     if (user.isPrimaryAdmin || user.isEnvUser || user.role === "ADMIN") {
-      alert("Der Hauptnutzer kann nicht deaktiviert werden.")
+      alert("Ein Administrator- bzw. Eltern-Profil kann nicht deaktiviert werden.")
       return
     }
 
@@ -231,13 +395,11 @@ export function UserManagementSettings({
       if (res.success) {
         setData((prev) => ({
           ...prev,
-          users: prev.users.map((u) =>
-            u.id === user.id ? { ...u, isActive: !u.isActive } : u
-          ),
+          users: prev.users.map((u) => (u.id === user.id ? { ...u, isActive: !u.isActive } : u)),
         }))
         setMessage({
           type: "success",
-          text: `Benutzer "${user.username}" wurde ${user.isActive ? "deaktiviert" : "aktiviert"}.`,
+          text: `Profil "${user.displayName || user.username}" wurde ${user.isActive ? "deaktiviert" : "aktiviert"}.`,
         })
         router.refresh()
       } else {
@@ -276,6 +438,7 @@ export function UserManagementSettings({
   const isMultiUser = data.hasPrimaryAdmin && data.users.length > 1
   const isSingleUserProtected = data.hasPrimaryAdmin && data.users.length <= 1
   const isSingleUserUnprotected = !data.hasPrimaryAdmin
+  const activeAdminCount = data.users.filter((u) => (u.role === "ADMIN" || u.isEnvUser) && u.isActive).length
 
   return (
     <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl p-4 sm:p-6 mt-8">
@@ -381,98 +544,269 @@ export function UserManagementSettings({
           </div>
 
           {showSetupForm && (
-            <div className="bg-zinc-50 dark:bg-zinc-800/50 border border-zinc-200 dark:border-zinc-700 rounded-xl p-4 sm:p-5 mt-2 space-y-3">
-              <div>
-                <h4 className="font-semibold text-sm text-zinc-900 dark:text-zinc-100">
-                  Persönliches Hauptkonto anlegen
-                </h4>
-                <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-1">
-                  Erstelle hier dein persönliches Eltern- oder Hauptkonto. Deine bisherigen Vokabeln bleiben zu 100% erhalten. Anschließend kannst du bei Bedarf weitere Profile für Kinder hinzufügen.
-                </p>
+            <div className="bg-zinc-50 dark:bg-zinc-800/50 border border-zinc-200 dark:border-zinc-700 rounded-xl p-4 sm:p-5 mt-2 space-y-4">
+              {/* Tab Selector */}
+              <div className="flex border-b border-zinc-200 dark:border-zinc-700 gap-4">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSetupMode("family")
+                    setMessage(null)
+                  }}
+                  className={`pb-2.5 text-xs sm:text-sm font-semibold flex items-center gap-1.5 border-b-2 transition-colors ${
+                    setupMode === "family"
+                      ? "border-blue-600 text-blue-600 dark:text-blue-400"
+                      : "border-transparent text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-200"
+                  }`}
+                >
+                  <Sparkles className="w-4 h-4 text-amber-500" />
+                  <span>Familie mit Kindern (Empfohlen)</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSetupMode("single")
+                    setMessage(null)
+                  }}
+                  className={`pb-2.5 text-xs sm:text-sm font-semibold flex items-center gap-1.5 border-b-2 transition-colors ${
+                    setupMode === "single"
+                      ? "border-blue-600 text-blue-600 dark:text-blue-400"
+                      : "border-transparent text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-200"
+                  }`}
+                >
+                  <User className="w-4 h-4" />
+                  <span>Nur für mich (Einzelnes Hauptkonto)</span>
+                </button>
               </div>
 
-              <form onSubmit={handleSetupAdmin} className="space-y-4 pt-1">
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                  <div>
-                    <label className="block text-xs font-medium text-zinc-600 dark:text-zinc-400 mb-1">
-                      Anmeldename *
-                    </label>
-                    <input
-                      type="text"
-                      required
-                      placeholder="z. B. eltern oder dein Name"
-                      value={setupUsername}
-                      onChange={(e) => setSetupUsername(e.target.value)}
-                      className="w-full px-3 py-2 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    />
+              {setupMode === "family" ? (
+                /* TAB A: Family setup */
+                <form onSubmit={handleSetupFamily} className="space-y-4 pt-1">
+                  <div className="bg-blue-50/70 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-900/50 rounded-xl p-3 text-xs text-blue-900 dark:text-blue-200 space-y-1">
+                    <p className="font-semibold flex items-center gap-1.5">
+                      <Sparkles className="w-4 h-4 text-blue-600 dark:text-blue-400 shrink-0" />
+                      <span>Saubere Trennung: Eltern-Schutz &amp; Kinder-Vokabeln</span>
+                    </p>
+                    <p className="text-zinc-600 dark:text-zinc-300">
+                      Bestehende Vokabelstapel werden automatisch dem neuen Kinder-Profil zugeordnet. Du als Elternteil erhältst ein eigenes Passwort, mit dem nur du Einstellungen und Kindersicherung verwalten kannst.
+                    </p>
                   </div>
-                  <div>
-                    <label className="block text-xs font-medium text-zinc-600 dark:text-zinc-400 mb-1">
-                      Passwort (mind. 8 Zeichen & 1 Sonderzeichen) *
-                    </label>
-                    <input
-                      type="password"
-                      required
-                      minLength={8}
-                      placeholder="Mind. 8 Zeichen & 1 Sonderzeichen"
-                      value={setupPassword}
-                      onChange={(e) => setSetupPassword(e.target.value)}
-                      className="w-full px-3 py-2 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-medium text-zinc-600 dark:text-zinc-400 mb-1">
-                      Passwort wiederholen *
-                    </label>
-                    <input
-                      type="password"
-                      required
-                      minLength={8}
-                      placeholder="Passwort wiederholen"
-                      value={setupPasswordConfirm}
-                      onChange={(e) => setSetupPasswordConfirm(e.target.value)}
-                      className="w-full px-3 py-2 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    />
-                  </div>
-                </div>
 
-                <div className="flex justify-end gap-2">
-                  <button
-                    type="button"
-                    onClick={() => setShowSetupForm(false)}
-                    className="w-full sm:w-auto px-3.5 py-2 rounded-lg border border-zinc-300 dark:border-zinc-700 text-sm text-zinc-600 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-700 text-center"
-                  >
-                    Abbrechen
-                  </button>
-                  <button
-                    type="submit"
-                    disabled={isSettingUpAdmin}
-                    className="w-full sm:w-auto inline-flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-5 py-2 rounded-lg text-sm font-medium transition-colors disabled:opacity-50"
-                  >
-                    {isSettingUpAdmin ? <Loader2 className="w-4 h-4 animate-spin" /> : <Shield className="w-4 h-4" />}
-                    <span>{isSettingUpAdmin ? "Wird eingerichtet..." : "Konto anlegen & aktivieren"}</span>
-                  </button>
-                </div>
-              </form>
+                  {/* Section 1: Parent */}
+                  <div className="space-y-2">
+                    <div className="font-semibold text-xs text-zinc-700 dark:text-zinc-300 uppercase tracking-wider flex items-center gap-1.5">
+                      <Shield className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" />
+                      <span>1. Eltern-Zugang (Einstellungen &amp; Kindersicherung)</span>
+                    </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                      <div>
+                        <label className="block text-xs font-medium text-zinc-600 dark:text-zinc-400 mb-1">
+                          Eltern-Anmeldename *
+                        </label>
+                        <input
+                          type="text"
+                          required
+                          placeholder="z. B. eltern"
+                          value={familyParentUsername}
+                          onChange={(e) => setFamilyParentUsername(e.target.value)}
+                          className="w-full px-3 py-2 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-medium text-zinc-600 dark:text-zinc-400 mb-1">
+                          Eltern-Passwort *
+                        </label>
+                        <input
+                          type="password"
+                          required
+                          minLength={8}
+                          placeholder="Mind. 8 Z. & 1 S.-Z."
+                          value={familyParentPassword}
+                          onChange={(e) => setFamilyParentPassword(e.target.value)}
+                          className="w-full px-3 py-2 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-medium text-zinc-600 dark:text-zinc-400 mb-1">
+                          Passwort wiederholen *
+                        </label>
+                        <input
+                          type="password"
+                          required
+                          minLength={8}
+                          placeholder="Passwort wiederholen"
+                          value={familyParentPasswordConfirm}
+                          onChange={(e) => setFamilyParentPasswordConfirm(e.target.value)}
+                          className="w-full px-3 py-2 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        />
+                      </div>
+                    </div>
+                  </div>
 
-              {data.users.length > 0 && (
-                <div className="mt-4 pt-4 border-t border-zinc-200 dark:border-zinc-700">
-                  <p className="text-xs font-medium text-zinc-700 dark:text-zinc-300 mb-2">
-                    Bereits vorhandenes Konto übernehmen:
-                  </p>
-                  <div className="flex flex-wrap gap-2">
-                    {data.users.map((u) => (
+                  {/* Section 2: Child */}
+                  <div className="space-y-2 pt-2 border-t border-zinc-200 dark:border-zinc-700">
+                    <div className="font-semibold text-xs text-zinc-700 dark:text-zinc-300 uppercase tracking-wider flex items-center gap-1.5">
+                      <User className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
+                      <span>2. Kinder-Profil (erhält bisherige Vokabelstapel)</span>
+                    </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                      <div>
+                        <label className="block text-xs font-medium text-zinc-600 dark:text-zinc-400 mb-1">
+                          Anmeldename des Kindes *
+                        </label>
+                        <input
+                          type="text"
+                          required
+                          placeholder="z. B. anna oder max"
+                          value={familyChildUsername}
+                          onChange={(e) => setFamilyChildUsername(e.target.value)}
+                          className="w-full px-3 py-2 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-medium text-zinc-600 dark:text-zinc-400 mb-1">
+                          Rufname (optional)
+                        </label>
+                        <input
+                          type="text"
+                          placeholder="z. B. Anna"
+                          value={familyChildDisplayName}
+                          onChange={(e) => setFamilyChildDisplayName(e.target.value)}
+                          className="w-full px-3 py-2 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-medium text-zinc-600 dark:text-zinc-400 mb-1">
+                          Passwort für das Kind *
+                        </label>
+                        <input
+                          type="password"
+                          required
+                          minLength={8}
+                          placeholder="Mind. 8 Z. & 1 S.-Z."
+                          value={familyChildPassword}
+                          onChange={(e) => setFamilyChildPassword(e.target.value)}
+                          className="w-full px-3 py-2 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="flex justify-end gap-2 pt-2">
+                    <button
+                      type="button"
+                      onClick={() => setShowSetupForm(false)}
+                      className="w-full sm:w-auto px-3.5 py-2 rounded-lg border border-zinc-300 dark:border-zinc-700 text-sm text-zinc-600 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-700 text-center"
+                    >
+                      Abbrechen
+                    </button>
+                    <button
+                      type="submit"
+                      disabled={isSettingUpFamily}
+                      className="w-full sm:w-auto inline-flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-5 py-2 rounded-lg text-sm font-medium transition-colors disabled:opacity-50"
+                    >
+                      {isSettingUpFamily ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
+                      <span>{isSettingUpFamily ? "Wird eingerichtet..." : "Familien-System einrichten"}</span>
+                    </button>
+                  </div>
+                </form>
+              ) : (
+                /* TAB B: Single User mode */
+                <div>
+                  <div className="mb-3">
+                    <h4 className="font-semibold text-sm text-zinc-900 dark:text-zinc-100">
+                      Persönliches Hauptkonto anlegen
+                    </h4>
+                    <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-1">
+                      Erstelle hier dein persönliches Hauptkonto. Deine bisherigen Vokabeln bleiben erhalten und werden diesem Konto zugewiesen.
+                    </p>
+                  </div>
+
+                  <form onSubmit={handleSetupAdmin} className="space-y-4 pt-1">
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                      <div>
+                        <label className="block text-xs font-medium text-zinc-600 dark:text-zinc-400 mb-1">
+                          Anmeldename *
+                        </label>
+                        <input
+                          type="text"
+                          required
+                          placeholder="z. B. eltern oder dein Name"
+                          value={setupUsername}
+                          onChange={(e) => setSetupUsername(e.target.value)}
+                          className="w-full px-3 py-2 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-medium text-zinc-600 dark:text-zinc-400 mb-1">
+                          Passwort *
+                        </label>
+                        <input
+                          type="password"
+                          required
+                          minLength={8}
+                          placeholder="Mind. 8 Z. & 1 S.-Z."
+                          value={setupPassword}
+                          onChange={(e) => setSetupPassword(e.target.value)}
+                          className="w-full px-3 py-2 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-medium text-zinc-600 dark:text-zinc-400 mb-1">
+                          Passwort wiederholen *
+                        </label>
+                        <input
+                          type="password"
+                          required
+                          minLength={8}
+                          placeholder="Passwort wiederholen"
+                          value={setupPasswordConfirm}
+                          onChange={(e) => setSetupPasswordConfirm(e.target.value)}
+                          className="w-full px-3 py-2 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="flex justify-end gap-2">
                       <button
-                        key={u.id}
                         type="button"
-                        onClick={() => setSetupUsername(u.username)}
-                        className="text-xs bg-zinc-200 hover:bg-blue-100 dark:bg-zinc-700 dark:hover:bg-blue-900/40 text-zinc-800 dark:text-zinc-200 px-3 py-1.5 rounded-lg transition-colors flex items-center gap-1.5"
+                        onClick={() => setShowSetupForm(false)}
+                        className="w-full sm:w-auto px-3.5 py-2 rounded-lg border border-zinc-300 dark:border-zinc-700 text-sm text-zinc-600 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-700 text-center"
                       >
-                        <Shield className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" />
-                        <span>&quot;{u.username}&quot; als Hauptnutzer übernehmen</span>
+                        Abbrechen
                       </button>
-                    ))}
-                  </div>
+                      <button
+                        type="submit"
+                        disabled={isSettingUpAdmin}
+                        className="w-full sm:w-auto inline-flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-5 py-2 rounded-lg text-sm font-medium transition-colors disabled:opacity-50"
+                      >
+                        {isSettingUpAdmin ? <Loader2 className="w-4 h-4 animate-spin" /> : <Shield className="w-4 h-4" />}
+                        <span>{isSettingUpAdmin ? "Wird eingerichtet..." : "Konto anlegen & aktivieren"}</span>
+                      </button>
+                    </div>
+                  </form>
+
+                  {data.users.length > 0 && (
+                    <div className="mt-4 pt-4 border-t border-zinc-200 dark:border-zinc-700">
+                      <p className="text-xs font-medium text-zinc-700 dark:text-zinc-300 mb-2">
+                        Bereits vorhandenes Konto übernehmen:
+                      </p>
+                      <div className="flex flex-wrap gap-2">
+                        {data.users.map((u) => (
+                          <button
+                            key={u.id}
+                            type="button"
+                            onClick={() => setSetupUsername(u.username)}
+                            className="text-xs bg-zinc-200 hover:bg-blue-100 dark:bg-zinc-700 dark:hover:bg-blue-900/40 text-zinc-800 dark:text-zinc-200 px-3 py-1.5 rounded-lg transition-colors flex items-center gap-1.5"
+                          >
+                            <Shield className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" />
+                            <span>&quot;{u.username}&quot; als Hauptnutzer übernehmen</span>
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
             </div>
@@ -531,7 +865,7 @@ export function UserManagementSettings({
                     type="password"
                     required
                     minLength={8}
-                    placeholder="Mind. 8 Zeichen & 1 Sonderzeichen"
+                    placeholder="Mind. 8 Z. & 1 S.-Z."
                     value={newPassword}
                     onChange={(e) => setNewPassword(e.target.value)}
                     className="w-full px-3 py-2 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
@@ -561,18 +895,18 @@ export function UserManagementSettings({
           {/* User profile list / card */}
           <div className="divide-y divide-zinc-200 dark:divide-zinc-800">
             {data.users.map((u) => {
-              const isPrimary = u.isPrimaryAdmin || u.isEnvUser || u.role === "ADMIN"
+              const isAdmin = u.isPrimaryAdmin || u.isEnvUser || u.role === "ADMIN"
 
               return (
                 <div
                   key={u.id}
                   className={`py-3 flex flex-col sm:flex-row sm:items-center justify-between gap-3 ${
-                    isPrimary ? "bg-zinc-50/70 dark:bg-zinc-800/40 -mx-2 px-2.5 rounded-lg" : ""
+                    isAdmin ? "bg-zinc-50/70 dark:bg-zinc-800/40 -mx-2 px-2.5 rounded-lg" : ""
                   }`}
                 >
                   <div className="flex items-start sm:items-center gap-3 min-w-0">
                     <div className="w-9 h-9 rounded-full bg-zinc-100 dark:bg-zinc-800 flex items-center justify-center shrink-0 mt-0.5 sm:mt-0">
-                      {isPrimary ? (
+                      {isAdmin ? (
                         <Shield className="w-5 h-5 text-blue-600 dark:text-blue-400" />
                       ) : (
                         <span className="font-semibold text-sm text-zinc-700 dark:text-zinc-300 uppercase">
@@ -590,8 +924,14 @@ export function UserManagementSettings({
                         )}
 
                         {/* Badges */}
-                        <span className="px-2 py-0.5 rounded text-[11px] font-semibold bg-blue-100 text-blue-800 dark:bg-blue-950/60 dark:text-blue-300">
-                          {isPrimary ? "Hauptprofil" : "Lernprofil"}
+                        <span
+                          className={`px-2 py-0.5 rounded text-[11px] font-semibold ${
+                            isAdmin
+                              ? "bg-blue-100 text-blue-800 dark:bg-blue-950/60 dark:text-blue-300"
+                              : "bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300"
+                          }`}
+                        >
+                          {isAdmin ? "Eltern / Admin" : "Kinder-Profil"}
                         </span>
 
                         <span
@@ -614,7 +954,7 @@ export function UserManagementSettings({
                   </div>
 
                   {/* Actions */}
-                  <div className="flex items-center gap-2 self-start sm:self-center pl-12 sm:pl-0">
+                  <div className="flex items-center gap-2 self-start sm:self-center pl-12 sm:pl-0 flex-wrap">
                     {/* Inline password edit form */}
                     {editingUserId === u.id ? (
                       <div className="flex items-center gap-2 flex-wrap">
@@ -657,12 +997,51 @@ export function UserManagementSettings({
                             className="p-1.5 text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-100 rounded hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors flex items-center gap-1 text-xs"
                           >
                             <Key className="w-4 h-4" />
-                            <span className="inline">Passwort ändern</span>
+                            <span className="hidden sm:inline">Passwort</span>
                           </button>
                         )}
 
+                        {/* Role Change Button */}
+                        {!u.isEnvUser && (
+                          u.role === "ADMIN" ? (
+                            <button
+                              type="button"
+                              disabled={activeAdminCount <= 1 || roleChangingUserId === u.id}
+                              onClick={() => handleChangeRole(u, "USER")}
+                              title={
+                                activeAdminCount <= 1
+                                  ? "Mindestens ein aktives Eltern-Konto muss erhalten bleiben."
+                                  : "Zu Kinder-Profil ändern (kann Einstellungen nicht mehr entsperren)"
+                              }
+                              className="p-1.5 text-zinc-500 hover:text-amber-600 dark:hover:text-amber-400 rounded hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors flex items-center gap-1 text-xs disabled:opacity-40 disabled:cursor-not-allowed"
+                            >
+                              {roleChangingUserId === u.id ? (
+                                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                              ) : (
+                                <ShieldAlert className="w-3.5 h-3.5 text-amber-500" />
+                              )}
+                              <span className="hidden sm:inline">Zu Kind ändern</span>
+                            </button>
+                          ) : (
+                            <button
+                              type="button"
+                              disabled={roleChangingUserId === u.id}
+                              onClick={() => handleChangeRole(u, "ADMIN")}
+                              title="Zu Eltern-Profil befördern (erhält Zugriff auf Einstellungen)"
+                              className="p-1.5 text-zinc-500 hover:text-blue-600 dark:hover:text-blue-400 rounded hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors flex items-center gap-1 text-xs disabled:opacity-40"
+                            >
+                              {roleChangingUserId === u.id ? (
+                                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                              ) : (
+                                <ShieldCheck className="w-3.5 h-3.5 text-blue-500" />
+                              )}
+                              <span className="hidden sm:inline">Zu Eltern ändern</span>
+                            </button>
+                          )
+                        )}
+
                         {/* Secondary users only: toggle active / delete */}
-                        {!isPrimary && (
+                        {u.role !== "ADMIN" && !u.isEnvUser && (
                           <>
                             <button
                               type="button"
