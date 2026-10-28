@@ -227,6 +227,82 @@ describe('Setup Wizard & Kindersicherung Settings Password', () => {
       expect(res.success).toBe(true)
       expect(settingsUpsertSpy).toHaveBeenCalled()
     })
+
+    it('creates both parent admin and child user when child account is specified', async () => {
+      vi.spyOn(prisma.user, 'findUnique').mockResolvedValue(null)
+      vi.spyOn(prisma.user, 'findFirst').mockResolvedValue(null)
+      const createdUsers: any[] = []
+      const userCreateSpy = (vi.spyOn(prisma.user, 'create') as any).mockImplementation(async ({ data }: any) => {
+        const u = { id: `user-${createdUsers.length + 1}`, ...data }
+        createdUsers.push(u)
+        return u
+      })
+      const deckUpdateSpy = vi.spyOn(prisma.deck, 'updateMany').mockResolvedValue({ count: 1 })
+      const settingsUpsertSpy = vi.spyOn(prisma.settings, 'upsert').mockResolvedValue({
+        id: 'default',
+        isSetupCompleted: true,
+      } as any)
+
+      const res = await completeSetupProtected({
+        username: 'eltern',
+        password: 'SecurePass123!',
+        settingsOption: 'same',
+        createChild: true,
+        childAccount: {
+          username: 'leon',
+          displayName: 'Leon',
+          password: 'ChildPassword123!',
+        },
+      })
+
+      expect(res.success).toBe(true)
+      expect(userCreateSpy).toHaveBeenCalledTimes(2)
+      // First is ADMIN parent, second is USER child
+      expect(createdUsers[0].role).toBe('ADMIN')
+      expect(createdUsers[0].username).toBe('eltern')
+      expect(createdUsers[1].role).toBe('USER')
+      expect(createdUsers[1].username).toBe('leon')
+      expect(createdUsers[1].displayName).toBe('Leon')
+      // Decks reassigned to child
+      expect(deckUpdateSpy).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: { userId: createdUsers[1].id },
+        })
+      )
+    })
+
+    it('rejects setup when child username is identical to parent username', async () => {
+      const res = await completeSetupProtected({
+        username: 'leon',
+        password: 'ParentPassword123!',
+        settingsOption: 'same',
+        createChild: true,
+        childAccount: {
+          username: 'leon',
+          password: 'ChildPassword123!',
+        },
+      })
+
+      expect(res.success).toBe(false)
+      expect(res.error).toContain('unterschiedliche Benutzernamen')
+    })
+
+    it('rejects setup when child password does not meet policy', async () => {
+      const res = await completeSetupProtected({
+        username: 'eltern',
+        password: 'ParentPassword123!',
+        settingsOption: 'same',
+        createChild: true,
+        childAccount: {
+          username: 'leon',
+          password: 'short',
+        },
+      })
+
+      expect(res.success).toBe(false)
+      expect(res.error).toContain('Kinder-Konto')
+      expect(res.error).toContain('mindestens 8 Zeichen')
+    })
   })
 
   describe('Kindersicherung and checkPassword', () => {

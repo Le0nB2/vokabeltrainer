@@ -131,11 +131,19 @@ export async function completeSetupSingleUser(): Promise<{ success: boolean; err
   }
 }
 
+export interface ChildAccountSetupInput {
+  username: string
+  displayName?: string
+  password: string
+}
+
 export async function completeSetupProtected(params: {
   username: string
   password: string
   settingsOption: "same" | "pin" | "none"
   customPin?: string
+  createChild?: boolean
+  childAccount?: ChildAccountSetupInput
 }): Promise<{ success: boolean; error?: string }> {
   const setupState = await getSetupState()
   if (!setupState.needsSetup) {
@@ -165,6 +173,30 @@ export async function completeSetupProtected(params: {
   const cleanUsername = (userValidation.normalized || params.username.trim()).toLowerCase()
   const password = params.password
 
+  // Validate Child Account if requested
+  let cleanChildUsername: string | null = null
+  let childDisplayName: string | null = null
+  let childPassword = ""
+
+  if (params.createChild && params.childAccount) {
+    const childUserVal = validateUsername(params.childAccount.username)
+    if (!childUserVal.valid) {
+      return { success: false, error: `Kinder-Konto: ${childUserVal.error}` }
+    }
+    const childPassVal = validatePasswordPolicy(params.childAccount.password)
+    if (!childPassVal.valid) {
+      return { success: false, error: `Kinder-Konto: ${childPassVal.error}` }
+    }
+
+    cleanChildUsername = (childUserVal.normalized || params.childAccount.username.trim()).toLowerCase()
+    childDisplayName = params.childAccount.displayName?.trim() || params.childAccount.username.trim()
+    childPassword = params.childAccount.password
+
+    if (cleanUsername === cleanChildUsername) {
+      return { success: false, error: "Eltern-Konto und Kinder-Konto müssen unterschiedliche Benutzernamen haben." }
+    }
+  }
+
   let settingsPasswordHash: string | null = null
   if (params.settingsOption === "same") {
     settingsPasswordHash = hashPassword(password)
@@ -181,7 +213,7 @@ export async function completeSetupProtected(params: {
   }
 
   try {
-    // Atomically create admin, assign decks, and update settings with race condition protection
+    // Atomically create admin, optional child, assign decks, and update settings with race condition protection
     const user = await prisma.$transaction(async (tx) => {
       const adminCount = await tx.user.count({ where: { role: "ADMIN" } })
       if (adminCount > 0) {
@@ -204,6 +236,20 @@ export async function completeSetupProtected(params: {
         throw new Error("USERNAME_TAKEN")
       }
 
+      if (cleanChildUsername) {
+        const existingChild = await tx.user.findFirst({
+          where: {
+            OR: [
+              { username: cleanChildUsername },
+              { username: params.childAccount!.username.trim() },
+            ],
+          },
+        })
+        if (existingChild) {
+          throw new Error("CHILD_USERNAME_TAKEN")
+        }
+      }
+
       const passwordHash = hashPassword(password)
 
       const newUser = await tx.user.create({
@@ -216,13 +262,28 @@ export async function completeSetupProtected(params: {
         },
       })
 
-      // Reassign existing unassigned decks to this primary admin
+      // Optionally create child account
+      let newChildUser = null
+      if (cleanChildUsername && childPassword) {
+        newChildUser = await tx.user.create({
+          data: {
+            username: cleanChildUsername,
+            displayName: childDisplayName || cleanChildUsername,
+            passwordHash: hashPassword(childPassword),
+            role: "USER",
+            isActive: true,
+          },
+        })
+      }
+
+      // Reassign existing unassigned decks: if child was created, assign to child (learning user), else to admin
+      const targetDeckUserId = newChildUser ? newChildUser.id : newUser.id
       await tx.deck.updateMany({
         where: {
           OR: [{ userId: null }, { userId: "default" }, { userId: "admin" }],
         },
         data: {
-          userId: newUser.id,
+          userId: targetDeckUserId,
         },
       })
 
@@ -273,6 +334,12 @@ export async function completeSetupProtected(params: {
       }
       if (err.message === "USERNAME_TAKEN") {
         return { success: false, error: `Der Benutzername "${params.username.trim()}" ist bereits vergeben.` }
+      }
+      if (err.message === "CHILD_USERNAME_TAKEN") {
+        return {
+          success: false,
+          error: `Der Benutzername "${params.childAccount?.username.trim()}" für das Kinder-Profil ist bereits vergeben.`,
+        }
       }
     }
     recordRateLimitFailure(rateLimitKey, { maxAttempts: 5, windowMs: 15 * 60 * 1000, blockDurationMs: 15 * 60 * 1000 })

@@ -1,6 +1,6 @@
 {
   "name": "Vokabeltrainer",
-  "short_name": "Vokabeln",
+  "short_name": "Vokabeltrainer",
   "description": "Moderner Vokabeltrainer mit KI Bilderkennung",
   "start_url": "/",
   "display": "standalone",

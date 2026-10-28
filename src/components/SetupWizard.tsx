@@ -12,6 +12,7 @@ import {
   AlertTriangle,
   CheckCircle2,
   Sparkles,
+  UserPlus,
 } from "lucide-react"
 import { completeSetupSingleUser, completeSetupProtected } from "@/actions/setup"
 
@@ -21,17 +22,25 @@ interface SetupWizardProps {
 
 export function SetupWizard({ isPublicOrRender }: SetupWizardProps) {
   const router = useRouter()
-  const [step, setStep] = useState<1 | 2>(1)
+  const [step, setStep] = useState<1 | 2 | 3>(1)
   const [showWarningModal, setShowWarningModal] = useState(false)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  // Step 2 Form States
+  // Step 2 Form States (Parent / Admin)
   const [username, setUsername] = useState("")
   const [password, setPassword] = useState("")
   const [confirmPassword, setConfirmPassword] = useState("")
   const [settingsOption, setSettingsOption] = useState<"same" | "pin" | "none">("same")
   const [customPin, setCustomPin] = useState("")
+
+  // Step 3 Form States (Child Account)
+  const [createChild, setCreateChild] = useState<boolean>(true)
+  const [childDisplayName, setChildDisplayName] = useState("")
+  const [childUsername, setChildUsername] = useState("")
+  const [hasManuallyEditedChildUsername, setHasManuallyEditedChildUsername] = useState(false)
+  const [childPassword, setChildPassword] = useState("")
+  const [childConfirmPassword, setChildConfirmPassword] = useState("")
 
   const handleStartSingleUser = async () => {
     setLoading(true)
@@ -59,18 +68,18 @@ export function SetupWizard({ isPublicOrRender }: SetupWizardProps) {
     }
   }
 
-  const handleProtectedSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
+  const handleProceedToChildStep = (e?: React.FormEvent) => {
+    if (e) e.preventDefault()
     setError(null)
 
     const cleanUsername = username.trim()
     if (!cleanUsername || cleanUsername.length < 2 || cleanUsername.length > 50) {
-      setError("Der Benutzername muss zwischen 2 und 50 Zeichen lang sein.")
+      setError("Der Eltern-Benutzername muss zwischen 2 und 50 Zeichen lang sein.")
       return
     }
 
     if (!/^[a-zA-Z0-9_\-\.]+$/.test(cleanUsername)) {
-      setError("Der Benutzername darf nur Buchstaben, Zahlen, Bindestriche und Punkte enthalten.")
+      setError("Der Eltern-Benutzername darf nur Buchstaben, Zahlen, Bindestriche und Punkte enthalten.")
       return
     }
 
@@ -80,18 +89,68 @@ export function SetupWizard({ isPublicOrRender }: SetupWizardProps) {
     }
 
     if (password.length < 8 || !/[^a-zA-Z0-9]/.test(password)) {
-      setError("Das Passwort muss mindestens 8 Zeichen lang sein und mindestens ein Sonderzeichen enthalten.")
+      setError("Das Eltern-Passwort muss mindestens 8 Zeichen lang sein und mindestens ein Sonderzeichen enthalten.")
       return
     }
 
     if (password !== confirmPassword) {
-      setError("Die Passwörter stimmen nicht überein.")
+      setError("Die Passwörter für das Eltern-Konto stimmen nicht überein.")
       return
     }
 
     if (settingsOption === "pin" && (!customPin.trim() || customPin.trim().length < 4)) {
       setError("Die Kindersicherungs-PIN muss mindestens 4 Zeichen lang sein.")
       return
+    }
+
+    setStep(3)
+  }
+
+  const handleChildDisplayNameChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const val = e.target.value
+    setChildDisplayName(val)
+    if (!hasManuallyEditedChildUsername) {
+      const suggested = val.toLowerCase().replace(/[^a-z0-9_\-\.]/g, "")
+      setChildUsername(suggested)
+    }
+  }
+
+  const handleProtectedSubmit = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault()
+    setError(null)
+
+    if (createChild) {
+      const cleanChildUser = childUsername.trim()
+
+      if (!cleanChildUser || cleanChildUser.length < 2 || cleanChildUser.length > 50) {
+        setError("Der Benutzername des Kindes muss zwischen 2 und 50 Zeichen lang sein.")
+        return
+      }
+
+      if (!/^[a-zA-Z0-9_\-\.]+$/.test(cleanChildUser)) {
+        setError("Der Benutzername des Kindes darf nur Buchstaben, Zahlen, Bindestriche und Punkte enthalten.")
+        return
+      }
+
+      if (cleanChildUser.toLowerCase() === username.trim().toLowerCase()) {
+        setError("Eltern-Konto und Kinder-Konto müssen unterschiedliche Benutzernamen haben.")
+        return
+      }
+
+      if (cleanChildUser.toLowerCase() === "default" || cleanChildUser.toLowerCase() === "env-admin") {
+        setError("Dieser Benutzername für das Kind ist reserviert.")
+        return
+      }
+
+      if (childPassword.length < 8 || !/[^a-zA-Z0-9]/.test(childPassword)) {
+        setError("Das Passwort für das Kind muss mindestens 8 Zeichen lang sein und mindestens ein Sonderzeichen enthalten.")
+        return
+      }
+
+      if (childPassword !== childConfirmPassword) {
+        setError("Die Passwörter für das Kinder-Konto stimmen nicht überein.")
+        return
+      }
     }
 
     setLoading(true)
@@ -101,6 +160,14 @@ export function SetupWizard({ isPublicOrRender }: SetupWizardProps) {
         password,
         settingsOption,
         customPin: settingsOption === "pin" ? customPin.trim() : undefined,
+        createChild,
+        childAccount: createChild
+          ? {
+              username: childUsername.trim(),
+              displayName: childDisplayName.trim() || childUsername.trim(),
+              password: childPassword,
+            }
+          : undefined,
       })
 
       if (res.success) {
@@ -235,18 +302,12 @@ export function SetupWizard({ isPublicOrRender }: SetupWizardProps) {
       {/* Screen 2: Protected Setup Form */}
       {step === 2 && (
         <div className="bg-white dark:bg-zinc-900 rounded-2xl p-6 sm:p-8 border border-zinc-200 dark:border-zinc-800 shadow-sm">
-          <button
-            type="button"
-            onClick={() => {
-              setStep(1)
-              setError(null)
-            }}
-            className="inline-flex items-center gap-2 text-xs sm:text-sm text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-100 mb-6 transition-colors"
-          >
-            <ArrowLeft className="w-4 h-4" /> Zurück zur Modus-Auswahl
-          </button>
+          <div className="flex items-center justify-between text-xs font-semibold text-zinc-500 dark:text-zinc-400 mb-6 uppercase tracking-wider pb-2 border-b border-zinc-100 dark:border-zinc-800">
+            <span>Schritt 1 von 2: Eltern-Konto</span>
+            <span>Geschützter Modus</span>
+          </div>
 
-          <form onSubmit={handleProtectedSubmit} className="space-y-6">
+          <form onSubmit={handleProceedToChildStep} className="space-y-6">
             {/* Account Information */}
             <div className="space-y-4">
               <h2 className="text-base font-bold text-zinc-900 dark:text-zinc-100 pb-1 border-b border-zinc-100 dark:border-zinc-800">
@@ -384,11 +445,191 @@ export function SetupWizard({ isPublicOrRender }: SetupWizardProps) {
               </div>
             </div>
 
-            <div className="pt-4 border-t border-zinc-100 dark:border-zinc-800">
+            <div className="pt-4 border-t border-zinc-100 dark:border-zinc-800 flex items-center justify-between gap-3">
+              <button
+                type="button"
+                onClick={() => {
+                  setStep(1)
+                  setError(null)
+                }}
+                className="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-xl border border-zinc-300 dark:border-zinc-700 text-xs sm:text-sm font-medium text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
+              >
+                <ArrowLeft className="w-4 h-4" /> Zurück
+              </button>
+              <button
+                type="submit"
+                className="py-2.5 px-5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-medium text-xs sm:text-sm transition-colors flex items-center justify-center gap-2 shadow-sm"
+              >
+                <span>Weiter: Kinder-Konto einrichten</span>
+                <ArrowRight className="w-4 h-4" />
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
+
+      {/* Screen 3: Child Account Setup Prompt */}
+      {step === 3 && (
+        <div className="bg-white dark:bg-zinc-900 rounded-2xl p-6 sm:p-8 border border-zinc-200 dark:border-zinc-800 shadow-sm">
+          <div className="flex items-center justify-between text-xs font-semibold text-blue-600 dark:text-blue-400 mb-6 uppercase tracking-wider pb-2 border-b border-zinc-100 dark:border-zinc-800">
+            <span>Schritt 2 von 2: Kinder-Konto</span>
+            <span>Geschützter Modus</span>
+          </div>
+
+          <div className="mb-6">
+            <h2 className="text-lg font-bold text-zinc-900 dark:text-zinc-100 mb-1">
+              Möchtest du direkt ein Kinder-Konto einrichten?
+            </h2>
+            <p className="text-xs sm:text-sm text-zinc-600 dark:text-zinc-400">
+              Mit einem Kinder-Konto kann dein Kind direkt mit eigenem Namen und Lernstand Vokabeln üben, ohne Zugriff auf deine Einstellungen.
+            </p>
+          </div>
+
+          <form onSubmit={handleProtectedSubmit} className="space-y-6">
+            {/* Choice: Create Child Account Now vs Later */}
+            <div className="space-y-3">
+              <label
+                onClick={() => setCreateChild(true)}
+                className={`flex items-start gap-3 p-4 rounded-2xl border-2 cursor-pointer transition-all ${
+                  createChild
+                    ? "border-blue-500 bg-blue-50/40 dark:bg-blue-950/20"
+                    : "border-zinc-200 dark:border-zinc-800 hover:bg-zinc-50 dark:hover:bg-zinc-800/40"
+                }`}
+              >
+                <input
+                  type="radio"
+                  name="childOption"
+                  checked={createChild}
+                  onChange={() => setCreateChild(true)}
+                  className="mt-1 text-blue-600 focus:ring-blue-500"
+                />
+                <div className="w-full">
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm font-bold text-zinc-900 dark:text-zinc-100">
+                      Ja, jetzt ein Kinder-Konto anlegen
+                    </span>
+                    <span className="text-[11px] font-semibold bg-blue-100 dark:bg-blue-900/60 text-blue-700 dark:text-blue-300 px-2 py-0.5 rounded-full">
+                      Empfohlen
+                    </span>
+                  </div>
+                  <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">
+                    Richte die Zugangsdaten für dein Kind ein.
+                  </p>
+
+                  {createChild && (
+                    <div className="mt-4 pt-4 border-t border-blue-200/60 dark:border-blue-900/40 space-y-4">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div>
+                          <label className="block text-xs font-medium text-zinc-700 dark:text-zinc-300 mb-1">
+                            Rufname / Vorname *
+                          </label>
+                          <input
+                            type="text"
+                            value={childDisplayName}
+                            onChange={handleChildDisplayNameChange}
+                            placeholder="z. B. Leon oder Anna"
+                            required={createChild}
+                            autoFocus
+                            className="w-full px-3 py-2 rounded-xl border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                          />
+                        </div>
+
+                        <div>
+                          <label className="block text-xs font-medium text-zinc-700 dark:text-zinc-300 mb-1">
+                            Anmeldename *
+                          </label>
+                          <input
+                            type="text"
+                            value={childUsername}
+                            onChange={(e) => {
+                              setHasManuallyEditedChildUsername(true)
+                              setChildUsername(e.target.value)
+                            }}
+                            placeholder="z. B. leon"
+                            required={createChild}
+                            className="w-full px-3 py-2 rounded-xl border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                          />
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div>
+                          <label className="block text-xs font-medium text-zinc-700 dark:text-zinc-300 mb-1">
+                            Passwort für Kind *
+                          </label>
+                          <input
+                            type="password"
+                            value={childPassword}
+                            onChange={(e) => setChildPassword(e.target.value)}
+                            placeholder="Mind. 8 Zeichen & 1 Sonderzeichen"
+                            required={createChild}
+                            minLength={8}
+                            className="w-full px-3 py-2 rounded-xl border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                          />
+                        </div>
+
+                        <div>
+                          <label className="block text-xs font-medium text-zinc-700 dark:text-zinc-300 mb-1">
+                            Passwort bestätigen *
+                          </label>
+                          <input
+                            type="password"
+                            value={childConfirmPassword}
+                            onChange={(e) => setChildConfirmPassword(e.target.value)}
+                            placeholder="Passwort wiederholen"
+                            required={createChild}
+                            minLength={8}
+                            className="w-full px-3 py-2 rounded-xl border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </label>
+
+              <label
+                onClick={() => setCreateChild(false)}
+                className={`flex items-start gap-3 p-4 rounded-2xl border-2 cursor-pointer transition-all ${
+                  !createChild
+                    ? "border-blue-500 bg-blue-50/40 dark:bg-blue-950/20"
+                    : "border-zinc-200 dark:border-zinc-800 hover:bg-zinc-50 dark:hover:bg-zinc-800/40"
+                }`}
+              >
+                <input
+                  type="radio"
+                  name="childOption"
+                  checked={!createChild}
+                  onChange={() => setCreateChild(false)}
+                  className="mt-1 text-blue-600 focus:ring-blue-500"
+                />
+                <div>
+                  <span className="text-sm font-bold text-zinc-900 dark:text-zinc-100">
+                    Nein, erst später in den Einstellungen anlegen
+                  </span>
+                  <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">
+                    Du startest vorerst nur mit deinem Eltern-Konto. In den Einstellungen unter „Benutzerverwaltung“ kannst du jederzeit Kinder-Profile hinzufügen.
+                  </p>
+                </div>
+              </label>
+            </div>
+
+            <div className="pt-4 border-t border-zinc-100 dark:border-zinc-800 flex items-center justify-between gap-3">
+              <button
+                type="button"
+                onClick={() => {
+                  setStep(2)
+                  setError(null)
+                }}
+                className="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-xl border border-zinc-300 dark:border-zinc-700 text-xs sm:text-sm font-medium text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
+              >
+                <ArrowLeft className="w-4 h-4" /> Zurück zu Eltern-Konto
+              </button>
+
               <button
                 type="submit"
                 disabled={loading}
-                className="w-full py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-medium text-sm transition-colors flex items-center justify-center gap-2 shadow-sm disabled:opacity-50"
+                className="py-2.5 px-6 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-medium text-xs sm:text-sm transition-colors flex items-center justify-center gap-2 shadow-sm disabled:opacity-50"
               >
                 {loading ? "Richte Vokabeltrainer ein..." : "Einrichtung abschließen 🚀"}
               </button>
