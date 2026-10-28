@@ -20,10 +20,16 @@ async function handleExport() {
 
     const decks = await prisma.deck.findMany({
       include: {
+        user: {
+          select: {
+            username: true,
+            displayName: true,
+          },
+        },
         cards: {
-            include: {
-                reviewLogs: true
-            }
+          include: {
+            reviewLogs: true,
+          },
         },
         reviewLogs: true,
       },
@@ -32,7 +38,14 @@ async function handleExport() {
     const payloadData = {
       version: 2,
       settings: settings,
-      decks: decks
+      decks: decks.map((deck) => {
+        const { user, ...deckRest } = deck
+        return {
+          ...deckRest,
+          ownerUsername: user?.username ?? null,
+          ownerDisplayName: user?.displayName ?? null,
+        }
+      }),
     }
 
     const payload = JSON.stringify(payloadData, null, 2)

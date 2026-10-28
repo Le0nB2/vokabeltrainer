@@ -84,4 +84,35 @@ describe('ImportExport Component (SEC-07 export behavior)', () => {
       expect(screen.getByText('Export fehlgeschlagen.')).toBeDefined()
     })
   })
+
+  it('opens mapping dialog when backup contains an unknown owner and availableUsers does not have it', async () => {
+    const backupJson = JSON.stringify({
+      version: 2,
+      decks: [
+        {
+          title: 'Englisch Deck',
+          ownerUsername: 'anna',
+          cards: [{ front: 'dog', back: 'Hund' }],
+        },
+      ],
+    })
+
+    const file = new File([backupJson], 'backup.json', { type: 'application/json' })
+
+    const availableUsers = [
+      { id: 'u-1', username: 'eltern', displayName: 'Eltern', role: 'ADMIN' },
+      { id: 'u-2', username: 'leon', displayName: 'Leon', role: 'USER' },
+    ]
+
+    render(<ImportExport availableUsers={availableUsers} />)
+    const fileInput = document.querySelector('input[type="file"]') as HTMLInputElement
+
+    fireEvent.change(fileInput, { target: { files: [file] } })
+
+    await waitFor(() => {
+      expect(screen.getByText('Profile in der Sicherung zuordnen')).toBeDefined()
+      expect(screen.getByText(/Profil "anna"/i)).toBeDefined()
+      expect(screen.getByText('Als neues Kinder-Profil anlegen (Empfohlen)')).toBeDefined()
+    })
+  })
 })

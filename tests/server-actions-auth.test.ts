@@ -58,6 +58,11 @@ const { mockCookies, mockPrisma } = vi.hoisted(() => {
     apiUsageLog: {
       findMany: vi.fn().mockResolvedValue([]),
     },
+    user: {
+      findMany: vi.fn().mockResolvedValue([]),
+      findUnique: vi.fn().mockResolvedValue(null),
+      create: vi.fn().mockImplementation(({ data }) => Promise.resolve({ id: 'user-1', ...data })),
+    },
     aiModel: {
       findMany: vi.fn().mockResolvedValue([]),
       deleteMany: vi.fn().mockResolvedValue({ count: 0 }),

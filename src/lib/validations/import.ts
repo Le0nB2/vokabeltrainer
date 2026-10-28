@@ -73,6 +73,9 @@ export const DeckImportSchema = z.object({
     .min(1, "Deck-Titel darf nicht leer sein")
     .max(200, "Deck-Titel darf maximal 200 Zeichen lang sein"),
   description: z.string().max(2000, "Beschreibung darf maximal 2000 Zeichen lang sein").optional().nullable(),
+  ownerUsername: z.string().max(100).optional().nullable(),
+  ownerDisplayName: z.string().max(100).optional().nullable(),
+  userId: z.string().max(100).optional().nullable(),
   createdAt: z.coerce.date().optional().nullable(),
   updatedAt: z.coerce.date().optional().nullable(),
   lastResultCorrect: z.number().int().min(0).optional().nullable(),

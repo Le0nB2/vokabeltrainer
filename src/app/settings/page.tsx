@@ -47,7 +47,7 @@ export default async function SettingsPage() {
         />
         <SettingsPasswordSettings isProtected={isSettingsProtected} />
         <UserManagementSettings initialData={userManagementData} />
-        <ImportExport />
+        <ImportExport availableUsers={userManagementData.users} />
       </div>
     </main>
   )

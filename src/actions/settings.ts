@@ -5,10 +5,21 @@ import { revalidatePath } from "next/cache"
 import { requireAppAuth, getCurrentUser, UnauthorizedError } from "@/lib/auth-guard"
 import { MAX_IMPORT_SIZE_BYTES, validateBackupData } from "@/lib/validations/import"
 import { checkSettingsAuthenticated } from "@/actions/auth"
+import { hashPassword, validateUsername, validatePasswordPolicy } from "@/lib/auth-utils"
 
 const checkSettingsAuth = checkSettingsAuthenticated
 
-export async function importData(jsonData: string) {
+export interface UserImportMapping {
+  action: "create" | "assign"
+  targetUserId?: string
+  password?: string
+  displayName?: string
+}
+
+export async function importData(
+  jsonData: string,
+  userMappings?: Record<string, UserImportMapping>
+) {
   try {
     await requireAppAuth()
     const user = await getCurrentUser()
@@ -39,10 +50,38 @@ export async function importData(jsonData: string) {
 
     const { decks, settings } = validationResult.data
 
+    // Fetch all active DB users for mapping
+    const existingDbUsers = typeof prisma?.user?.findMany === "function"
+      ? await prisma.user.findMany({
+          select: { id: true, username: true, displayName: true },
+        })
+      : []
+    const userByUsername = new Map(existingDbUsers.map((u) => [u.username.toLowerCase(), u]))
+    const createdUsersMap = new Map<string, string>() // lowercase username -> newly created userId
+
+    // Validate any users that need to be created
+    if (userMappings) {
+      for (const [ownerUsername, mapping] of Object.entries(userMappings)) {
+        if (mapping.action === "create") {
+          const userVal = validateUsername(ownerUsername)
+          if (!userVal.valid) {
+            return { success: false, error: `Benutzer "${ownerUsername}": ${userVal.error}` }
+          }
+          if (!mapping.password) {
+            return { success: false, error: `Bitte gib ein Passwort für das neue Profil "${ownerUsername}" an.` }
+          }
+          const passVal = validatePasswordPolicy(mapping.password)
+          if (!passVal.valid) {
+            return { success: false, error: `Passwort für Profil "${ownerUsername}": ${passVal.error}` }
+          }
+        }
+      }
+    }
+
     // Only assign userId if the user is a persistent database user.
     // Synthetic users ("admin", "default", "env-admin") do not have a record in the User table,
     // which would trigger a foreign key violation (P2003 / Deck_userId_fkey) in PostgreSQL.
-    const targetUserId =
+    const fallbackUserId =
       user &&
       user.id &&
       user.id !== "default" &&
@@ -53,7 +92,31 @@ export async function importData(jsonData: string) {
 
     // Wrap in a transaction to ensure all or nothing
     await prisma.$transaction(async (tx) => {
-      // Restore Settings if available (defense-in-depth: strip sensitive security fields)
+      // 1. Create any missing users that were requested to be created
+      if (userMappings && typeof tx?.user?.findUnique === "function") {
+        for (const [ownerUsername, mapping] of Object.entries(userMappings)) {
+          if (mapping.action === "create" && mapping.password) {
+            const cleanUsername = ownerUsername.trim().toLowerCase()
+            const existing = await tx.user.findUnique({ where: { username: cleanUsername } })
+            if (existing) {
+              createdUsersMap.set(cleanUsername, existing.id)
+            } else if (typeof tx?.user?.create === "function") {
+              const newUser = await tx.user.create({
+                data: {
+                  username: cleanUsername,
+                  displayName: mapping.displayName?.trim() || ownerUsername.trim(),
+                  passwordHash: hashPassword(mapping.password),
+                  role: "USER",
+                  isActive: true,
+                },
+              })
+              createdUsersMap.set(cleanUsername, newUser.id)
+            }
+          }
+        }
+      }
+
+      // 2. Restore Settings if available (defense-in-depth: strip sensitive security fields)
       if (settings) {
         const { id, ...settingsWithoutId } = settings as Record<string, unknown>
         delete (settingsWithoutId as Record<string, unknown>).isSetupCompleted
@@ -69,12 +132,26 @@ export async function importData(jsonData: string) {
         })
       }
 
+      // 3. Create decks with their respective assigned users
       for (const deck of decks) {
+        let deckTargetUserId: string | null = fallbackUserId
+
+        const rawOwner = (deck as any).ownerUsername?.trim()?.toLowerCase()
+        if (rawOwner) {
+          if (createdUsersMap.has(rawOwner)) {
+            deckTargetUserId = createdUsersMap.get(rawOwner)!
+          } else if (userMappings?.[rawOwner]?.action === "assign" && userMappings[rawOwner].targetUserId) {
+            deckTargetUserId = userMappings[rawOwner].targetUserId!
+          } else if (userByUsername.has(rawOwner)) {
+            deckTargetUserId = userByUsername.get(rawOwner)!.id
+          }
+        }
+
         const createdDeck = await tx.deck.create({
           data: {
             title: deck.title,
             description: deck.description ?? null,
-            userId: targetUserId,
+            userId: deckTargetUserId,
             createdAt: deck.createdAt ?? undefined,
             updatedAt: deck.updatedAt ?? undefined,
             lastResultCorrect: deck.lastResultCorrect ?? null,
