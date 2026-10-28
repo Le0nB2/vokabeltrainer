@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { proxy } from '../src/proxy'
 import { NextRequest } from 'next/server'
-import { createAppSessionToken, getAppSecret, AUTH_COOKIE_NAME } from '../src/lib/auth-utils'
+import { createAppSessionToken, getAppSecret, AUTH_COOKIE_NAME, SETTINGS_COOKIE_NAME } from '../src/lib/auth-utils'
 
 // Mock next/server response methods
 vi.mock('next/server', () => {
@@ -21,15 +21,41 @@ vi.mock('next/server', () => {
       }
 
       static next() {
-        return { status: 200, type: 'next' }
+        const obj: any = { status: 200, type: 'next' }
+        const cookiesMap = new Map<string, any>()
+        Object.defineProperty(obj, 'cookies', {
+          enumerable: false,
+          value: {
+            set: vi.fn((name: string, value: string, opts?: any) => {
+              cookiesMap.set(name, { name, value, ...opts })
+            }),
+            get: vi.fn((name: string) => cookiesMap.get(name)),
+            delete: vi.fn((name: string) => cookiesMap.delete(name)),
+            _map: cookiesMap,
+          },
+        })
+        return obj
       }
 
       static redirect(url: string | URL) {
-        return {
+        const obj: any = {
           status: 307,
           type: 'redirect',
           url: typeof url === 'string' ? url : url.toString(),
         }
+        const cookiesMap = new Map<string, any>()
+        Object.defineProperty(obj, 'cookies', {
+          enumerable: false,
+          value: {
+            set: vi.fn((name: string, value: string, opts?: any) => {
+              cookiesMap.set(name, { name, value, ...opts })
+            }),
+            get: vi.fn((name: string) => cookiesMap.get(name)),
+            delete: vi.fn((name: string) => cookiesMap.delete(name)),
+            _map: cookiesMap,
+          },
+        })
+        return obj
       }
 
       static json(body: any, init?: any) {
@@ -297,6 +323,97 @@ describe('proxy middleware session auth', () => {
       const result: any = await proxy(req)
       expect(result.status).toBe(401)
       expect(result.type).toBe('json')
+    })
+  })
+
+  describe('settings session auto-logout handling', () => {
+    it('does NOT clear settings_auth on background prefetch requests', async () => {
+      const validSession = createAppSessionToken('testuser', getAppSecret('testpassword123'), 3600)
+      const url = new URL('/', 'http://localhost:3000')
+      const req = {
+        url: url.toString(),
+        nextUrl: url,
+        method: 'GET',
+        headers: {
+          get: (name: string) => {
+            const n = name.toLowerCase()
+            if (n === 'cookie') return `${AUTH_COOKIE_NAME}=${validSession}; ${SETTINGS_COOKIE_NAME}=active-token`
+            if (n === 'next-router-prefetch') return '1'
+            if (n === 'referer') return 'http://localhost:3000/settings'
+            return null
+          },
+        },
+        cookies: {
+          get: (name: string) => {
+            if (name === AUTH_COOKIE_NAME) return { value: validSession }
+            if (name === SETTINGS_COOKIE_NAME) return { value: 'active-token' }
+            return undefined
+          },
+        },
+      } as unknown as NextRequest
+
+      const result: any = await proxy(req)
+      expect(result.type).toBe('next')
+      expect(result.cookies.set).not.toHaveBeenCalledWith(SETTINGS_COOKIE_NAME, '', expect.anything())
+    })
+
+    it('does NOT clear settings_auth on Server Actions originating from /settings', async () => {
+      const validSession = createAppSessionToken('testuser', getAppSecret('testpassword123'), 3600)
+      const url = new URL('/settings', 'http://localhost:3000')
+      const req = {
+        url: url.toString(),
+        nextUrl: url,
+        method: 'POST',
+        headers: {
+          get: (name: string) => {
+            const n = name.toLowerCase()
+            if (n === 'cookie') return `${AUTH_COOKIE_NAME}=${validSession}; ${SETTINGS_COOKIE_NAME}=active-token`
+            if (n === 'next-action') return 'some-action-id'
+            if (n === 'referer') return 'http://localhost:3000/settings'
+            return null
+          },
+        },
+        cookies: {
+          get: (name: string) => {
+            if (name === AUTH_COOKIE_NAME) return { value: validSession }
+            if (name === SETTINGS_COOKIE_NAME) return { value: 'active-token' }
+            return undefined
+          },
+        },
+      } as unknown as NextRequest
+
+      const result: any = await proxy(req)
+      expect(result.type).toBe('next')
+      expect(result.cookies.set).not.toHaveBeenCalledWith(SETTINGS_COOKIE_NAME, '', expect.anything())
+    })
+
+    it('clears settings_auth on full top-level document navigation away from /settings', async () => {
+      const validSession = createAppSessionToken('testuser', getAppSecret('testpassword123'), 3600)
+      const url = new URL('/decks', 'http://localhost:3000')
+      const req = {
+        url: url.toString(),
+        nextUrl: url,
+        method: 'GET',
+        headers: {
+          get: (name: string) => {
+            const n = name.toLowerCase()
+            if (n === 'cookie') return `${AUTH_COOKIE_NAME}=${validSession}; ${SETTINGS_COOKIE_NAME}=active-token`
+            if (n === 'sec-fetch-dest') return 'document'
+            return null
+          },
+        },
+        cookies: {
+          get: (name: string) => {
+            if (name === AUTH_COOKIE_NAME) return { value: validSession }
+            if (name === SETTINGS_COOKIE_NAME) return { value: 'active-token' }
+            return undefined
+          },
+        },
+      } as unknown as NextRequest
+
+      const result: any = await proxy(req)
+      expect(result.type).toBe('next')
+      expect(result.cookies.set).toHaveBeenCalledWith(SETTINGS_COOKIE_NAME, '', expect.objectContaining({ maxAge: 0 }))
     })
   })
 })

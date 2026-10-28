@@ -11,6 +11,8 @@ import {
   AUTH_COOKIE_NAME,
   AUTH_COOKIE_MAX_AGE,
   SETTINGS_COOKIE_NAME,
+  SETTINGS_COOKIE_MAX_AGE,
+  createSettingsSessionToken,
   hashPassword,
   isSecureRequest,
 } from "@/lib/auth-utils"
@@ -157,13 +159,23 @@ export async function completeSetupSingleUser(params?: {
       maxAge: AUTH_COOKIE_MAX_AGE,
     })
 
-    cookieStore.set(SETTINGS_COOKIE_NAME, "", {
-      httpOnly: true,
-      secure: isSecure,
-      path: "/",
-      sameSite: "lax",
-      maxAge: 0,
-    })
+    if (settingsPasswordHash && settingsPasswordHash !== "disabled") {
+      cookieStore.set(SETTINGS_COOKIE_NAME, createSettingsSessionToken(settingsPasswordHash, SETTINGS_COOKIE_MAX_AGE), {
+        httpOnly: true,
+        secure: isSecure,
+        path: "/",
+        sameSite: "lax",
+        maxAge: SETTINGS_COOKIE_MAX_AGE,
+      })
+    } else {
+      cookieStore.set(SETTINGS_COOKIE_NAME, "", {
+        httpOnly: true,
+        secure: isSecure,
+        path: "/",
+        sameSite: "lax",
+        maxAge: 0,
+      })
+    }
 
     resetRateLimit(rateLimitKey)
     revalidatePath("/")
@@ -387,6 +399,16 @@ export async function completeSetupProtected(params: {
       sameSite: "lax",
       maxAge: AUTH_COOKIE_MAX_AGE,
     })
+
+    if (settingsPasswordHash && settingsPasswordHash !== "disabled") {
+      cookieStore.set(SETTINGS_COOKIE_NAME, createSettingsSessionToken(settingsPasswordHash, SETTINGS_COOKIE_MAX_AGE), {
+        httpOnly: true,
+        secure: isSecure,
+        path: "/",
+        sameSite: "lax",
+        maxAge: SETTINGS_COOKIE_MAX_AGE,
+      })
+    }
 
     resetRateLimit(rateLimitKey)
     revalidatePath("/")
