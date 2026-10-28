@@ -78,7 +78,9 @@ export async function getSetupState(): Promise<{
   }
 }
 
-export async function completeSetupSingleUser(): Promise<{ success: boolean; error?: string }> {
+export async function completeSetupSingleUser(params?: {
+  settingsPin?: string
+}): Promise<{ success: boolean; error?: string }> {
   const setupState = await getSetupState()
   if (!setupState.needsSetup) {
     return { success: false, error: "Die Ersteinrichtung wurde bereits abgeschlossen." }
@@ -92,6 +94,18 @@ export async function completeSetupSingleUser(): Promise<{ success: boolean; err
       success: false,
       error: `Zu viele Anfragen. Bitte versuche es in ${formatRetryDuration(rateLimit.retryAfterSeconds)} erneut.`,
     }
+  }
+
+  let settingsPasswordHash: string | null = null
+  if (params?.settingsPin && params.settingsPin.trim().length > 0) {
+    const cleanPin = params.settingsPin.trim()
+    if (cleanPin.length < 4) {
+      return { success: false, error: "Die Einstellungs-PIN muss mindestens 4 Zeichen lang sein." }
+    }
+    if (cleanPin.length > 128) {
+      return { success: false, error: "Die Einstellungs-PIN darf maximal 128 Zeichen lang sein." }
+    }
+    settingsPasswordHash = hashPassword(cleanPin)
   }
 
   try {
@@ -110,9 +124,11 @@ export async function completeSetupSingleUser(): Promise<{ success: boolean; err
         create: {
           id: "default",
           isSetupCompleted: true,
+          ...(settingsPasswordHash ? { settingsPasswordHash } : {}),
         },
         update: {
           isSetupCompleted: true,
+          ...(settingsPasswordHash ? { settingsPasswordHash } : {}),
         },
       })
     })
@@ -140,7 +156,8 @@ export interface ChildAccountSetupInput {
 export async function completeSetupProtected(params: {
   username: string
   password: string
-  settingsOption: "same" | "pin" | "none"
+  settingsPin?: string
+  settingsOption?: "same" | "pin" | "none"
   customPin?: string
   createChild?: boolean
   childAccount?: ChildAccountSetupInput
@@ -198,7 +215,20 @@ export async function completeSetupProtected(params: {
   }
 
   let settingsPasswordHash: string | null = null
-  if (params.settingsOption === "same") {
+  if (params.settingsPin !== undefined) {
+    const cleanPin = params.settingsPin.trim()
+    if (cleanPin.length > 0) {
+      if (cleanPin.length < 4) {
+        return { success: false, error: "Die Einstellungs-PIN muss mindestens 4 Zeichen lang sein." }
+      }
+      if (cleanPin.length > 128) {
+        return { success: false, error: "Die Einstellungs-PIN darf maximal 128 Zeichen lang sein." }
+      }
+      settingsPasswordHash = hashPassword(cleanPin)
+    } else {
+      settingsPasswordHash = "disabled"
+    }
+  } else if (params.settingsOption === "same") {
     settingsPasswordHash = hashPassword(password)
   } else if (params.settingsOption === "pin") {
     if (!params.customPin || params.customPin.trim().length < 4) {
@@ -210,6 +240,9 @@ export async function completeSetupProtected(params: {
     settingsPasswordHash = hashPassword(params.customPin.trim())
   } else if (params.settingsOption === "none") {
     settingsPasswordHash = "disabled"
+  } else {
+    // Default fallback
+    settingsPasswordHash = hashPassword(password)
   }
 
   try {
@@ -293,11 +326,11 @@ export async function completeSetupProtected(params: {
         create: {
           id: "default",
           isSetupCompleted: true,
-          settingsPasswordHash,
+          ...(settingsPasswordHash ? { settingsPasswordHash } : {}),
         },
         update: {
           isSetupCompleted: true,
-          settingsPasswordHash,
+          ...(settingsPasswordHash ? { settingsPasswordHash } : {}),
         },
       })
 

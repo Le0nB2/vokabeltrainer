@@ -134,6 +134,25 @@ describe('Setup Wizard & Kindersicherung Settings Password', () => {
         })
       )
     })
+
+    it('sets settingsPasswordHash when settingsPin is provided in single user setup', async () => {
+      const upsertSpy = vi.spyOn(prisma.settings, 'upsert').mockResolvedValue({
+        id: 'default',
+        isSetupCompleted: true,
+      } as any)
+
+      const res = await completeSetupSingleUser({ settingsPin: '5678' })
+      expect(res.success).toBe(true)
+      expect(upsertSpy).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { id: 'default' },
+          update: expect.objectContaining({
+            isSetupCompleted: true,
+            settingsPasswordHash: expect.any(String),
+          }),
+        })
+      )
+    })
   })
 
   describe('completeSetupProtected', () => {

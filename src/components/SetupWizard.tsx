@@ -6,7 +6,6 @@ import {
   ShieldCheck,
   User,
   Users,
-  Lock,
   ArrowRight,
   ArrowLeft,
   AlertTriangle,
@@ -23,16 +22,20 @@ interface SetupWizardProps {
 export function SetupWizard({ isPublicOrRender }: SetupWizardProps) {
   const router = useRouter()
   const [step, setStep] = useState<1 | 2 | 3>(1)
-  const [showWarningModal, setShowWarningModal] = useState(false)
+  const [showSingleUserModal, setShowSingleUserModal] = useState(false)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+
+  // Single-User Mode PIN States
+  const [singleUserPin, setSingleUserPin] = useState("")
+  const [singleUserPinConfirm, setSingleUserPinConfirm] = useState("")
 
   // Step 2 Form States (Parent / Admin)
   const [username, setUsername] = useState("")
   const [password, setPassword] = useState("")
   const [confirmPassword, setConfirmPassword] = useState("")
-  const [settingsOption, setSettingsOption] = useState<"same" | "pin" | "none">("same")
-  const [customPin, setCustomPin] = useState("")
+  const [settingsPin, setSettingsPin] = useState("")
+  const [settingsPinConfirm, setSettingsPinConfirm] = useState("")
 
   // Step 3 Form States (Child Account)
   const [createChild, setCreateChild] = useState<boolean>(true)
@@ -42,11 +45,26 @@ export function SetupWizard({ isPublicOrRender }: SetupWizardProps) {
   const [childPassword, setChildPassword] = useState("")
   const [childConfirmPassword, setChildConfirmPassword] = useState("")
 
-  const handleStartSingleUser = async () => {
-    setLoading(true)
+  const handleStartSingleUser = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault()
     setError(null)
+
+    if (singleUserPin.trim().length > 0) {
+      if (singleUserPin.trim().length < 4) {
+        setError("Die Einstellungs-PIN muss mindestens 4 Zeichen lang sein.")
+        return
+      }
+      if (singleUserPin !== singleUserPinConfirm) {
+        setError("Die Einstellungs-PINs stimmen nicht überein.")
+        return
+      }
+    }
+
+    setLoading(true)
     try {
-      const res = await completeSetupSingleUser()
+      const res = await completeSetupSingleUser({
+        settingsPin: singleUserPin.trim() || undefined,
+      })
       if (res.success) {
         router.push("/")
         router.refresh()
@@ -57,14 +75,6 @@ export function SetupWizard({ isPublicOrRender }: SetupWizardProps) {
     } catch {
       setError("Ein unerwarteter Fehler ist aufgetreten.")
       setLoading(false)
-    }
-  }
-
-  const handleSingleUserClick = () => {
-    if (isPublicOrRender) {
-      setShowWarningModal(true)
-    } else {
-      setShowWarningModal(true) // Always verify awareness to be safe
     }
   }
 
@@ -98,8 +108,13 @@ export function SetupWizard({ isPublicOrRender }: SetupWizardProps) {
       return
     }
 
-    if (settingsOption === "pin" && (!customPin.trim() || customPin.trim().length < 4)) {
-      setError("Die Kindersicherungs-PIN muss mindestens 4 Zeichen lang sein.")
+    if (!settingsPin || settingsPin.trim().length < 4) {
+      setError("Die Einstellungs-PIN muss mindestens 4 Zeichen lang sein.")
+      return
+    }
+
+    if (settingsPin !== settingsPinConfirm) {
+      setError("Die Einstellungs-PINs stimmen nicht überein.")
       return
     }
 
@@ -158,8 +173,7 @@ export function SetupWizard({ isPublicOrRender }: SetupWizardProps) {
       const res = await completeSetupProtected({
         username: username.trim(),
         password,
-        settingsOption,
-        customPin: settingsOption === "pin" ? customPin.trim() : undefined,
+        settingsPin: settingsPin.trim(),
         createChild,
         childAccount: createChild
           ? {
@@ -188,15 +202,17 @@ export function SetupWizard({ isPublicOrRender }: SetupWizardProps) {
       {/* Top Header */}
       <div className="text-center mb-8">
         <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-blue-100 dark:bg-blue-900/40 text-blue-600 dark:text-blue-400 mb-3 shadow-sm">
-          <Sparkles className="w-7 h-7" />
+          {step === 3 ? <UserPlus className="w-7 h-7" /> : <Sparkles className="w-7 h-7" />}
         </div>
         <h1 className="text-2xl sm:text-3xl font-extrabold text-zinc-900 dark:text-zinc-100 tracking-tight">
-          Willkommen beim Vokabeltrainer! 👋
+          {step === 3 ? "Kinder-Konto einrichten" : "Willkommen beim Vokabeltrainer! 👋"}
         </h1>
         <p className="text-sm sm:text-base text-zinc-600 dark:text-zinc-400 mt-2 max-w-md mx-auto">
           {step === 1
             ? "Wähle bitte, wie du den Vokabeltrainer auf diesem System nutzen möchtest:"
-            : "Richte dein Eltern-Konto und die Kindersicherung ein."}
+            : step === 2
+            ? "Richte dein Eltern-Konto und die Einstellungs-PIN ein (Schritt 1 von 2)."
+            : "Möchtest du direkt ein Profil für dein Kind anlegen (Schritt 2 von 2)?"}
         </p>
       </div>
 
@@ -235,7 +251,7 @@ export function SetupWizard({ isPublicOrRender }: SetupWizardProps) {
                 </li>
                 <li className="flex items-center gap-2">
                   <CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0" />
-                  <span>Kindersicherung für Einstellungen</span>
+                  <span>Kindersicherung per PIN für Einstellungen</span>
                 </li>
                 <li className="flex items-center gap-2">
                   <CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0" />
@@ -265,32 +281,32 @@ export function SetupWizard({ isPublicOrRender }: SetupWizardProps) {
                 Einzelnutzer-Modus
               </h2>
               <p className="text-xs text-zinc-500 dark:text-zinc-400 mb-4">
-                Schnellstart ohne Benutzerkonto für rein private lokale Heimnetzwerke.
+                Schnellstart ohne Benutzerkonten. Einstellungen werden mit einer PIN geschützt.
               </p>
 
-              <ul className="space-y-2.5 text-xs sm:text-sm text-zinc-700 dark:text-zinc-300 mb-4">
+              <ul className="space-y-2.5 text-xs sm:text-sm text-zinc-700 dark:text-zinc-300 mb-6">
                 <li className="flex items-center gap-2">
                   <CheckCircle2 className="w-4 h-4 text-blue-500 shrink-0" />
-                  <span>Kein Anmeldename oder Login nötig</span>
+                  <span>Kein Login beim Vokabellernen nötig</span>
                 </li>
                 <li className="flex items-center gap-2">
                   <CheckCircle2 className="w-4 h-4 text-blue-500 shrink-0" />
-                  <span>Alle Vokabeln in einer Übersicht</span>
+                  <span>Einstellungsmenü mit PIN geschützt</span>
+                </li>
+                <li className="flex items-center gap-2">
+                  <CheckCircle2 className="w-4 h-4 text-blue-500 shrink-0" />
+                  <span>Alle Vokabeln in einer gemeinsamen Übersicht</span>
                 </li>
               </ul>
-
-              <div className="p-3 bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800/60 rounded-xl mb-6">
-                <div className="flex items-start gap-2 text-xs text-amber-800 dark:text-amber-300">
-                  <AlertTriangle className="w-4 h-4 shrink-0 text-amber-600 dark:text-amber-400 mt-0.5" />
-                  <span>Nicht für öffentliche Seiten im Internet (z. B. Render) geeignet!</span>
-                </div>
-              </div>
             </div>
 
             <button
               type="button"
               disabled={loading}
-              onClick={handleSingleUserClick}
+              onClick={() => {
+                setError(null)
+                setShowSingleUserModal(true)
+              }}
               className="w-full py-3 bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-zinc-800 dark:text-zinc-200 rounded-xl font-medium text-sm transition-colors"
             >
               Als Einzelnutzer starten
@@ -362,86 +378,46 @@ export function SetupWizard({ isPublicOrRender }: SetupWizardProps) {
               </div>
             </div>
 
-            {/* Kindersicherung / Settings Protection */}
-            <div className="space-y-3 pt-2">
+            {/* 2. Einstellungs-PIN */}
+            <div className="space-y-4 pt-2">
               <h2 className="text-base font-bold text-zinc-900 dark:text-zinc-100 pb-1 border-b border-zinc-100 dark:border-zinc-800 flex items-center gap-2">
                 <ShieldCheck className="w-5 h-5 text-blue-600 dark:text-blue-400" />
-                2. Kindersicherung für Einstellungen
+                2. PIN für das Einstellungsmenü
               </h2>
               <p className="text-xs text-zinc-600 dark:text-zinc-400">
-                Kindersicherung: Verhindert, dass Kinder beim Vokabellernen Einstellungen verändern.
+                Schützt Einstellungen, API-Keys und Profile vor unbefugten Änderungen durch Kinder.
               </p>
 
-              <div className="space-y-2.5 pt-1">
-                <label className="flex items-start gap-3 p-3 rounded-xl border border-zinc-200 dark:border-zinc-800 hover:bg-zinc-50 dark:hover:bg-zinc-800/50 cursor-pointer transition-colors">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs sm:text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-1.5">
+                    Einstellungs-PIN *
+                  </label>
                   <input
-                    type="radio"
-                    name="settingsOption"
-                    value="same"
-                    checked={settingsOption === "same"}
-                    onChange={() => setSettingsOption("same")}
-                    className="mt-0.5 text-blue-600 focus:ring-blue-500"
+                    type="password"
+                    value={settingsPin}
+                    onChange={(e) => setSettingsPin(e.target.value)}
+                    placeholder="z. B. 1234 (mind. 4 Zeichen)"
+                    required
+                    minLength={4}
+                    className="w-full px-3.5 py-2.5 rounded-xl border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                   />
-                  <div className="text-xs sm:text-sm">
-                    <span className="font-medium text-zinc-900 dark:text-zinc-100">
-                      Gleiches Passwort wie Anmeldekennwort verwenden
-                    </span>
-                    <p className="text-zinc-500 dark:text-zinc-400 text-xs mt-0.5">
-                      Bequem: Du musst dir nur ein Passwort merken.
-                    </p>
-                  </div>
-                </label>
+                </div>
 
-                <label className="flex items-start gap-3 p-3 rounded-xl border border-zinc-200 dark:border-zinc-800 hover:bg-zinc-50 dark:hover:bg-zinc-800/50 cursor-pointer transition-colors">
+                <div>
+                  <label className="block text-xs sm:text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-1.5">
+                    PIN bestätigen *
+                  </label>
                   <input
-                    type="radio"
-                    name="settingsOption"
-                    value="pin"
-                    checked={settingsOption === "pin"}
-                    onChange={() => setSettingsOption("pin")}
-                    className="mt-0.5 text-blue-600 focus:ring-blue-500"
+                    type="password"
+                    value={settingsPinConfirm}
+                    onChange={(e) => setSettingsPinConfirm(e.target.value)}
+                    placeholder="PIN wiederholen"
+                    required
+                    minLength={4}
+                    className="w-full px-3.5 py-2.5 rounded-xl border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                   />
-                  <div className="text-xs sm:text-sm w-full">
-                    <span className="font-medium text-zinc-900 dark:text-zinc-100">
-                      Eigene PIN vergeben (z. B. 4-stellige Zahl)
-                    </span>
-                    <p className="text-zinc-500 dark:text-zinc-400 text-xs mt-0.5">
-                      Ermöglicht schnelles Entsperren mit einer einfachen Zahl.
-                    </p>
-                    {settingsOption === "pin" && (
-                      <div className="mt-3">
-                        <input
-                          type="password"
-                          value={customPin}
-                          onChange={(e) => setCustomPin(e.target.value)}
-                          placeholder="z. B. 1234 (mindestens 4 Zeichen)"
-                          minLength={4}
-                          required={settingsOption === "pin"}
-                          className="w-full max-w-xs px-3.5 py-2 rounded-xl border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                        />
-                      </div>
-                    )}
-                  </div>
-                </label>
-
-                <label className="flex items-start gap-3 p-3 rounded-xl border border-zinc-200 dark:border-zinc-800 hover:bg-zinc-50 dark:hover:bg-zinc-800/50 cursor-pointer transition-colors">
-                  <input
-                    type="radio"
-                    name="settingsOption"
-                    value="none"
-                    checked={settingsOption === "none"}
-                    onChange={() => setSettingsOption("none")}
-                    className="mt-0.5 text-blue-600 focus:ring-blue-500"
-                  />
-                  <div className="text-xs sm:text-sm">
-                    <span className="font-medium text-zinc-900 dark:text-zinc-100">
-                      Kindersicherung deaktivieren
-                    </span>
-                    <p className="text-zinc-500 dark:text-zinc-400 text-xs mt-0.5">
-                      Einstellungen können direkt ohne Passworteingabe geöffnet werden.
-                    </p>
-                  </div>
-                </label>
+                </div>
               </div>
             </div>
 
@@ -638,50 +614,71 @@ export function SetupWizard({ isPublicOrRender }: SetupWizardProps) {
         </div>
       )}
 
-      {/* Safety Warning Modal for Single-User Mode */}
-      {showWarningModal && (
+      {/* Modal for Single-User Mode Settings PIN */}
+      {showSingleUserModal && (
         <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
           <div className="bg-white dark:bg-zinc-900 rounded-2xl max-w-md w-full p-6 shadow-2xl border border-zinc-200 dark:border-zinc-800">
-            <div className="w-12 h-12 rounded-xl bg-amber-100 dark:bg-amber-950/50 text-amber-600 dark:text-amber-400 flex items-center justify-center mb-4">
-              <AlertTriangle className="w-6 h-6" />
+            <div className="w-12 h-12 rounded-xl bg-blue-100 dark:bg-blue-950/50 text-blue-600 dark:text-blue-400 flex items-center justify-center mb-4">
+              <ShieldCheck className="w-6 h-6" />
             </div>
 
             <h3 className="text-lg font-bold text-zinc-900 dark:text-zinc-100 mb-2">
-              Wichtiger Sicherheitshinweis
+              Einzelnutzer-Modus einrichten
             </h3>
 
             <p className="text-xs sm:text-sm text-zinc-600 dark:text-zinc-400 mb-4 leading-relaxed">
-              Du möchtest den Vokabeltrainer <strong>ohne Passwort</strong> starten.
+              Zum Vokabellernen ist kein Login nötig. Bitte lege eine <strong>PIN für das Einstellungsmenü</strong> fest, um deine Einstellungen zu schützen.
             </p>
 
-            <div className="p-3.5 bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800/80 rounded-xl text-xs text-amber-900 dark:text-amber-200 mb-6 leading-relaxed">
-              ⚠️ Wenn diese Seite öffentlich im Internet erreichbar ist (z. B. auf Render),
-              kann jede Person ohne Anmeldung deine Vokabeln einsehen und verändern!
-              <br />
-              <br />
-              Nutze den Einzelnutzer-Modus bitte nur, wenn die App privat auf deinem eigenen Gerät oder im lokalen Heimnetzwerk läuft.
-            </div>
+            <form onSubmit={handleStartSingleUser} className="space-y-4">
+              <div>
+                <label className="block text-xs font-medium text-zinc-700 dark:text-zinc-300 mb-1">
+                  Einstellungs-PIN *
+                </label>
+                <input
+                  type="password"
+                  value={singleUserPin}
+                  onChange={(e) => setSingleUserPin(e.target.value)}
+                  placeholder="z. B. 1234 (mind. 4 Zeichen)"
+                  required
+                  minLength={4}
+                  autoFocus
+                  className="w-full px-3 py-2 rounded-xl border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
 
-            <div className="flex flex-col sm:flex-row items-center gap-3">
-              <button
-                type="button"
-                onClick={() => {
-                  setShowWarningModal(false)
-                  setStep(2)
-                }}
-                className="w-full sm:w-auto flex-1 py-2.5 px-4 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs sm:text-sm font-medium transition-colors"
-              >
-                Doch Passwort anlegen
-              </button>
-              <button
-                type="button"
-                disabled={loading}
-                onClick={handleStartSingleUser}
-                className="w-full sm:w-auto py-2.5 px-4 bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-zinc-700 dark:text-zinc-300 rounded-xl text-xs sm:text-sm font-medium transition-colors"
-              >
-                {loading ? "Starte..." : "Ich bin privat / Starten"}
-              </button>
-            </div>
+              <div>
+                <label className="block text-xs font-medium text-zinc-700 dark:text-zinc-300 mb-1">
+                  PIN bestätigen *
+                </label>
+                <input
+                  type="password"
+                  value={singleUserPinConfirm}
+                  onChange={(e) => setSingleUserPinConfirm(e.target.value)}
+                  placeholder="PIN wiederholen"
+                  required
+                  minLength={4}
+                  className="w-full px-3 py-2 rounded-xl border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+
+              <div className="flex flex-col sm:flex-row items-center gap-2 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setShowSingleUserModal(false)}
+                  className="w-full sm:w-auto px-4 py-2.5 rounded-xl border border-zinc-300 dark:border-zinc-700 text-xs sm:text-sm font-medium text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
+                >
+                  Abbrechen
+                </button>
+                <button
+                  type="submit"
+                  disabled={loading}
+                  className="w-full sm:w-auto flex-1 py-2.5 px-4 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs sm:text-sm font-medium transition-colors flex items-center justify-center gap-1.5 disabled:opacity-50"
+                >
+                  {loading ? "Richte ein..." : "Einzelnutzer-Modus starten 🚀"}
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}

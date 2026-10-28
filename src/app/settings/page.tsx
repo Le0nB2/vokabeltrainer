@@ -6,7 +6,6 @@ import { NotificationSettings } from "@/components/NotificationSettings"
 import { AudioSettings } from "@/components/AudioSettings"
 import { AiModelSettings } from "@/components/AiModelSettings"
 import { UserManagementSettings } from "@/components/UserManagementSettings"
-import { SettingsPasswordSettings } from "@/components/SettingsPasswordSettings"
 import { getSettings, getAvailableAiModelsAction } from "@/actions/settings"
 import { getUserManagementData } from "@/actions/users"
 import { getApiStats } from "@/actions/api-stats"
@@ -45,8 +44,10 @@ export default async function SettingsPage() {
           initialModels={availableModels}
           apiStats={apiStats}
         />
-        <SettingsPasswordSettings isProtected={isSettingsProtected} />
-        <UserManagementSettings initialData={userManagementData} />
+        <UserManagementSettings
+          initialData={userManagementData}
+          isSettingsProtected={isSettingsProtected}
+        />
         <ImportExport availableUsers={userManagementData.users} />
       </div>
     </main>

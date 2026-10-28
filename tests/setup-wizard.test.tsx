@@ -37,11 +37,15 @@ describe('SetupWizard Component', () => {
     // Fill parent credentials
     const usernameInput = screen.getByPlaceholderText('z. B. Papa, Mama oder Admin')
     const passInput = screen.getByPlaceholderText('Mind. 8 Zeichen & 1 Sonderzeichen')
-    const confirmPassInput = screen.getByPlaceholderText('Passwort wiederholen')
+    const confirmPassInputs = screen.getAllByPlaceholderText('Passwort wiederholen')
+    const pinInput = screen.getByPlaceholderText('z. B. 1234 (mind. 4 Zeichen)')
+    const pinConfirmInput = screen.getByPlaceholderText('PIN wiederholen')
 
     fireEvent.change(usernameInput, { target: { value: 'eltern' } })
     fireEvent.change(passInput, { target: { value: 'ParentPass123!' } })
-    fireEvent.change(confirmPassInput, { target: { value: 'ParentPass123!' } })
+    fireEvent.change(confirmPassInputs[0], { target: { value: 'ParentPass123!' } })
+    fireEvent.change(pinInput, { target: { value: '4321' } })
+    fireEvent.change(pinConfirmInput, { target: { value: '4321' } })
 
     // Click "Weiter: Kinder-Konto einrichten"
     fireEvent.click(screen.getByText('Weiter: Kinder-Konto einrichten'))
@@ -72,6 +76,7 @@ describe('SetupWizard Component', () => {
         expect.objectContaining({
           username: 'eltern',
           password: 'ParentPass123!',
+          settingsPin: '4321',
           createChild: true,
           childAccount: expect.objectContaining({
             displayName: 'Leon',
@@ -94,7 +99,9 @@ describe('SetupWizard Component', () => {
     // Fill parent credentials
     fireEvent.change(screen.getByPlaceholderText('z. B. Papa, Mama oder Admin'), { target: { value: 'eltern' } })
     fireEvent.change(screen.getByPlaceholderText('Mind. 8 Zeichen & 1 Sonderzeichen'), { target: { value: 'ParentPass123!' } })
-    fireEvent.change(screen.getByPlaceholderText('Passwort wiederholen'), { target: { value: 'ParentPass123!' } })
+    fireEvent.change(screen.getAllByPlaceholderText('Passwort wiederholen')[0], { target: { value: 'ParentPass123!' } })
+    fireEvent.change(screen.getByPlaceholderText('z. B. 1234 (mind. 4 Zeichen)'), { target: { value: '4321' } })
+    fireEvent.change(screen.getByPlaceholderText('PIN wiederholen'), { target: { value: '4321' } })
 
     fireEvent.click(screen.getByText('Weiter: Kinder-Konto einrichten'))
 
@@ -113,10 +120,37 @@ describe('SetupWizard Component', () => {
         expect.objectContaining({
           username: 'eltern',
           password: 'ParentPass123!',
+          settingsPin: '4321',
           createChild: false,
           childAccount: undefined,
         })
       )
+    })
+  })
+
+  it('sets up single-user mode with settings PIN', async () => {
+    vi.spyOn(setupActions, 'completeSetupSingleUser').mockResolvedValue({ success: true })
+
+    render(<SetupWizard isPublicOrRender={false} />)
+
+    fireEvent.click(screen.getByText('Als Einzelnutzer starten'))
+
+    // Modal opens
+    expect(screen.getByText('Einzelnutzer-Modus einrichten')).toBeDefined()
+
+    const pinInput = screen.getByPlaceholderText('z. B. 1234 (mind. 4 Zeichen)')
+    const pinConfirmInput = screen.getByPlaceholderText('PIN wiederholen')
+
+    fireEvent.change(pinInput, { target: { value: '9876' } })
+    fireEvent.change(pinConfirmInput, { target: { value: '9876' } })
+
+    fireEvent.click(screen.getByText('Einzelnutzer-Modus starten 🚀'))
+
+    await waitFor(() => {
+      expect(setupActions.completeSetupSingleUser).toHaveBeenCalledWith({
+        settingsPin: '9876',
+      })
+      expect(mockPush).toHaveBeenCalledWith('/')
     })
   })
 })

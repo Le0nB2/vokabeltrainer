@@ -31,14 +31,17 @@ import {
   UserSummary,
   UserManagementData,
 } from "@/actions/users"
+import { updateSettingsPasswordAction } from "@/actions/auth"
 import { useRouter } from "next/navigation"
 
 export function UserManagementSettings({
   initialData,
   initialUsers,
+  isSettingsProtected,
 }: {
   initialData?: UserManagementData
   initialUsers?: UserSummary[]
+  isSettingsProtected?: boolean
 }) {
   const router = useRouter()
 
@@ -101,6 +104,78 @@ export function UserManagementSettings({
 
   // Feedback Message
   const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null)
+
+  // Settings PIN Modal state
+  const [showPinModal, setShowPinModal] = useState(false)
+  const [newPin, setNewPin] = useState("")
+  const [newPinConfirm, setNewPinConfirm] = useState("")
+  const [isSavingPin, setIsSavingPin] = useState(false)
+  const [pinProtected, setPinProtected] = useState(isSettingsProtected ?? false)
+
+  const handleSavePin = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setMessage(null)
+
+    if (newPin.trim().length < 4) {
+      setMessage({ type: "error", text: "Die PIN muss mindestens 4 Zeichen lang sein." })
+      return
+    }
+
+    if (newPin !== newPinConfirm) {
+      setMessage({ type: "error", text: "Die eingegebenen PINs stimmen nicht überein." })
+      return
+    }
+
+    setIsSavingPin(true)
+    try {
+      const res = await updateSettingsPasswordAction({
+        action: "change",
+        newPassword: newPin.trim(),
+      })
+
+      if (res.success) {
+        setPinProtected(true)
+        setShowPinModal(false)
+        setNewPin("")
+        setNewPinConfirm("")
+        setMessage({ type: "success", text: "Einstellungs-PIN erfolgreich gespeichert!" })
+        router.refresh()
+      } else {
+        setMessage({ type: "error", text: res.error || "Fehler beim Speichern der PIN." })
+      }
+    } catch {
+      setMessage({ type: "error", text: "Netzwerkfehler beim Speichern der PIN." })
+    } finally {
+      setIsSavingPin(false)
+    }
+  }
+
+  const handleDisablePin = async () => {
+    if (!confirm("Möchtest du die PIN für die Einstellungen wirklich entfernen? Die Einstellungen sind danach ohne PIN zugänglich.")) {
+      return
+    }
+
+    setIsSavingPin(true)
+    setMessage(null)
+    try {
+      const res = await updateSettingsPasswordAction({
+        action: "disable",
+      })
+
+      if (res.success) {
+        setPinProtected(false)
+        setShowPinModal(false)
+        setMessage({ type: "success", text: "Einstellungs-PIN wurde entfernt." })
+        router.refresh()
+      } else {
+        setMessage({ type: "error", text: res.error || "Fehler beim Entfernen der PIN." })
+      }
+    } catch {
+      setMessage({ type: "error", text: "Netzwerkfehler beim Entfernen der PIN." })
+    } finally {
+      setIsSavingPin(false)
+    }
+  }
 
   // Handle setting up family system (atomic Parent ADMIN + Child USER + Reassign decks)
   const handleSetupFamily = async (e: React.FormEvent) => {
@@ -625,13 +700,27 @@ export function UserManagementSettings({
       {/* CASE 1: UNPROTECTED SINGLE USER MODE */}
       {isSingleUserUnprotected && (
         <div className="space-y-4">
-          <div className="p-4 rounded-xl bg-zinc-50 dark:bg-zinc-800/40 border border-zinc-200 dark:border-zinc-800 text-sm space-y-1">
-            <p className="font-semibold text-zinc-900 dark:text-zinc-100 flex items-center gap-1.5">
-              <CheckCircle className="w-4 h-4 text-green-600 dark:text-green-400 shrink-0" />
-              <span>Einzelnutzer-Modus aktiv</span>
-            </p>
+          <div className="p-4 rounded-xl bg-zinc-50 dark:bg-zinc-800/40 border border-zinc-200 dark:border-zinc-800 text-sm space-y-2">
+            <div className="flex items-center justify-between flex-wrap gap-2">
+              <p className="font-semibold text-zinc-900 dark:text-zinc-100 flex items-center gap-1.5">
+                <CheckCircle className="w-4 h-4 text-green-600 dark:text-green-400 shrink-0" />
+                <span>Einzelnutzer-Modus aktiv</span>
+              </p>
+              <button
+                type="button"
+                onClick={() => {
+                  setShowPinModal(true)
+                  setNewPin("")
+                  setNewPinConfirm("")
+                }}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-700 transition-colors shadow-sm"
+              >
+                <ShieldCheck className="w-3.5 h-3.5 text-blue-500" />
+                <span>Einstellungs-PIN {pinProtected ? "ändern" : "festlegen"}</span>
+              </button>
+            </div>
             <p className="text-zinc-600 dark:text-zinc-400 text-xs sm:text-sm leading-relaxed">
-              Alle Vokabeln und Lernfunktionen stehen direkt zur Verfügung. Du brauchst kein Passwort und kein Login.
+              Alle Vokabeln und Lernfunktionen stehen direkt ohne Login zur Verfügung. {pinProtected ? "Das Einstellungsmenü ist durch deine PIN geschützt." : "Aktuell ist keine Einstellungs-PIN aktiv."}
             </p>
           </div>
 
@@ -1245,11 +1334,27 @@ export function UserManagementSettings({
                               setEditingUserId(u.id)
                               setEditingPassword("")
                             }}
-                            title="Passwort ändern"
+                            title="Anmeldepasswort ändern"
                             className="p-1.5 text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-100 rounded hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors flex items-center gap-1 text-xs"
                           >
                             <Key className="w-4 h-4" />
                             <span className="hidden sm:inline">Passwort</span>
+                          </button>
+                        )}
+
+                        {isAdmin && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setShowPinModal(true)
+                              setNewPin("")
+                              setNewPinConfirm("")
+                            }}
+                            title="PIN für Einstellungen ändern"
+                            className="p-1.5 text-zinc-500 hover:text-blue-600 dark:hover:text-blue-400 rounded hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors flex items-center gap-1 text-xs"
+                          >
+                            <ShieldCheck className="w-4 h-4 text-blue-500" />
+                            <span className="hidden sm:inline">Einstellungs-PIN</span>
                           </button>
                         )}
 
@@ -1341,6 +1446,89 @@ export function UserManagementSettings({
               </button>
             </div>
           )}
+        </div>
+      )}
+
+      {/* Modal for Managing Settings PIN */}
+      {showPinModal && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-white dark:bg-zinc-900 rounded-2xl max-w-md w-full p-6 shadow-2xl border border-zinc-200 dark:border-zinc-800">
+            <div className="w-12 h-12 rounded-xl bg-blue-100 dark:bg-blue-950/50 text-blue-600 dark:text-blue-400 flex items-center justify-center mb-4">
+              <ShieldCheck className="w-6 h-6" />
+            </div>
+
+            <h3 className="text-lg font-bold text-zinc-900 dark:text-zinc-100 mb-1">
+              Einstellungs-PIN verwalten
+            </h3>
+
+            <p className="text-xs sm:text-sm text-zinc-600 dark:text-zinc-400 mb-4 leading-relaxed">
+              Mit dieser PIN wird der Zugriff auf das Einstellungsmenü geschützt, damit Kinder keine Änderungen vornehmen können.
+            </p>
+
+            <form onSubmit={handleSavePin} className="space-y-4">
+              <div>
+                <label className="block text-xs font-medium text-zinc-700 dark:text-zinc-300 mb-1">
+                  Neue Einstellungs-PIN *
+                </label>
+                <input
+                  type="password"
+                  value={newPin}
+                  onChange={(e) => setNewPin(e.target.value)}
+                  placeholder="Mindestens 4 Zeichen (z. B. 1234)"
+                  required
+                  minLength={4}
+                  autoFocus
+                  className="w-full px-3 py-2 rounded-xl border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-medium text-zinc-700 dark:text-zinc-300 mb-1">
+                  PIN bestätigen *
+                </label>
+                <input
+                  type="password"
+                  value={newPinConfirm}
+                  onChange={(e) => setNewPinConfirm(e.target.value)}
+                  placeholder="PIN wiederholen"
+                  required
+                  minLength={4}
+                  className="w-full px-3 py-2 rounded-xl border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+
+              <div className="flex flex-col sm:flex-row items-center justify-between gap-2 pt-2 border-t border-zinc-100 dark:border-zinc-800">
+                {pinProtected ? (
+                  <button
+                    type="button"
+                    disabled={isSavingPin}
+                    onClick={handleDisablePin}
+                    className="w-full sm:w-auto px-3 py-2 text-xs text-rose-600 hover:text-rose-700 dark:text-rose-400 font-medium hover:bg-rose-50 dark:hover:bg-rose-950/40 rounded-xl transition-colors"
+                  >
+                    PIN entfernen
+                  </button>
+                ) : <div />}
+
+                <div className="flex items-center gap-2 w-full sm:w-auto justify-end">
+                  <button
+                    type="button"
+                    onClick={() => setShowPinModal(false)}
+                    className="px-3.5 py-2 rounded-xl border border-zinc-300 dark:border-zinc-700 text-xs sm:text-sm font-medium text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
+                  >
+                    Abbrechen
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={isSavingPin}
+                    className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs sm:text-sm font-medium transition-colors flex items-center justify-center gap-1.5 disabled:opacity-50"
+                  >
+                    {isSavingPin ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : null}
+                    <span>PIN speichern</span>
+                  </button>
+                </div>
+              </div>
+            </form>
+          </div>
         </div>
       )}
     </div>
