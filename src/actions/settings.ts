@@ -42,14 +42,14 @@ export async function importData(jsonData: string) {
     // Only assign userId if the user is a persistent database user.
     // Synthetic users ("admin", "default", "env-admin") do not have a record in the User table,
     // which would trigger a foreign key violation (P2003 / Deck_userId_fkey) in PostgreSQL.
-    const isDbUser = Boolean(
+    const targetUserId =
       user &&
       user.id &&
       user.id !== "default" &&
       user.id !== "admin" &&
       user.id !== "env-admin"
-    )
-    const targetUserId = isDbUser ? user.id : null
+        ? user.id
+        : null
 
     // Wrap in a transaction to ensure all or nothing
     await prisma.$transaction(async (tx) => {

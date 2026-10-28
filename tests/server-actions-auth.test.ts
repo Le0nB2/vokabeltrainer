@@ -187,11 +187,18 @@ describe('SEC-02: Server Actions Authentication Protection', () => {
       expect(mockPrisma.deck.create).not.toHaveBeenCalled()
     })
 
-    it('allows createDeck when authenticated', async () => {
+    it('allows createDeck when authenticated and sets userId: null for synthetic admin to prevent FK violations', async () => {
       setValidSessionCookie()
       const deck = await createDeck('Englisch', 'Vokabeln')
       expect(deck.title).toBe('Englisch')
-      expect(mockPrisma.deck.create).toHaveBeenCalled()
+      expect(mockPrisma.deck.create).toHaveBeenCalledWith({
+        data: {
+          title: 'Englisch',
+          description: 'Vokabeln',
+          targetLanguage: 'en',
+          userId: null,
+        },
+      })
     })
 
     it('blocks deleteDeck when unauthenticated', async () => {

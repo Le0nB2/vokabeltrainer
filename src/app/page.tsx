@@ -115,8 +115,14 @@ export default async function Dashboard() {
           <div className="flex gap-2 sm:gap-3 items-center w-full sm:w-auto">
             <form action={async (formData) => {
               "use server"
-              const title = formData.get("title") as string
-              if (title) await createDeck(title)
+              const title = (formData.get("title") as string)?.trim()
+              if (title) {
+                try {
+                  await createDeck(title)
+                } catch (err) {
+                  console.error("Fehler beim Erstellen des Decks:", err)
+                }
+              }
             }} className="flex gap-2 w-full sm:w-auto">
               <input
                 name="title"
