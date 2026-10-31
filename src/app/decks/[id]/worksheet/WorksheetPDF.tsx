@@ -37,6 +37,8 @@ const styles = StyleSheet.create({
     right: 30,
     fontSize: 9,
     color: '#666',
+    textAlign: 'right',
+    maxWidth: 320,
   },
   section: {
     marginBottom: 14,
@@ -240,15 +242,20 @@ interface WorksheetPDFProps {
   solutions: SolutionData;
   worksheetId: string;
   dateStr: string;
+  deckName?: string;
   onRender?: (params: any) => void;
 }
 
-const WorksheetPDF: React.FC<WorksheetPDFProps> = ({ exercises, solutions, worksheetId, dateStr, onRender }) => {
+const WorksheetPDF: React.FC<WorksheetPDFProps> = ({ exercises, solutions, worksheetId, dateStr, deckName, onRender }) => {
+  const cleanDeckName = deckName?.trim();
+  const headerInfo = cleanDeckName ? `${cleanDeckName} - ID: ${worksheetId} - ${dateStr}` : `ID: ${worksheetId} - ${dateStr}`;
+  const docTitle = cleanDeckName ? `${cleanDeckName} - ${worksheetId}` : worksheetId;
+
   return (
-    <Document title={worksheetId} onRender={onRender}>
+    <Document title={docTitle} onRender={onRender}>
       {/* PAGE 1: Multiple Choice */}
       <Page size="A4" style={styles.page}>
-        <Text style={styles.pageIdDate} fixed>ID: {worksheetId} - {dateStr}</Text>
+        <Text style={styles.pageIdDate} fixed>{headerInfo}</Text>
         {/* Header */}
         <View style={styles.header}>
           <Text style={styles.title}>Vocabulary Worksheet</Text>
@@ -335,7 +342,7 @@ const WorksheetPDF: React.FC<WorksheetPDFProps> = ({ exercises, solutions, works
 
       {/* PAGE 4: Solutions Page */}
       <Page size="A4" style={styles.solutionPage}>
-        <Text style={styles.pageIdDate} fixed>ID: {worksheetId} - {dateStr}</Text>
+        <Text style={styles.pageIdDate} fixed>{headerInfo}</Text>
         <Text style={styles.solutionHeader}>Solution Key (Teacher&apos;s Copy)</Text>
 
         <View style={styles.columnsContainer}>

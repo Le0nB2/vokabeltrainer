@@ -45,6 +45,7 @@ interface WorksheetResponse {
   solutions: SolutionData;
   worksheetId: string;
   dateStr: string;
+  deckName?: string;
 }
 
 interface ApiWorksheetPayload {
@@ -54,9 +55,16 @@ interface ApiWorksheetPayload {
   };
   worksheetId: string;
   dateStr: string;
+  deckName?: string;
 }
 
-export default function WorksheetClientView({ deckId }: { deckId: string }) {
+export default function WorksheetClientView({
+  deckId,
+  initialDeckName,
+}: {
+  deckId: string;
+  initialDeckName?: string;
+}) {
   const router = useRouter();
 
   const [loading, setLoading] = useState(true);
@@ -72,6 +80,7 @@ export default function WorksheetClientView({ deckId }: { deckId: string }) {
         solutions={worksheetData.solutions}
         worksheetId={worksheetData.worksheetId}
         dateStr={worksheetData.dateStr}
+        deckName={worksheetData.deckName}
       />
     ) : (
       <Document>
@@ -88,6 +97,7 @@ export default function WorksheetClientView({ deckId }: { deckId: string }) {
           solutions={worksheetData.solutions}
           worksheetId={worksheetData.worksheetId}
           dateStr={worksheetData.dateStr}
+          deckName={worksheetData.deckName}
         />
       );
     }
@@ -120,6 +130,7 @@ export default function WorksheetClientView({ deckId }: { deckId: string }) {
           solutions: data.worksheet.solutions,
           worksheetId: data.worksheetId,
           dateStr: data.dateStr,
+          deckName: data.deckName || initialDeckName,
         });
       } catch (err: unknown) {
         setError((err as Error).message);
@@ -131,12 +142,22 @@ export default function WorksheetClientView({ deckId }: { deckId: string }) {
     if (deckId) {
       fetchWorksheet();
     }
-  }, [deckId]);
+  }, [deckId, initialDeckName]);
+
+  const getPdfFileName = () => {
+    if (!worksheetData) return "Worksheet.pdf";
+    const baseId = worksheetData.worksheetId || "Worksheet";
+    if (worksheetData.deckName) {
+      const safeDeckName = worksheetData.deckName.replace(/[/\\?%*:|"<>]/g, "-").trim();
+      return `${safeDeckName} - ${baseId}.pdf`;
+    }
+    return `${baseId}.pdf`;
+  };
 
   const handlePrint = () => {
     if (!worksheetData || !pdfInstance.url) return;
     try {
-      const fileName = `${worksheetData.worksheetId || "Worksheet"}.pdf`;
+      const fileName = getPdfFileName();
       const oldTitle = document.title;
       document.title = fileName;
       const newWindow = window.open(pdfInstance.url, "_blank");
@@ -165,7 +186,7 @@ export default function WorksheetClientView({ deckId }: { deckId: string }) {
   const handleDownload = () => {
     if (!worksheetData || !pdfInstance.url) return;
     try {
-      const fileName = `${worksheetData.worksheetId || "Worksheet"}.pdf`;
+      const fileName = getPdfFileName();
 
       const a = document.createElement("a");
       a.href = pdfInstance.url;

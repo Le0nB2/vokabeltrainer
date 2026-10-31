@@ -23,5 +23,5 @@ export default async function WorksheetPage({ params }: { params: Promise<{ id: 
     return notFound()
   }
 
-  return <WorksheetClientView deckId={id} />
+  return <WorksheetClientView deckId={id} initialDeckName={deck.title} />
 }

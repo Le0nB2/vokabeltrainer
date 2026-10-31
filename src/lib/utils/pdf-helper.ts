@@ -13,7 +13,8 @@ export async function generateOptimizedPdf(
     dateStr: string,
     exercises: any,
     solutions: any,
-    maxPages: number = 4
+    maxPages: number = 4,
+    deckName?: string
 ) {
     let currentExercises = JSON.parse(JSON.stringify(exercises));
     let currentSolutions = JSON.parse(JSON.stringify(solutions));
@@ -25,6 +26,7 @@ export async function generateOptimizedPdf(
             React.createElement(WorksheetPDF, {
                 worksheetId,
                 dateStr,
+                deckName,
                 exercises: currentExercises,
                 solutions: currentSolutions
             }) as any

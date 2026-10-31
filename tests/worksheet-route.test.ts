@@ -79,7 +79,7 @@ describe("POST /api/worksheet (SEC-06)", () => {
     // Mock deck with 5 cards
     vi.spyOn(prisma.deck, "findUnique").mockResolvedValueOnce({
       id: "deck-1",
-      name: "Englisch Vokabeln",
+      title: "Englisch Vokabeln",
       cards: [
         { id: "c1", front: "apple", back: "Apfel", dueDate: new Date() },
         { id: "c2", front: "book", back: "Buch", dueDate: new Date() },
@@ -133,5 +133,14 @@ describe("POST /api/worksheet (SEC-06)", () => {
     expect(statuses.some((s) => s.stage === "retrying" && s.delaySeconds === 3)).toBe(true);
     expect(statuses.some((s) => s.stage === "optimizing")).toBe(true);
     expect(result.worksheetId).toBe("A005");
+    expect(result.deckName).toBe("Englisch Vokabeln");
+    expect(pdfHelper.generateOptimizedPdf).toHaveBeenCalledWith(
+      "A005",
+      expect.any(String),
+      expect.anything(),
+      expect.anything(),
+      4,
+      "Englisch Vokabeln"
+    );
   });
 });

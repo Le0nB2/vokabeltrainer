@@ -257,7 +257,8 @@ ${JSON.stringify(selectedCards.map(c => ({ englisch: c.front, deutsch: c.back })
         dateStr,
         parsedWorksheet.exercises,
         parsedWorksheet.solutions,
-        4
+        4,
+        deck.title
       );
 
       parsedWorksheet.exercises = optimized.finalExercises;
@@ -267,6 +268,7 @@ ${JSON.stringify(selectedCards.map(c => ({ englisch: c.front, deutsch: c.back })
         worksheet: parsedWorksheet,
         worksheetId,
         dateStr,
+        deckName: deck.title,
       };
     };
 
