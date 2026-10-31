@@ -1,0 +1,4 @@
+[[IgnoredVulns]]
+id = "GHSA-g3hv-75wg-m249"
+ignoreUntil = "2026-12-30T23:59:59Z"
+reason = "Unreachable in production: Dev-only dependency / not exposed"
