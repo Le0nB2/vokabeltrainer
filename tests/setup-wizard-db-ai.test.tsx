@@ -19,8 +19,17 @@ describe('SetupWizard Database & AI Setup', () => {
     vi.clearAllMocks()
   })
 
-  it('shows database setup step when initialDatabaseNeedsSetup is true and hides SQLite under advanced when isRender is true', async () => {
+  it('shows welcome screen first when initialDatabaseNeedsSetup is true and hides SQLite under advanced when isRender is true', async () => {
     render(<SetupWizard isPublicOrRender={true} isRender={true} initialDatabaseNeedsSetup={true} />)
+
+    // Welcome step appears first
+    expect(screen.getByText('Lass uns loslegen! 🚀')).toBeDefined()
+    expect(screen.getByText('Datenbank verbinden')).toBeDefined()
+    expect(screen.getByText('Benutzerkonten & Kindersicherung')).toBeDefined()
+    expect(screen.getByText('KI-Assistent anbinden')).toBeDefined()
+
+    // Proceed to database setup
+    fireEvent.click(screen.getByText('Einrichtung jetzt starten'))
 
     expect(screen.getByText('Datenbank auswählen & verbinden')).toBeDefined()
     expect(screen.getByText('Neon Cloud-Datenbank (PostgreSQL)')).toBeDefined()
@@ -31,6 +40,10 @@ describe('SetupWizard Database & AI Setup', () => {
     // Clicking "Erweiterte Einstellungen" reveals SQLite option
     fireEvent.click(screen.getByText('Erweiterte Einstellungen'))
     expect(screen.getByText('Lokale Datei-Datenbank (SQLite)')).toBeDefined()
+
+    // Back button returns to welcome overview
+    fireEvent.click(screen.getByText(/Zurück zur Einführung/i))
+    expect(screen.getByText('Lass uns loslegen! 🚀')).toBeDefined()
   })
 
   it('preselects Neon and tests connection on submit', async () => {
@@ -39,7 +52,7 @@ describe('SetupWizard Database & AI Setup', () => {
       message: 'Neon-Datenbank erfolgreich verbunden!',
     })
 
-    render(<SetupWizard isPublicOrRender={true} isRender={true} initialDatabaseNeedsSetup={true} />)
+    render(<SetupWizard isPublicOrRender={true} isRender={true} initialDatabaseNeedsSetup={true} initialStep={0} />)
 
     const input = screen.getByPlaceholderText(/postgresql:\/\/user:password@/i)
     fireEvent.change(input, {
@@ -61,5 +74,32 @@ describe('SetupWizard Database & AI Setup', () => {
 
     expect(screen.queryByText(/Server-Standard/i)).toBeNull()
     expect(screen.queryByText(/Option 3/i)).toBeNull()
+  })
+
+  it('hides single-user mode under advanced settings and marks protected mode as required when isRender is true', async () => {
+    render(<SetupWizard isPublicOrRender={true} isRender={true} initialDatabaseNeedsSetup={false} initialStep={1} />)
+
+    // Protected mode is shown with "Erforderlich"
+    expect(screen.getByText('Geschützter Modus')).toBeDefined()
+    expect(screen.getByText('Erforderlich')).toBeDefined()
+
+    // Single-user mode is initially hidden
+    expect(screen.queryByText('Einzelnutzer-Modus')).toBeNull()
+    expect(screen.getByText('Erweiterte Einstellungen')).toBeDefined()
+
+    // Expanding advanced settings reveals single-user mode
+    fireEvent.click(screen.getByText('Erweiterte Einstellungen'))
+    expect(screen.getByText('Einzelnutzer-Modus')).toBeDefined()
+    expect(screen.getByText(/Trotzdem als Einzelnutzer starten/i)).toBeDefined()
+  })
+
+  it('shows both modes side-by-side with recommended badge when isRender is false', async () => {
+    render(<SetupWizard isPublicOrRender={false} isRender={false} initialDatabaseNeedsSetup={false} initialStep={1} />)
+
+    expect(screen.getByText('Geschützter Modus')).toBeDefined()
+    expect(screen.getByText('Empfohlen')).toBeDefined()
+    expect(screen.getByText('Einzelnutzer-Modus')).toBeDefined()
+    expect(screen.getByText('Als Einzelnutzer starten')).toBeDefined()
+    expect(screen.queryByText('Erweiterte Einstellungen')).toBeNull()
   })
 })

@@ -24,19 +24,27 @@ import { testAndMigrateDatabase, useLocalDatabase } from "@/actions/setup-databa
 import { saveAiKeyAction } from "@/actions/ai-credentials"
 import { ChildShareInfoCard } from "@/components/ChildShareInfoCard"
 
+type Step = "welcome" | 0 | 1 | 2 | 3 | 4
+
 interface SetupWizardProps {
   isPublicOrRender: boolean
   isRender?: boolean
   initialDatabaseNeedsSetup?: boolean
+  initialStep?: Step
+  initialShowAdvanced?: boolean
 }
 
 export function SetupWizard({
   isPublicOrRender,
   isRender = false,
   initialDatabaseNeedsSetup = false,
+  initialStep,
+  initialShowAdvanced = false,
 }: SetupWizardProps) {
   const router = useRouter()
-  const [step, setStep] = useState<0 | 1 | 2 | 3 | 4>(initialDatabaseNeedsSetup ? 0 : 1)
+  const [step, setStep] = useState<Step>(
+    initialStep ?? (initialDatabaseNeedsSetup ? "welcome" : 1)
+  )
   const [showSingleUserModal, setShowSingleUserModal] = useState(false)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -51,6 +59,7 @@ export function SetupWizard({
   const [dbError, setDbError] = useState<string | null>(null)
   const [copiedNeonUrl, setCopiedNeonUrl] = useState(false)
   const [showAdvancedDb, setShowAdvancedDb] = useState(false)
+  const [showAdvancedMode, setShowAdvancedMode] = useState(initialShowAdvanced)
 
   // AI Step State (in step 4 / completion)
   const [aiProviderChoice, setAiProviderChoice] = useState<"openrouter" | "gemini">("openrouter")
@@ -355,27 +364,33 @@ export function SetupWizard({
       {/* Top Header */}
       <div className="text-center mb-8">
         <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-blue-100 dark:bg-blue-900/40 text-blue-600 dark:text-blue-400 mb-3 shadow-sm">
-          {step === 4 ? (
+          {step === "welcome" ? (
+            <Sparkles className="w-7 h-7" />
+          ) : step === 4 ? (
             <CheckCircle2 className="w-7 h-7 text-emerald-600 dark:text-emerald-400" />
           ) : step === 3 ? (
             <UserPlus className="w-7 h-7" />
           ) : step === 0 ? (
             <Database className="w-7 h-7 text-blue-600 dark:text-blue-400" />
           ) : (
-            <Sparkles className="w-7 h-7" />
+            <Users className="w-7 h-7" />
           )}
         </div>
         <h1 className="text-2xl sm:text-3xl font-extrabold text-zinc-900 dark:text-zinc-100 tracking-tight">
-          {step === 4
+          {step === "welcome"
+            ? "Willkommen beim N30 Vokabeltrainer! 👋"
+            : step === 4
             ? "Einrichtung fast abgeschlossen! 🎉"
             : step === 3
             ? "Kinder-Konto einrichten"
             : step === 0
             ? "Datenbank auswählen & verbinden"
-            : "Willkommen beim N30 Vokabeltrainer! 👋"}
+            : "Nutzungsmodus wählen"}
         </h1>
         <p className="text-sm sm:text-base text-zinc-600 dark:text-zinc-400 mt-2 max-w-md mx-auto">
-          {step === 0
+          {step === "welcome"
+            ? "Lass uns deinen Vokabeltrainer in wenigen Minuten gemeinsam startklar machen."
+            : step === 0
             ? "Wähle aus, wo deine Vokabeln, Decks und Lernfortschritte gespeichert werden sollen."
             : step === 1
             ? "Wähle bitte, wie du den N30 Vokabeltrainer auf diesem System nutzen möchtest:"
@@ -391,6 +406,98 @@ export function SetupWizard({
         <div className="mb-6 p-4 bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-800 rounded-2xl text-sm text-rose-700 dark:text-rose-300 flex items-start gap-3">
           <AlertTriangle className="w-5 h-5 shrink-0 mt-0.5 text-rose-600 dark:text-rose-400" />
           <span>{error}</span>
+        </div>
+      )}
+
+      {/* Screen 'welcome': Ersteinrichtungs-Willkommensseite */}
+      {step === "welcome" && (
+        <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-3xl p-6 sm:p-8 shadow-xl">
+          <div className="mb-6">
+            <h2 className="text-xl sm:text-2xl font-bold text-zinc-900 dark:text-zinc-100 tracking-tight mb-2">
+              Lass uns loslegen! 🚀
+            </h2>
+            <p className="text-sm text-zinc-600 dark:text-zinc-400 leading-relaxed">
+              Bevor es mit dem spielerischen Vokabellernen losgeht, konfigurieren wir gemeinsam kurz die wichtigsten Grundlagen für Speicherung, Sicherheit und KI-Funktionen:
+            </p>
+          </div>
+
+          <div className="space-y-3.5 mb-8">
+            {/* Schritt 1: Datenbank */}
+            <div className="flex items-start gap-3.5 p-4 rounded-2xl bg-zinc-50 dark:bg-zinc-800/40 border border-zinc-200/80 dark:border-zinc-800 transition-colors">
+              <div className="w-10 h-10 rounded-xl bg-blue-100 dark:bg-blue-950/60 text-blue-600 dark:text-blue-400 flex items-center justify-center shrink-0 mt-0.5">
+                <Database className="w-5 h-5" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2 mb-1">
+                  <span className="px-2 py-0.5 text-[11px] font-bold rounded-full bg-blue-100 dark:bg-blue-950/60 text-blue-700 dark:text-blue-300">
+                    Schritt 1
+                  </span>
+                  <h3 className="font-bold text-sm sm:text-base text-zinc-900 dark:text-zinc-100">
+                    Datenbank verbinden
+                  </h3>
+                </div>
+                <p className="text-xs sm:text-sm text-zinc-600 dark:text-zinc-400 leading-relaxed">
+                  Sichere und dauerhafte Speicherung all deiner Vokabeln, Decks und individuellen Lernfortschritte &ndash; wahlweise dauerhaft kostenlos in der Cloud (Neon PostgreSQL) oder lokal.
+                </p>
+              </div>
+            </div>
+
+            {/* Schritt 2: Konten & Schutz */}
+            <div className="flex items-start gap-3.5 p-4 rounded-2xl bg-zinc-50 dark:bg-zinc-800/40 border border-zinc-200/80 dark:border-zinc-800 transition-colors">
+              <div className="w-10 h-10 rounded-xl bg-purple-100 dark:bg-purple-950/60 text-purple-600 dark:text-purple-400 flex items-center justify-center shrink-0 mt-0.5">
+                <ShieldCheck className="w-5 h-5" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2 mb-1">
+                  <span className="px-2 py-0.5 text-[11px] font-bold rounded-full bg-purple-100 dark:bg-purple-950/60 text-purple-700 dark:text-purple-300">
+                    Schritt 2
+                  </span>
+                  <h3 className="font-bold text-sm sm:text-base text-zinc-900 dark:text-zinc-100">
+                    Benutzerkonten &amp; Kindersicherung
+                  </h3>
+                </div>
+                <p className="text-xs sm:text-sm text-zinc-600 dark:text-zinc-400 leading-relaxed">
+                  Erstelle getrennte Profile für Eltern und Kinder. Eine Eltern-PIN schützt sensible Einstellungen und den Zugriff auf KI-Schlüssel zuverlässig ab.
+                </p>
+              </div>
+            </div>
+
+            {/* Schritt 3: KI-Assistent */}
+            <div className="flex items-start gap-3.5 p-4 rounded-2xl bg-zinc-50 dark:bg-zinc-800/40 border border-zinc-200/80 dark:border-zinc-800 transition-colors">
+              <div className="w-10 h-10 rounded-xl bg-amber-100 dark:bg-amber-950/60 text-amber-600 dark:text-amber-400 flex items-center justify-center shrink-0 mt-0.5">
+                <Sparkles className="w-5 h-5" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2 mb-1">
+                  <span className="px-2 py-0.5 text-[11px] font-bold rounded-full bg-amber-100 dark:bg-amber-950/60 text-amber-700 dark:text-amber-300">
+                    Schritt 3
+                  </span>
+                  <h3 className="font-bold text-sm sm:text-base text-zinc-900 dark:text-zinc-100">
+                    KI-Assistent anbinden
+                  </h3>
+                </div>
+                <p className="text-xs sm:text-sm text-zinc-600 dark:text-zinc-400 leading-relaxed">
+                  Verbinde Google Gemini oder OpenRouter, um Vokabelhefte automatisch per Foto einzuscannen und didaktische Beispielsätze sowie Eselsbrücken zu generieren.
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <div className="pt-5 border-t border-zinc-100 dark:border-zinc-800 flex flex-col sm:flex-row items-center justify-between gap-4">
+            <div className="flex items-center gap-2 text-xs text-zinc-500 dark:text-zinc-400">
+              <span className="inline-block w-2 h-2 rounded-full bg-emerald-500" />
+              <span>Dauer: ca. 2–3 Minuten • Alle Angaben später anpassbar</span>
+            </div>
+
+            <button
+              type="button"
+              onClick={() => setStep(initialDatabaseNeedsSetup ? 0 : 1)}
+              className="w-full sm:w-auto py-3 px-6 bg-blue-600 hover:bg-blue-700 active:scale-[0.98] text-white rounded-xl font-semibold text-sm transition-all shadow-md hover:shadow-lg flex items-center justify-center gap-2"
+            >
+              <span>Einrichtung jetzt starten</span>
+              <ArrowRight className="w-4 h-4" />
+            </button>
+          </div>
         </div>
       )}
 
@@ -568,7 +675,14 @@ export function SetupWizard({
             </div>
           )}
 
-          <div className="pt-4 border-t border-zinc-100 dark:border-zinc-800 flex justify-end">
+          <div className="pt-4 border-t border-zinc-100 dark:border-zinc-800 flex items-center justify-between">
+            <button
+              type="button"
+              onClick={() => setStep("welcome")}
+              className="inline-flex items-center gap-1.5 text-xs text-zinc-500 hover:text-zinc-800 dark:text-zinc-400 dark:hover:text-zinc-200 transition-colors font-medium"
+            >
+              <ArrowLeft className="w-3.5 h-3.5" /> Zurück zur Einführung
+            </button>
             {dbSuccess ? (
               <button
                 type="button"
@@ -593,88 +707,208 @@ export function SetupWizard({
 
       {/* Screen 1: Mode Selection */}
       {step === 1 && (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          {/* Option A: Protected Mode */}
-          <div className="bg-white dark:bg-zinc-900 border-2 border-blue-500/30 hover:border-blue-500 dark:border-blue-500/20 dark:hover:border-blue-500/60 rounded-3xl p-6 sm:p-7 shadow-lg flex flex-col justify-between transition-all">
-            <div>
-              <div className="w-12 h-12 rounded-2xl bg-blue-100 dark:bg-blue-950/60 text-blue-600 dark:text-blue-400 flex items-center justify-center mb-4">
-                <Users className="w-6 h-6" />
+        <div>
+          {!isRender ? (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {/* Option A: Protected Mode */}
+              <div className="bg-white dark:bg-zinc-900 border-2 border-blue-500/30 hover:border-blue-500 dark:border-blue-500/20 dark:hover:border-blue-500/60 rounded-3xl p-6 sm:p-7 shadow-lg flex flex-col justify-between transition-all">
+                <div>
+                  <div className="w-12 h-12 rounded-2xl bg-blue-100 dark:bg-blue-950/60 text-blue-600 dark:text-blue-400 flex items-center justify-center mb-4">
+                    <Users className="w-6 h-6" />
+                  </div>
+                  <div className="flex items-center gap-2 mb-2">
+                    <h3 className="text-lg font-bold text-zinc-900 dark:text-zinc-100">
+                      Geschützter Modus
+                    </h3>
+                    <span className="px-2.5 py-0.5 text-xs font-semibold rounded-full bg-blue-100 text-blue-800 dark:bg-blue-950/60 dark:text-blue-300">
+                      Empfohlen
+                    </span>
+                  </div>
+                  <p className="text-xs sm:text-sm text-zinc-600 dark:text-zinc-400 leading-relaxed mb-4">
+                    Ideal für Familien & geteilte Geräte. Schützt Einstellungen und API-Keys mit einer Eltern-PIN und trennt Lernstände sauber voneinander.
+                  </p>
+                  <ul className="text-xs sm:text-sm text-zinc-600 dark:text-zinc-400 space-y-2 mb-6">
+                    <li className="flex items-center gap-2">
+                      <CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0" />
+                      <span>Kindersichere PIN für sensible Einstellungen</span>
+                    </li>
+                    <li className="flex items-center gap-2">
+                      <CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0" />
+                      <span>Getrennte Vokabelstapel & Statistiken</span>
+                    </li>
+                    <li className="flex items-center gap-2">
+                      <CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0" />
+                      <span>Einfacher Kinder-Login ohne E-Mail-Adresse</span>
+                    </li>
+                  </ul>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => setStep(2)}
+                  className="w-full py-3 px-4 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-medium text-xs sm:text-sm transition-colors flex items-center justify-center gap-2 shadow-sm"
+                >
+                  Geschützt einrichten <ArrowRight className="w-4 h-4" />
+                </button>
               </div>
-              <div className="flex items-center gap-2 mb-2">
-                <h3 className="text-lg font-bold text-zinc-900 dark:text-zinc-100">
-                  Geschützter Modus
-                </h3>
-                <span className="px-2.5 py-0.5 text-xs font-semibold rounded-full bg-blue-100 text-blue-800 dark:bg-blue-950/60 dark:text-blue-300">
-                  Empfohlen
-                </span>
+
+              {/* Option B: Single-User Mode */}
+              <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 hover:border-zinc-300 dark:hover:border-zinc-700 rounded-3xl p-6 sm:p-7 shadow-sm flex flex-col justify-between transition-all">
+                <div>
+                  <div className="w-12 h-12 rounded-2xl bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 flex items-center justify-center mb-4">
+                    <User className="w-6 h-6" />
+                  </div>
+                  <h3 className="text-lg font-bold text-zinc-900 dark:text-zinc-100 mb-2">
+                    Einzelnutzer-Modus
+                  </h3>
+                  <p className="text-xs sm:text-sm text-zinc-600 dark:text-zinc-400 leading-relaxed mb-4">
+                    Schnellstart ohne Benutzerkonten. Alle Daten werden zentral für einen einzelnen Nutzer gespeichert.
+                  </p>
+                  <ul className="text-xs sm:text-sm text-zinc-600 dark:text-zinc-400 space-y-2 mb-6">
+                    <li className="flex items-center gap-2">
+                      <CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0" />
+                      <span>Sofort startklar ohne Passwörter</span>
+                    </li>
+                    <li className="flex items-center gap-2">
+                      <CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0" />
+                      <span>Optional mit Einstellungs-PIN absicherbar</span>
+                    </li>
+                    <li className="flex items-center gap-2">
+                      <CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0" />
+                      <span>Jederzeit später auf Benutzerkonten erweiterbar</span>
+                    </li>
+                  </ul>
+                </div>
+
+                <button
+                  type="button"
+                  disabled={loading}
+                  onClick={() => {
+                    setError(null)
+                    setShowSingleUserModal(true)
+                  }}
+                  className="w-full py-3 bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-zinc-800 dark:text-zinc-200 rounded-xl font-medium text-sm transition-colors"
+                >
+                  Als Einzelnutzer starten
+                </button>
               </div>
-              <p className="text-xs sm:text-sm text-zinc-600 dark:text-zinc-400 leading-relaxed mb-4">
-                Ideal für Familien & geteilte Geräte. Schützt Einstellungen und API-Keys mit einer Eltern-PIN und trennt Lernstände sauber voneinander.
-              </p>
-              <ul className="text-xs sm:text-sm text-zinc-600 dark:text-zinc-400 space-y-2 mb-6">
-                <li className="flex items-center gap-2">
-                  <CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0" />
-                  <span>Kindersichere PIN für sensible Einstellungen</span>
-                </li>
-                <li className="flex items-center gap-2">
-                  <CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0" />
-                  <span>Getrennte Vokabelstapel & Statistiken</span>
-                </li>
-                <li className="flex items-center gap-2">
-                  <CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0" />
-                  <span>Einfacher Kinder-Login ohne E-Mail-Adresse</span>
-                </li>
-              </ul>
             </div>
+          ) : (
+            /* Render Cloud Mode: Geschützter Modus prominently displayed as "Erforderlich", Einzelnutzer hidden under "Erweiterte Einstellungen" */
+            <div className="space-y-4">
+              <div className="bg-white dark:bg-zinc-900 border-2 border-blue-600 dark:border-blue-500 rounded-3xl p-6 sm:p-8 shadow-xl">
+                <div className="flex items-start gap-4 mb-4">
+                  <div className="w-12 h-12 rounded-2xl bg-blue-100 dark:bg-blue-950/60 text-blue-600 dark:text-blue-400 flex items-center justify-center shrink-0">
+                    <Users className="w-6 h-6" />
+                  </div>
+                  <div className="flex-1">
+                    <div className="flex items-center gap-2 mb-1">
+                      <h3 className="text-xl font-bold text-zinc-900 dark:text-zinc-100">
+                        Geschützter Modus
+                      </h3>
+                      <span className="px-2.5 py-0.5 text-xs font-semibold rounded-full bg-blue-100 text-blue-800 dark:bg-blue-950/60 dark:text-blue-300">
+                        Erforderlich
+                      </span>
+                    </div>
+                    <p className="text-xs sm:text-sm text-zinc-600 dark:text-zinc-400 leading-relaxed">
+                      Für Render und Cloud-Betrieb: Schützt Einstellungen, API-Keys und Datenbankverbindung zuverlässig mit einer Eltern-PIN und trennt Profile für Eltern und Kinder.
+                    </p>
+                  </div>
+                </div>
 
-            <button
-              onClick={() => setStep(2)}
-              className="w-full py-3 px-4 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-medium text-xs sm:text-sm transition-colors flex items-center justify-center gap-2 shadow-sm"
-            >
-              Geschützt einrichten <ArrowRight className="w-4 h-4" />
-            </button>
-          </div>
+                <ul className="text-xs sm:text-sm text-zinc-600 dark:text-zinc-400 space-y-2.5 my-6 p-4 rounded-2xl bg-zinc-50 dark:bg-zinc-800/40 border border-zinc-200/80 dark:border-zinc-800">
+                  <li className="flex items-center gap-2.5">
+                    <CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0" />
+                    <span>Kindersichere PIN für sensible Einstellungen &amp; API-Keys</span>
+                  </li>
+                  <li className="flex items-center gap-2.5">
+                    <CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0" />
+                    <span>Getrennte Vokabelstapel, Lernstände &amp; Statistiken</span>
+                  </li>
+                  <li className="flex items-center gap-2.5">
+                    <CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0" />
+                    <span>Einfacher Kinder-Login ohne E-Mail-Adresse</span>
+                  </li>
+                </ul>
 
-          {/* Option B: Single-User Mode */}
-          <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 hover:border-zinc-300 dark:hover:border-zinc-700 rounded-3xl p-6 sm:p-7 shadow-sm flex flex-col justify-between transition-all">
-            <div>
-              <div className="w-12 h-12 rounded-2xl bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 flex items-center justify-center mb-4">
-                <User className="w-6 h-6" />
+                <button
+                  type="button"
+                  onClick={() => setStep(2)}
+                  className="w-full py-3.5 px-6 bg-blue-600 hover:bg-blue-700 active:scale-[0.99] text-white rounded-xl font-semibold text-sm transition-all shadow-md hover:shadow-lg flex items-center justify-center gap-2"
+                >
+                  <span>Geschützt einrichten</span>
+                  <ArrowRight className="w-4 h-4" />
+                </button>
               </div>
-              <h3 className="text-lg font-bold text-zinc-900 dark:text-zinc-100 mb-2">
-                Einzelnutzer-Modus
-              </h3>
-              <p className="text-xs sm:text-sm text-zinc-600 dark:text-zinc-400 leading-relaxed mb-4">
-                Schnellstart ohne Benutzerkonten. Alle Daten werden zentral für einen einzelnen Nutzer gespeichert.
-              </p>
-              <ul className="text-xs sm:text-sm text-zinc-600 dark:text-zinc-400 space-y-2 mb-6">
-                <li className="flex items-center gap-2">
-                  <CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0" />
-                  <span>Sofort startklar ohne Passwörter</span>
-                </li>
-                <li className="flex items-center gap-2">
-                  <CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0" />
-                  <span>Optional mit Einstellungs-PIN absicherbar</span>
-                </li>
-                <li className="flex items-center gap-2">
-                  <CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0" />
-                  <span>Jederzeit später auf Benutzerkonten erweiterbar</span>
-                </li>
-              </ul>
-            </div>
 
-            <button
-              type="button"
-              disabled={loading}
-              onClick={() => {
-                setError(null)
-                setShowSingleUserModal(true)
-              }}
-              className="w-full py-3 bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-zinc-800 dark:text-zinc-200 rounded-xl font-medium text-sm transition-colors"
-            >
-              Als Einzelnutzer starten
-            </button>
-          </div>
+              {/* Collapsed Option B under "Erweiterte Einstellungen" */}
+              <div className="pt-1">
+                <button
+                  type="button"
+                  onClick={() => setShowAdvancedMode(!showAdvancedMode)}
+                  className="flex items-center gap-1.5 text-xs text-zinc-500 hover:text-zinc-800 dark:text-zinc-400 dark:hover:text-zinc-200 transition-colors font-medium px-2 py-1"
+                >
+                  <ChevronDown
+                    className={`w-3.5 h-3.5 transition-transform duration-200 ${
+                      showAdvancedMode ? "rotate-180" : ""
+                    }`}
+                  />
+                  Erweiterte Einstellungen
+                </button>
+
+                {showAdvancedMode && (
+                  <div className="mt-3 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-3xl p-6 shadow-sm transition-all">
+                    <div className="flex items-start gap-3.5 mb-3">
+                      <div className="w-10 h-10 rounded-xl bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 flex items-center justify-center shrink-0">
+                        <User className="w-5 h-5" />
+                      </div>
+                      <div className="flex-1">
+                        <h3 className="text-base font-bold text-zinc-900 dark:text-zinc-100 mb-1">
+                          Einzelnutzer-Modus
+                        </h3>
+                        <p className="text-xs sm:text-sm text-zinc-600 dark:text-zinc-400 leading-relaxed">
+                          Schnellstart ohne Benutzerkonten. Alle Daten werden zentral für einen einzelnen Nutzer gespeichert.
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="p-3 bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800 rounded-xl text-xs text-amber-800 dark:text-amber-300 flex items-start gap-2 mb-4">
+                      <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5 text-amber-600" />
+                      <span>
+                        Hinweis: Im Cloud-Betrieb auf Render wird der geschützte Modus dringend empfohlen, damit Einstellungen und API-Keys durch eine Eltern-PIN geschützt bleiben.
+                      </span>
+                    </div>
+
+                    <div className="flex justify-end">
+                      <button
+                        type="button"
+                        disabled={loading}
+                        onClick={() => {
+                          setError(null)
+                          setShowSingleUserModal(true)
+                        }}
+                        className="py-2.5 px-4 bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-zinc-800 dark:text-zinc-200 rounded-xl font-medium text-xs sm:text-sm transition-colors"
+                      >
+                        Trotzdem als Einzelnutzer starten
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {initialDatabaseNeedsSetup && (
+            <div className="mt-6 flex justify-start">
+              <button
+                type="button"
+                onClick={() => setStep(0)}
+                className="inline-flex items-center gap-1.5 text-xs text-zinc-500 hover:text-zinc-800 dark:text-zinc-400 dark:hover:text-zinc-200 transition-colors font-medium"
+              >
+                <ArrowLeft className="w-3.5 h-3.5" /> Zurück zur Datenbankauswahl
+              </button>
+            </div>
+          )}
         </div>
       )}
 
