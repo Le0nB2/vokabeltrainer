@@ -120,17 +120,21 @@ describe('SetupWizard Database & AI Setup', () => {
     expect(screen.getByText('KI-Assistent einrichten')).toBeDefined()
     expect(screen.getByText('Erforderlich')).toBeDefined()
 
-    // 3 options must be present in order: Gemini first, ChatGPT second, OpenRouter third
-    expect(screen.getByText(/Option 1: Google Gemini \(Empfohlen & Kostenlos\)/i)).toBeDefined()
-    expect(screen.getByText(/Option 2: ChatGPT \(OpenAI API-Key\)/i)).toBeDefined()
-    expect(screen.getByText(/Option 3: OpenRouter \(1-Klick-Verbindung\)/i)).toBeDefined()
-
-    // Pricing badges: Gemini is free, ChatGPT & OpenRouter are marked as "Kostenpflichtig"
-    expect(screen.getByText('Dauerhaft kostenlos')).toBeDefined()
-    expect(screen.getAllByText('Kostenpflichtig').length).toBe(2)
-
-    // Google Gemini input should be visible by default
+    // Google Gemini is shown directly by default
+    expect(screen.getByText(/Google Gemini \(Empfohlen & Kostenlos\)/i)).toBeDefined()
+    expect(screen.getByText('Kostenlos')).toBeDefined()
     expect(screen.getByPlaceholderText('AIzaSy...')).toBeDefined()
+
+    // ChatGPT & OpenRouter are collapsed inside "Erweiterte Einstellungen"
+    expect(screen.queryByText(/ChatGPT \(OpenAI API-Key\)/i)).toBeNull()
+    expect(screen.queryByText(/OpenRouter \(1-Klick-Verbindung\)/i)).toBeNull()
+
+    // Expand "Erweiterte Einstellungen"
+    fireEvent.click(screen.getByText(/Erweiterte Einstellungen/i))
+
+    expect(screen.getByText(/ChatGPT \(OpenAI API-Key\)/i)).toBeDefined()
+    expect(screen.getByText(/OpenRouter \(1-Klick-Verbindung\)/i)).toBeDefined()
+    expect(screen.getAllByText('Kostenpflichtig').length).toBe(2)
 
     // Continue button must be disabled when AI is not configured
     const submitBtn = screen.getByRole('button', { name: /Weiter zum Abschluss|Einrichtung abschließen/i })
@@ -154,8 +158,11 @@ describe('SetupWizard Database & AI Setup', () => {
 
     render(<SetupWizard isPublicOrRender={false} initialStep={4} />)
 
-    // Select Option 2: ChatGPT
-    fireEvent.click(screen.getByText(/Option 2: ChatGPT/i))
+    // Expand "Erweiterte Einstellungen"
+    fireEvent.click(screen.getByText(/Erweiterte Einstellungen/i))
+
+    // Select ChatGPT
+    fireEvent.click(screen.getByText(/ChatGPT \(OpenAI API-Key\)/i))
 
     // Enter API Key
     const input = screen.getByPlaceholderText('sk-proj-...')
@@ -191,8 +198,11 @@ describe('SetupWizard Database & AI Setup', () => {
     // Initially Gemini is selected
     expect(screen.getByPlaceholderText('AIzaSy...')).toBeDefined()
 
-    // Switch to OpenRouter (Option 3)
-    fireEvent.click(screen.getByText(/Option 3: OpenRouter/i))
+    // Expand "Erweiterte Einstellungen"
+    fireEvent.click(screen.getByText(/Erweiterte Einstellungen/i))
+
+    // Switch to OpenRouter
+    fireEvent.click(screen.getByText(/OpenRouter \(1-Klick-Verbindung\)/i))
 
     // Explanation hint must be visible
     expect(screen.getByText(/Hinweis zur 1-Klick-Anbindung:/i)).toBeDefined()
