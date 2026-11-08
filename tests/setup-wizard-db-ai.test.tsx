@@ -102,4 +102,69 @@ describe('SetupWizard Database & AI Setup', () => {
     expect(screen.getByText('Als Einzelnutzer starten')).toBeDefined()
     expect(screen.queryByText('Erweiterte Einstellungen')).toBeNull()
   })
+
+  it('renders Step 4 as dedicated mandatory AI setup with OpenRouter, ChatGPT (OpenAI), and Google Gemini', async () => {
+    vi.spyOn(aiActions, 'getAiConfigStatus').mockResolvedValue({
+      activeProvider: 'openrouter',
+      hasGeminiKey: false,
+      hasOpenRouterKey: false,
+      hasOpenAiKey: false,
+      hasEnvGeminiKey: false,
+      hasEnvOpenRouterKey: false,
+      hasEnvOpenAiKey: false,
+    })
+
+    render(<SetupWizard isPublicOrRender={false} initialStep={4} />)
+
+    // Heading and mandatory badge
+    expect(screen.getByText('KI-Assistent einrichten')).toBeDefined()
+    expect(screen.getByText('Erforderlich')).toBeDefined()
+
+    // 3 options must be present
+    expect(screen.getByText(/Option 1: OpenRouter/i)).toBeDefined()
+    expect(screen.getByText(/Option 2: ChatGPT \(OpenAI API-Key\)/i)).toBeDefined()
+    expect(screen.getByText(/Option 3: Google Gemini \(Free-Tier API-Key\)/i)).toBeDefined()
+
+    // Continue button must be disabled when AI is not configured
+    const submitBtn = screen.getByRole('button', { name: /Weiter zum Abschluss|Einrichtung abschließen/i })
+    expect(submitBtn.hasAttribute('disabled')).toBe(true)
+  })
+
+  it('allows saving an OpenAI (ChatGPT) key and enables the proceed button', async () => {
+    vi.spyOn(aiActions, 'getAiConfigStatus').mockResolvedValue({
+      activeProvider: 'gemini',
+      hasGeminiKey: false,
+      hasOpenRouterKey: false,
+      hasOpenAiKey: false,
+      hasEnvGeminiKey: false,
+      hasEnvOpenRouterKey: false,
+      hasEnvOpenAiKey: false,
+    })
+
+    const saveSpy = vi.spyOn(aiActions, 'saveAiKeyAction').mockResolvedValue({
+      success: true,
+    })
+
+    render(<SetupWizard isPublicOrRender={false} initialStep={4} />)
+
+    // Select Option 2: ChatGPT
+    fireEvent.click(screen.getByText(/Option 2: ChatGPT/i))
+
+    // Enter API Key
+    const input = screen.getByPlaceholderText('sk-proj-...')
+    fireEvent.change(input, { target: { value: 'sk-proj-1234567890abcdef' } })
+
+    // Click Speichern
+    const saveBtn = screen.getByRole('button', { name: 'Speichern' })
+    fireEvent.click(saveBtn)
+
+    await waitFor(() => {
+      expect(saveSpy).toHaveBeenCalledWith('openai_key', 'sk-proj-1234567890abcdef', true)
+      expect(screen.getByText(/OpenAI \(ChatGPT\) API-Key erfolgreich gespeichert!/i)).toBeDefined()
+    })
+
+    // Continue button must now be enabled
+    const submitBtn = screen.getByRole('button', { name: /Weiter zum Abschluss|Einrichtung abschließen/i })
+    expect(submitBtn.hasAttribute('disabled')).toBe(false)
+  })
 })

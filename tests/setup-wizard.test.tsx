@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import { SetupWizard } from '../src/components/SetupWizard'
 import * as setupActions from '../src/actions/setup'
+import * as aiActions from '../src/actions/ai-credentials'
 
 const mockPush = vi.fn()
 const mockRefresh = vi.fn()
@@ -16,10 +17,20 @@ vi.mock('next/navigation', () => ({
 describe('SetupWizard Component', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    vi.spyOn(aiActions, 'getAiConfigStatus').mockResolvedValue({
+      activeProvider: 'openrouter',
+      hasGeminiKey: false,
+      hasOpenRouterKey: false,
+      hasOpenAiKey: false,
+      hasEnvGeminiKey: false,
+      hasEnvOpenRouterKey: false,
+      hasEnvOpenAiKey: false,
+    })
   })
 
-  it('navigates from mode selection to step 2 (Eltern-Konto), and then to step 3 (Kinder-Konto)', async () => {
+  it('navigates from mode selection to step 2 (Eltern-Konto), step 3 (Kinder-Konto), step 4 (KI-Assistent), and step 5 (Abschluss)', async () => {
     vi.spyOn(setupActions, 'completeSetupProtected').mockResolvedValue({ success: true })
+    vi.spyOn(aiActions, 'saveAiKeyAction').mockResolvedValue({ success: true })
 
     render(<SetupWizard isPublicOrRender={false} />)
 
@@ -87,7 +98,27 @@ describe('SetupWizard Component', () => {
       )
     })
 
-    // Step 4: Completion and Share screen is shown
+    // Step 4: Dedicated AI setup screen is shown
+    await waitFor(() => {
+      expect(screen.getByText('KI-Assistent einrichten')).toBeDefined()
+      expect(screen.getByText('Erforderlich')).toBeDefined()
+    })
+
+    // Save OpenRouter key to fulfill requirement
+    const openRouterInput = screen.getByPlaceholderText('sk-or-v1-...')
+    fireEvent.change(openRouterInput, { target: { value: 'sk-or-v1-test-token' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Speichern' }))
+
+    await waitFor(() => {
+      expect(screen.getByText(/OpenRouter erfolgreich konfiguriert!/)).toBeDefined()
+    })
+
+    // Proceed to Step 5
+    const proceedBtn = screen.getByRole('button', { name: 'Weiter zum Abschluss ➔' })
+    expect(proceedBtn.hasAttribute('disabled')).toBe(false)
+    fireEvent.click(proceedBtn)
+
+    // Step 5: Completion and Share screen is shown
     await waitFor(() => {
       expect(screen.getByText('Fast geschafft! So legt Leon los 🎉')).toBeDefined()
       expect(screen.getByText('leon')).toBeDefined()
@@ -137,9 +168,14 @@ describe('SetupWizard Component', () => {
         })
       )
     })
+
+    // Navigates to dedicated Step 4 AI page
+    await waitFor(() => {
+      expect(screen.getByText('KI-Assistent einrichten')).toBeDefined()
+    })
   })
 
-  it('sets up single-user mode with settings PIN', async () => {
+  it('sets up single-user mode with settings PIN and proceeds to Step 4 AI setup', async () => {
     vi.spyOn(setupActions, 'completeSetupSingleUser').mockResolvedValue({ success: true })
 
     render(<SetupWizard isPublicOrRender={false} />)
@@ -161,11 +197,12 @@ describe('SetupWizard Component', () => {
       expect(setupActions.completeSetupSingleUser).toHaveBeenCalledWith({
         settingsPin: '9876',
       })
-      expect(mockPush).toHaveBeenCalledWith('/')
+      // AI setup is mandatory, navigates to Step 4
+      expect(screen.getByText('KI-Assistent einrichten')).toBeDefined()
     })
   })
 
-  it('sets up single-user mode without PIN / password (optional PIN left empty)', async () => {
+  it('sets up single-user mode without PIN / password and proceeds to Step 4 AI setup', async () => {
     vi.spyOn(setupActions, 'completeSetupSingleUser').mockResolvedValue({ success: true })
 
     render(<SetupWizard isPublicOrRender={false} />)
@@ -181,7 +218,8 @@ describe('SetupWizard Component', () => {
       expect(setupActions.completeSetupSingleUser).toHaveBeenCalledWith({
         settingsPin: undefined,
       })
-      expect(mockPush).toHaveBeenCalledWith('/')
+      // AI setup is mandatory, navigates to Step 4
+      expect(screen.getByText('KI-Assistent einrichten')).toBeDefined()
     })
   })
 })

@@ -23,7 +23,7 @@ export default async function SetupPage({
   const headersList = await headers()
   const isServerAction = Boolean(headersList.get("next-action"))
 
-  if (!setupState.needsSetup && !isServerAction && !hasAiConnected && !isPreview) {
+  if (!setupState.needsSetup && !isServerAction && !hasAiConnected && !isPreview && rawStep !== "4" && rawStep !== "5") {
     redirect("/")
   }
 
@@ -40,6 +40,8 @@ export default async function SetupPage({
       ? (3 as const)
       : rawStep === "4"
       ? (4 as const)
+      : rawStep === "5"
+      ? (5 as const)
       : undefined
 
   const isRender = Boolean(setupState.isRender || params.render === "1" || params.render === "true")

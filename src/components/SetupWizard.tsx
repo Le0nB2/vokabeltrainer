@@ -21,11 +21,11 @@ import {
 } from "lucide-react"
 import { completeSetupSingleUser, completeSetupProtected } from "@/actions/setup"
 import { testAndMigrateDatabase, useLocalDatabase } from "@/actions/setup-database"
-import { saveAiKeyAction } from "@/actions/ai-credentials"
+import { saveAiKeyAction, getAiConfigStatus } from "@/actions/ai-credentials"
 import { ChildShareInfoCard } from "@/components/ChildShareInfoCard"
 import { AppLogoIcon } from "@/components/AppLogo"
 
-type Step = "welcome" | 0 | 1 | 2 | 3 | 4
+type Step = "welcome" | 0 | 1 | 2 | 3 | 4 | 5
 
 interface SetupWizardProps {
   isPublicOrRender: boolean
@@ -62,26 +62,50 @@ export function SetupWizard({
   const [showAdvancedDb, setShowAdvancedDb] = useState(false)
   const [showAdvancedMode, setShowAdvancedMode] = useState(initialShowAdvanced)
 
-  // AI Step State (in step 4 / completion)
-  const [aiProviderChoice, setAiProviderChoice] = useState<"openrouter" | "gemini">("openrouter")
+  // AI Step State (Step 4)
+  const [aiProviderChoice, setAiProviderChoice] = useState<"openrouter" | "openai" | "gemini">("openrouter")
   const [openRouterKey, setOpenRouterKey] = useState("")
+  const [openAiKey, setOpenAiKey] = useState("")
   const [geminiKey, setGeminiKey] = useState("")
   const [aiLoading, setAiLoading] = useState(false)
   const [aiSuccess, setAiSuccess] = useState<string | null>(null)
   const [aiError, setAiError] = useState<string | null>(null)
+  const [isAiConfigured, setIsAiConfigured] = useState(false)
+  const [isSingleUserMode, setIsSingleUserMode] = useState(false)
 
   // Single-User Mode PIN States
   const [singleUserPin, setSingleUserPin] = useState("")
   const [singleUserPinConfirm, setSingleUserPinConfirm] = useState("")
 
   useEffect(() => {
+    // Check if any AI key or env var is configured
+    getAiConfigStatus()
+      .then((status) => {
+        const hasKey = Boolean(
+          status.hasGeminiKey ||
+            status.hasOpenRouterKey ||
+            status.hasOpenAiKey ||
+            status.hasEnvGeminiKey ||
+            status.hasEnvOpenRouterKey ||
+            status.hasEnvOpenAiKey
+        )
+        if (hasKey) {
+          setIsAiConfigured(true)
+        }
+        if (status.activeProvider) {
+          setAiProviderChoice(status.activeProvider)
+        }
+      })
+      .catch(() => {})
+
     if (typeof window !== "undefined") {
       const params = new URLSearchParams(window.location.search)
       const connected = params.get("ai_connected")
       const err = params.get("ai_error")
       if (connected === "openrouter") {
         setStep(4)
-        setAiSuccess("OpenRouter erfolgreich verknüpft! Dein Vokabeltrainer ist jetzt startklar.")
+        setIsAiConfigured(true)
+        setAiSuccess("OpenRouter erfolgreich verknüpft! Klicke auf 'Weiter', um fortzufahren.")
         const url = new URL(window.location.href)
         url.searchParams.delete("ai_connected")
         window.history.replaceState({}, document.title, url.pathname + (url.search ? url.search : ""))
@@ -161,6 +185,20 @@ export function SetupWizard({
         const res = await saveAiKeyAction("openrouter_key", openRouterKey.trim(), true)
         if (res.success) {
           setAiSuccess("OpenRouter erfolgreich konfiguriert!")
+          setIsAiConfigured(true)
+        } else {
+          setAiError(res.error || "Fehler beim Speichern des Schlüssels.")
+        }
+      } else if (aiProviderChoice === "openai") {
+        if (!openAiKey.trim()) {
+          setAiError("Bitte gib einen OpenAI (ChatGPT) API-Key ein.")
+          setAiLoading(false)
+          return
+        }
+        const res = await saveAiKeyAction("openai_key", openAiKey.trim(), true)
+        if (res.success) {
+          setAiSuccess("OpenAI (ChatGPT) API-Key erfolgreich gespeichert!")
+          setIsAiConfigured(true)
         } else {
           setAiError(res.error || "Fehler beim Speichern des Schlüssels.")
         }
@@ -173,6 +211,7 @@ export function SetupWizard({
         const res = await saveAiKeyAction("gemini_key", geminiKey.trim(), true)
         if (res.success) {
           setAiSuccess("Google Gemini Key erfolgreich gespeichert!")
+          setIsAiConfigured(true)
         } else {
           setAiError(res.error || "Fehler beim Speichern des Schlüssels.")
         }
@@ -210,11 +249,11 @@ export function SetupWizard({
         settingsPin: cleanPin || undefined,
       })
       if (res.success) {
-        router.push("/")
-        router.refresh()
-        if (typeof window !== "undefined") {
-          window.location.href = "/"
-        }
+        setIsSingleUserMode(true)
+        setShowSingleUserModal(false)
+        setLoading(false)
+        // AI is mandatory! Navigate to Step 4 so user sets up AI provider
+        setStep(4)
       } else {
         setError(res.error || "Fehler beim Abschließen der Einrichtung.")
         setLoading(false)
@@ -367,8 +406,10 @@ export function SetupWizard({
         <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-blue-100 dark:bg-blue-900/40 text-blue-600 dark:text-blue-400 mb-3 shadow-sm">
           {step === "welcome" ? (
             <AppLogoIcon className="w-8 h-8 text-blue-600 dark:text-blue-500" />
-          ) : step === 4 ? (
+          ) : step === 5 ? (
             <CheckCircle2 className="w-7 h-7 text-emerald-600 dark:text-emerald-400" />
+          ) : step === 4 ? (
+            <Sparkles className="w-7 h-7 text-purple-600 dark:text-purple-400" />
           ) : step === 3 ? (
             <UserPlus className="w-7 h-7" />
           ) : step === 0 ? (
@@ -388,8 +429,10 @@ export function SetupWizard({
               </span>
               <span>👋</span>
             </span>
+          ) : step === 5 ? (
+            "Einrichtung abgeschlossen! 🎉"
           ) : step === 4 ? (
-            "Einrichtung fast abgeschlossen! 🎉"
+            "KI-Assistent einrichten"
           ) : step === 3 ? (
             "Kinder-Konto einrichten"
           ) : step === 0 ? (
@@ -409,7 +452,11 @@ export function SetupWizard({
             ? "Richte dein Eltern-Konto und die Einstellungs-PIN ein (Schritt 1 von 2)."
             : step === 3
             ? "Möchtest du direkt ein Profil für dein Kind anlegen (Schritt 2 von 2)?"
-            : "Hier kannst du die KI-Funktionen konfigurieren oder direkt loslegen:"}
+            : step === 4
+            ? "Verbinde einen KI-Provider für Scan per Foto, Beispielsätze und PDF-Arbeitsblätter."
+            : createChild
+            ? "Hier sind die Zugangsdaten für dein Kind zum Teilen oder Ausdrucken:"
+            : "Dein Vokabeltrainer ist nun startklar eingerichtet!"}
         </p>
       </div>
 
@@ -1226,160 +1273,279 @@ export function SetupWizard({
         </div>
       )}
 
-      {/* Screen 4: Child Account Sharing & Optional AI Setup */}
+      {/* Screen 4: Dedicated AI Provider Setup (Mandatory) */}
       {step === 4 && (
-        <div className="space-y-6">
-          {createChild && (
-            <ChildShareInfoCard
-              childName={childDisplayName || childUsername}
-              childUsername={childUsername.trim()}
-              onFinish={handleFinalRedirect}
-            />
-          )}
-
-          {/* Optional AI Connection Card */}
-          <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-3xl p-6 sm:p-8 shadow-xl text-left">
-            <div className="flex items-center gap-2.5 mb-2">
+        <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-3xl p-6 sm:p-8 shadow-xl text-left space-y-6">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2.5">
               <Sparkles className="w-5 h-5 text-purple-600 dark:text-purple-400" />
               <h3 className="text-base sm:text-lg font-bold text-zinc-900 dark:text-zinc-100">
-                KI-Funktionen einrichten (Optional)
+                KI-Assistent verbinden
               </h3>
             </div>
-            <p className="text-xs sm:text-sm text-zinc-600 dark:text-zinc-400 mb-5 leading-relaxed">
-              Für das automatische Einlesen von Vokabelheften per Foto, didaktische Eselsbrücken und Lückentexte.
-            </p>
+            <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-amber-100 text-amber-800 dark:bg-amber-950/60 dark:text-amber-300">
+              Erforderlich
+            </span>
+          </div>
 
-            <div className="space-y-4 mb-5">
-              {/* Option 1: OpenRouter */}
-              <div
-                onClick={() => setAiProviderChoice("openrouter")}
-                className={`p-4 rounded-2xl border-2 cursor-pointer transition-all ${
-                  aiProviderChoice === "openrouter"
-                    ? "border-purple-600 bg-purple-50/30 dark:bg-purple-950/20"
-                    : "border-zinc-200 dark:border-zinc-800 hover:bg-zinc-50 dark:hover:bg-zinc-800/40"
-                }`}
-              >
-                <div className="flex items-start gap-3">
-                  <input
-                    type="radio"
-                    name="aiChoice"
-                    checked={aiProviderChoice === "openrouter"}
-                    onChange={() => setAiProviderChoice("openrouter")}
-                    className="mt-1 text-purple-600 focus:ring-purple-500"
-                  />
-                  <div className="flex-1">
+          <p className="text-xs sm:text-sm text-zinc-600 dark:text-zinc-400 leading-relaxed">
+            Die KI ist ein zentraler Bestandteil des N30 Vokabeltrainers: Sie ermöglicht das Einlesen von Vokabellisten und Schulbuchseiten per Foto, generiert didaktische Eselsbrücken, Beispielsätze und erstellt druckbare PDF-Arbeitsblätter mit Lückentexten.
+          </p>
+
+          {isAiConfigured && (
+            <div className="p-3.5 bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-800 rounded-2xl flex items-center gap-2.5 text-xs sm:text-sm text-emerald-800 dark:text-emerald-300 font-medium">
+              <CheckCircle2 className="w-5 h-5 shrink-0 text-emerald-600 dark:text-emerald-400" />
+              <span>KI-Assistent ist einsatzbereit! Du kannst jetzt fortfahren oder einen anderen Anbieter wählen.</span>
+            </div>
+          )}
+
+          <div className="space-y-4">
+            {/* Option 1: OpenRouter */}
+            <div
+              onClick={() => setAiProviderChoice("openrouter")}
+              className={`p-4 rounded-2xl border-2 cursor-pointer transition-all ${
+                aiProviderChoice === "openrouter"
+                  ? "border-purple-600 bg-purple-50/30 dark:bg-purple-950/20"
+                  : "border-zinc-200 dark:border-zinc-800 hover:bg-zinc-50 dark:hover:bg-zinc-800/40"
+              }`}
+            >
+              <div className="flex items-start gap-3">
+                <input
+                  type="radio"
+                  name="aiChoice"
+                  checked={aiProviderChoice === "openrouter"}
+                  onChange={() => setAiProviderChoice("openrouter")}
+                  className="mt-1 text-purple-600 focus:ring-purple-500"
+                />
+                <div className="flex-1">
+                  <div className="flex items-center justify-between">
                     <span className="font-bold text-xs sm:text-sm text-zinc-900 dark:text-zinc-100">
-                      🟣 Option 1: OpenRouter (1-Klick verbinden oder Key)
+                      🟣 Option 1: OpenRouter (Empfohlen)
                     </span>
-                    <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">
-                      Universeller Zugriff auf alle Modelle (GPT-4o, Claude, Gemini) und kostenlose Free-Modelle.
-                    </p>
-
-                    {aiProviderChoice === "openrouter" && (
-                      <div className="mt-3 space-y-2 pt-2 border-t border-zinc-100 dark:border-zinc-800">
-                        <a
-                          href="/api/auth/openrouter/login?returnTo=/setup"
-                          className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-xl text-xs font-medium transition-colors shadow-sm"
-                        >
-                          <Sparkles className="w-3.5 h-3.5" /> Mit OpenRouter verbinden (1-Klick)
-                        </a>
-                        <p className="text-xs text-zinc-500">oder API-Schlüssel manuell eingeben:</p>
-                        <div className="flex gap-2">
-                          <input
-                            type="password"
-                            value={openRouterKey}
-                            onChange={(e) => setOpenRouterKey(e.target.value)}
-                            placeholder="sk-or-v1-..."
-                            className="flex-1 px-3 py-2 rounded-xl border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-xs text-zinc-900 dark:text-zinc-100"
-                          />
-                          <button
-                            type="button"
-                            disabled={aiLoading}
-                            onClick={handleSaveAiCredentials}
-                            className="px-3 py-2 bg-zinc-800 dark:bg-zinc-200 text-white dark:text-zinc-900 rounded-xl text-xs font-medium disabled:opacity-50"
-                          >
-                            Speichern
-                          </button>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              </div>
-
-              {/* Option 2: Google Gemini */}
-              <div
-                onClick={() => setAiProviderChoice("gemini")}
-                className={`p-4 rounded-2xl border-2 cursor-pointer transition-all ${
-                  aiProviderChoice === "gemini"
-                    ? "border-blue-600 bg-blue-50/30 dark:bg-blue-950/20"
-                    : "border-zinc-200 dark:border-zinc-800 hover:bg-zinc-50 dark:hover:bg-zinc-800/40"
-                }`}
-              >
-                <div className="flex items-start gap-3">
-                  <input
-                    type="radio"
-                    name="aiChoice"
-                    checked={aiProviderChoice === "gemini"}
-                    onChange={() => setAiProviderChoice("gemini")}
-                    className="mt-1 text-blue-600 focus:ring-blue-500"
-                  />
-                  <div className="flex-1">
-                    <span className="font-bold text-xs sm:text-sm text-zinc-900 dark:text-zinc-100">
-                      🔵 Option 2: Google Gemini (Free-Tier API-Key)
+                    <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-purple-100 dark:bg-purple-950/60 text-purple-700 dark:text-purple-300">
+                      Empfohlen
                     </span>
-                    <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">
-                      Kostenloser Schlüssel aus dem Google AI Studio (15 Requests/Min kostenlos).
-                    </p>
-
-                    {aiProviderChoice === "gemini" && (
-                      <div className="mt-3 space-y-2 pt-2 border-t border-zinc-100 dark:border-zinc-800">
-                        <div className="flex gap-2">
-                          <input
-                            type="password"
-                            value={geminiKey}
-                            onChange={(e) => setGeminiKey(e.target.value)}
-                            placeholder="AIzaSy..."
-                            className="flex-1 px-3 py-2 rounded-xl border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-xs text-zinc-900 dark:text-zinc-100"
-                          />
-                          <button
-                            type="button"
-                            disabled={aiLoading}
-                            onClick={handleSaveAiCredentials}
-                            className="px-3 py-2 bg-zinc-800 dark:bg-zinc-200 text-white dark:text-zinc-900 rounded-xl text-xs font-medium disabled:opacity-50"
-                          >
-                            Speichern
-                          </button>
-                        </div>
-                        <a
-                          href="https://aistudio.google.com/app/apikey"
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="text-xs text-blue-600 hover:underline inline-flex items-center gap-1 font-medium"
-                        >
-                          Kostenlosen Key im Google AI Studio holen <ExternalLink className="w-3 h-3" />
-                        </a>
-                      </div>
-                    )}
                   </div>
+                  <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">
+                    1-Klick-Verbindung oder API-Key. Universeller Zugriff auf GPT-4o, Claude und kostenlose Modelle.
+                  </p>
+
+                  {aiProviderChoice === "openrouter" && (
+                    <div className="mt-3 space-y-2 pt-2 border-t border-zinc-100 dark:border-zinc-800">
+                      <a
+                        href="/api/auth/openrouter/login?returnTo=/setup?step=4"
+                        className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-xl text-xs font-medium transition-colors shadow-sm"
+                      >
+                        <Sparkles className="w-3.5 h-3.5" /> Mit OpenRouter verbinden (1-Klick)
+                      </a>
+                      <p className="text-xs text-zinc-500">oder API-Schlüssel manuell eingeben:</p>
+                      <div className="flex gap-2">
+                        <input
+                          type="password"
+                          value={openRouterKey}
+                          onChange={(e) => setOpenRouterKey(e.target.value)}
+                          placeholder="sk-or-v1-..."
+                          className="flex-1 px-3 py-2 rounded-xl border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-xs text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-purple-500"
+                        />
+                        <button
+                          type="button"
+                          disabled={aiLoading}
+                          onClick={handleSaveAiCredentials}
+                          className="px-3 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-xl text-xs font-medium disabled:opacity-50"
+                        >
+                          {aiLoading ? "Speichert..." : "Speichern"}
+                        </button>
+                      </div>
+                      <a
+                        href="https://openrouter.ai/keys"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-xs text-purple-600 dark:text-purple-400 hover:underline inline-flex items-center gap-1 font-medium"
+                      >
+                        API-Key auf openrouter.ai erstellen <ExternalLink className="w-3 h-3" />
+                      </a>
+                    </div>
+                  )}
                 </div>
               </div>
             </div>
 
-            {aiSuccess && <p className="text-xs text-emerald-600 mb-4 font-semibold">✅ {aiSuccess}</p>}
-            {aiError && <p className="text-xs text-rose-600 mb-4 font-medium">⚠️ {aiError}</p>}
+            {/* Option 2: ChatGPT (OpenAI) */}
+            <div
+              onClick={() => setAiProviderChoice("openai")}
+              className={`p-4 rounded-2xl border-2 cursor-pointer transition-all ${
+                aiProviderChoice === "openai"
+                  ? "border-emerald-600 bg-emerald-50/30 dark:bg-emerald-950/20"
+                  : "border-zinc-200 dark:border-zinc-800 hover:bg-zinc-50 dark:hover:bg-zinc-800/40"
+              }`}
+            >
+              <div className="flex items-start gap-3">
+                <input
+                  type="radio"
+                  name="aiChoice"
+                  checked={aiProviderChoice === "openai"}
+                  onChange={() => setAiProviderChoice("openai")}
+                  className="mt-1 text-emerald-600 focus:ring-emerald-500"
+                />
+                <div className="flex-1">
+                  <span className="font-bold text-xs sm:text-sm text-zinc-900 dark:text-zinc-100">
+                    🟢 Option 2: ChatGPT (OpenAI API-Key)
+                  </span>
+                  <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">
+                    Direkte OpenAI API für GPT-4o, GPT-4o-mini und präzise optische Texterkennung (OCR).
+                  </p>
 
-            {!createChild && (
-              <div className="pt-4 border-t border-zinc-100 dark:border-zinc-800 flex justify-end">
-                <button
-                  type="button"
-                  onClick={handleFinalRedirect}
-                  className="py-2.5 px-6 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-medium text-xs sm:text-sm transition-colors flex items-center gap-2 shadow-sm"
-                >
-                  Einrichtung abschließen & zur App 🚀
-                </button>
+                  {aiProviderChoice === "openai" && (
+                    <div className="mt-3 space-y-2 pt-2 border-t border-zinc-100 dark:border-zinc-800">
+                      <div className="flex gap-2">
+                        <input
+                          type="password"
+                          value={openAiKey}
+                          onChange={(e) => setOpenAiKey(e.target.value)}
+                          placeholder="sk-proj-..."
+                          className="flex-1 px-3 py-2 rounded-xl border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-xs text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                        />
+                        <button
+                          type="button"
+                          disabled={aiLoading}
+                          onClick={handleSaveAiCredentials}
+                          className="px-3 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-medium disabled:opacity-50"
+                        >
+                          {aiLoading ? "Speichert..." : "Speichern"}
+                        </button>
+                      </div>
+                      <a
+                        href="https://platform.openai.com/api-keys"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-xs text-emerald-600 dark:text-emerald-400 hover:underline inline-flex items-center gap-1 font-medium"
+                      >
+                        API-Key auf platform.openai.com erstellen <ExternalLink className="w-3 h-3" />
+                      </a>
+                    </div>
+                  )}
+                </div>
               </div>
+            </div>
+
+            {/* Option 3: Google Gemini */}
+            <div
+              onClick={() => setAiProviderChoice("gemini")}
+              className={`p-4 rounded-2xl border-2 cursor-pointer transition-all ${
+                aiProviderChoice === "gemini"
+                  ? "border-blue-600 bg-blue-50/30 dark:bg-blue-950/20"
+                  : "border-zinc-200 dark:border-zinc-800 hover:bg-zinc-50 dark:hover:bg-zinc-800/40"
+              }`}
+            >
+              <div className="flex items-start gap-3">
+                <input
+                  type="radio"
+                  name="aiChoice"
+                  checked={aiProviderChoice === "gemini"}
+                  onChange={() => setAiProviderChoice("gemini")}
+                  className="mt-1 text-blue-600 focus:ring-blue-500"
+                />
+                <div className="flex-1">
+                  <span className="font-bold text-xs sm:text-sm text-zinc-900 dark:text-zinc-100">
+                    🔵 Option 3: Google Gemini (Free-Tier API-Key)
+                  </span>
+                  <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">
+                    Kostenloser Schlüssel aus dem Google AI Studio (15 Requests/Min kostenlos).
+                  </p>
+
+                  {aiProviderChoice === "gemini" && (
+                    <div className="mt-3 space-y-2 pt-2 border-t border-zinc-100 dark:border-zinc-800">
+                      <div className="flex gap-2">
+                        <input
+                          type="password"
+                          value={geminiKey}
+                          onChange={(e) => setGeminiKey(e.target.value)}
+                          placeholder="AIzaSy..."
+                          className="flex-1 px-3 py-2 rounded-xl border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-xs text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        />
+                        <button
+                          type="button"
+                          disabled={aiLoading}
+                          onClick={handleSaveAiCredentials}
+                          className="px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-medium disabled:opacity-50"
+                        >
+                          {aiLoading ? "Speichert..." : "Speichern"}
+                        </button>
+                      </div>
+                      <a
+                        href="https://aistudio.google.com/app/apikey"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-xs text-blue-600 hover:underline inline-flex items-center gap-1 font-medium"
+                      >
+                        Kostenlosen Key im Google AI Studio holen <ExternalLink className="w-3 h-3" />
+                      </a>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {aiSuccess && <p className="text-xs text-emerald-600 dark:text-emerald-400 font-semibold">✅ {aiSuccess}</p>}
+          {aiError && <p className="text-xs text-rose-600 dark:text-rose-400 font-medium">⚠️ {aiError}</p>}
+
+          <div className="pt-4 border-t border-zinc-100 dark:border-zinc-800 flex items-center justify-between gap-3">
+            <button
+              type="button"
+              onClick={() => {
+                if (isSingleUserMode) {
+                  setStep(1)
+                } else {
+                  setStep(3)
+                }
+              }}
+              className="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-xl border border-zinc-300 dark:border-zinc-700 text-xs sm:text-sm font-medium text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
+            >
+              <ArrowLeft className="w-4 h-4" /> {isSingleUserMode ? "Zurück zur Moduswahl" : "Zurück zu Kinder-Konto"}
+            </button>
+
+            {isSingleUserMode || !createChild ? (
+              <button
+                type="button"
+                disabled={!isAiConfigured}
+                onClick={handleFinalRedirect}
+                className="py-2.5 px-6 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-medium text-xs sm:text-sm transition-colors flex items-center gap-2 shadow-sm disabled:opacity-40 disabled:cursor-not-allowed"
+                title={!isAiConfigured ? "Bitte verbinde zuerst einen KI-Provider" : undefined}
+              >
+                Einrichtung abschließen & zur App 🚀
+              </button>
+            ) : (
+              <button
+                type="button"
+                disabled={!isAiConfigured}
+                onClick={() => setStep(5)}
+                className="py-2.5 px-6 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-medium text-xs sm:text-sm transition-colors flex items-center gap-2 shadow-sm disabled:opacity-40 disabled:cursor-not-allowed"
+                title={!isAiConfigured ? "Bitte verbinde zuerst einen KI-Provider" : undefined}
+              >
+                Weiter zum Abschluss ➔
+              </button>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* Screen 5: Final Completion & Child Credentials Sharing */}
+      {step === 5 && (
+        <div className="space-y-6">
+          <ChildShareInfoCard
+            childName={childDisplayName || childUsername}
+            childUsername={childUsername.trim()}
+            onFinish={handleFinalRedirect}
+          />
+          <div className="flex justify-start">
+            <button
+              type="button"
+              onClick={() => setStep(4)}
+              className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl border border-zinc-300 dark:border-zinc-700 text-xs sm:text-sm font-medium text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
+            >
+              <ArrowLeft className="w-4 h-4" /> Zurück zur KI-Einrichtung
+            </button>
           </div>
         </div>
       )}

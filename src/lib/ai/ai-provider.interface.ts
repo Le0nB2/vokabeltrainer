@@ -12,7 +12,7 @@ export interface AiGenerateOptions {
 }
 
 export interface IAiProvider {
-  id: "gemini" | "openrouter"
+  id: "gemini" | "openrouter" | "openai"
   name: string
   generateStructuredJson<T>(options: AiGenerateOptions): Promise<T>
 }

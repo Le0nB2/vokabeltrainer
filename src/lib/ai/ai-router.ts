@@ -3,9 +3,10 @@ import { decryptSecret } from "@/lib/security/crypto"
 import { IAiProvider, AiGenerateOptions } from "./ai-provider.interface"
 import { GeminiProvider } from "./providers/gemini-provider"
 import { OpenRouterProvider } from "./providers/openrouter-provider"
+import { OpenAiProvider } from "./providers/openai-provider"
 
 export interface ResolvedAiConfig {
-  providerId: "gemini" | "openrouter"
+  providerId: "gemini" | "openrouter" | "openai"
   provider: IAiProvider
   source: "user_credential" | "global_credential" | "env_fallback"
 }
@@ -27,7 +28,48 @@ export async function getActiveAiProvider(userId?: string): Promise<ResolvedAiCo
     // If settings table not available yet, default to gemini
   }
 
-  // 2. If OpenRouter is chosen, look for OpenRouter credentials
+  // 2. If OpenAI (ChatGPT) is chosen, look for OpenAI credentials
+  if (activeProviderPreference === "openai") {
+    let oaKey: string | undefined
+
+    if (userId) {
+      const userCred = await prisma.userAiCredential.findFirst({
+        where: {
+          userId,
+          provider: "openai_key",
+        },
+      })
+      if (userCred?.apiKey) {
+        oaKey = decryptSecret(userCred.apiKey)
+      }
+    }
+
+    if (!oaKey) {
+      const globalCred = await prisma.userAiCredential.findFirst({
+        where: {
+          userId: null,
+          provider: "openai_key",
+        },
+      })
+      if (globalCred?.apiKey) {
+        oaKey = decryptSecret(globalCred.apiKey)
+      }
+    }
+
+    if (!oaKey && process.env.OPENAI_API_KEY) {
+      oaKey = process.env.OPENAI_API_KEY.trim()
+    }
+
+    if (oaKey) {
+      return {
+        providerId: "openai",
+        provider: new OpenAiProvider(oaKey),
+        source: userId ? "user_credential" : "global_credential",
+      }
+    }
+  }
+
+  // 3. If OpenRouter is chosen, look for OpenRouter credentials
   if (activeProviderPreference === "openrouter") {
     let orKey: string | undefined
 
@@ -114,7 +156,15 @@ export async function getActiveAiProvider(userId?: string): Promise<ResolvedAiCo
     }
   }
 
-  // 4. If Gemini was not found but OpenRouter is available in ENV:
+  // 4. Fallbacks from ENV:
+  if (process.env.OPENAI_API_KEY) {
+    return {
+      providerId: "openai",
+      provider: new OpenAiProvider(process.env.OPENAI_API_KEY.trim()),
+      source: "env_fallback",
+    }
+  }
+
   if (process.env.OPENROUTER_API_KEY) {
     return {
       providerId: "openrouter",
@@ -124,7 +174,7 @@ export async function getActiveAiProvider(userId?: string): Promise<ResolvedAiCo
   }
 
   throw new Error(
-    "Kein aktiver KI-Dienst konfiguriert. Bitte hinterlege einen Google AI Studio Key oder verbinde OpenRouter in den Einstellungen."
+    "Kein aktiver KI-Dienst konfiguriert. Bitte hinterlege einen API-Schlüssel für ChatGPT (OpenAI), Google Gemini oder verbinde OpenRouter."
   )
 }
 

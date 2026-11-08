@@ -6,19 +6,23 @@ import { getCurrentUser } from "@/lib/auth-guard"
 import { revalidatePath } from "next/cache"
 
 export interface AiConfigStatus {
-  activeProvider: "gemini" | "openrouter"
+  activeProvider: "gemini" | "openrouter" | "openai"
   hasGeminiKey: boolean
   hasOpenRouterKey: boolean
+  hasOpenAiKey: boolean
   hasEnvGeminiKey: boolean
   hasEnvOpenRouterKey: boolean
+  hasEnvOpenAiKey: boolean
 }
 
 export async function getAiConfigStatus(): Promise<AiConfigStatus> {
-  let activeProvider: "gemini" | "openrouter" = "gemini"
+  let activeProvider: "gemini" | "openrouter" | "openai" = "gemini"
   try {
     const settings = await prisma.settings.findUnique({ where: { id: "default" } })
     if (settings?.activeAiProvider === "openrouter") {
       activeProvider = "openrouter"
+    } else if (settings?.activeAiProvider === "openai") {
+      activeProvider = "openai"
     }
   } catch {
     // ignore
@@ -29,6 +33,7 @@ export async function getAiConfigStatus(): Promise<AiConfigStatus> {
 
   let hasGeminiKey = false
   let hasOpenRouterKey = false
+  let hasOpenAiKey = false
 
   try {
     const creds = await prisma.userAiCredential.findMany({
@@ -46,24 +51,28 @@ export async function getAiConfigStatus(): Promise<AiConfigStatus> {
         (c.provider === "openrouter_key" || c.provider === "openrouter_oauth") &&
         Boolean(c.apiKey || c.accessToken)
     )
+    hasOpenAiKey = creds.some((c) => c.provider === "openai_key" && Boolean(c.apiKey))
   } catch {
     // ignore
   }
 
   const hasEnvGeminiKey = Boolean(process.env.GEMINI_API_KEY || process.env.GEMINI_API_KEYS)
   const hasEnvOpenRouterKey = Boolean(process.env.OPENROUTER_API_KEY)
+  const hasEnvOpenAiKey = Boolean(process.env.OPENAI_API_KEY)
 
   return {
     activeProvider,
     hasGeminiKey,
     hasOpenRouterKey,
+    hasOpenAiKey,
     hasEnvGeminiKey,
     hasEnvOpenRouterKey,
+    hasEnvOpenAiKey,
   }
 }
 
 export async function saveAiKeyAction(
-  provider: "gemini_key" | "openrouter_key",
+  provider: "gemini_key" | "openrouter_key" | "openai_key",
   rawKey: string,
   isGlobal = true
 ): Promise<{ success: boolean; error?: string }> {
@@ -99,7 +108,12 @@ export async function saveAiKeyAction(
       })
     }
 
-    const activeProvider = provider === "gemini_key" ? "gemini" : "openrouter"
+    const activeProvider =
+      provider === "gemini_key"
+        ? "gemini"
+        : provider === "openai_key"
+        ? "openai"
+        : "openrouter"
     await prisma.settings.upsert({
       where: { id: "default" },
       update: { activeAiProvider: activeProvider },
@@ -115,7 +129,7 @@ export async function saveAiKeyAction(
 }
 
 export async function setActiveAiProviderAction(
-  provider: "gemini" | "openrouter"
+  provider: "gemini" | "openrouter" | "openai"
 ): Promise<{ success: boolean; error?: string }> {
   try {
     await prisma.settings.upsert({
@@ -131,7 +145,7 @@ export async function setActiveAiProviderAction(
 }
 
 export async function disconnectAiProviderAction(
-  provider: "gemini" | "openrouter"
+  provider: "gemini" | "openrouter" | "openai"
 ): Promise<{ success: boolean; error?: string }> {
   const user = await getCurrentUser()
   const userId = user?.id
@@ -140,6 +154,8 @@ export async function disconnectAiProviderAction(
     const providerFilter =
       provider === "gemini"
         ? ["gemini_key"]
+        : provider === "openai"
+        ? ["openai_key"]
         : ["openrouter_key", "openrouter_oauth"]
 
     await prisma.userAiCredential.deleteMany({

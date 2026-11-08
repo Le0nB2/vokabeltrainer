@@ -47,12 +47,17 @@ export function AiModelSettings({
   const [selectedModel, setSelectedModel] = useState(
     initialSettings.selectedModel ?? "gemini-3.6-flash"
   )
-  const [activeProvider, setActiveProvider] = useState<"gemini" | "openrouter">(
-    initialSettings.activeAiProvider === "openrouter" ? "openrouter" : "gemini"
+  const [activeProvider, setActiveProvider] = useState<"gemini" | "openrouter" | "openai">(
+    initialSettings.activeAiProvider === "openrouter"
+      ? "openrouter"
+      : initialSettings.activeAiProvider === "openai"
+      ? "openai"
+      : "gemini"
   )
   const [aiStatus, setAiStatus] = useState<AiConfigStatus | null>(null)
   const [geminiKeyInput, setGeminiKeyInput] = useState("")
   const [openRouterKeyInput, setOpenRouterKeyInput] = useState("")
+  const [openAiKeyInput, setOpenAiKeyInput] = useState("")
   const [isSavingKey, setIsSavingKey] = useState(false)
   const [models, setModels] = useState<ModelItem[]>(initialModels)
   const [stats, setStats] = useState<ApiStatsResult[] | undefined>(apiStats)
@@ -97,14 +102,20 @@ export function AiModelSettings({
     }
   }, [])
 
-  const handleProviderSwitch = async (newProvider: "gemini" | "openrouter") => {
+  const handleProviderSwitch = async (newProvider: "gemini" | "openrouter" | "openai") => {
     setActiveProvider(newProvider)
     setFeedback(null)
     try {
       await setActiveAiProviderAction(newProvider)
+      const providerLabel =
+        newProvider === "gemini"
+          ? "Google Gemini"
+          : newProvider === "openai"
+          ? "ChatGPT (OpenAI)"
+          : "OpenRouter"
       setFeedback({
         type: "success",
-        message: `Aktiver KI-Dienst auf ${newProvider === "gemini" ? "Google Gemini" : "OpenRouter"} umgestellt.`,
+        message: `Aktiver KI-Dienst auf ${providerLabel} umgestellt.`,
       })
     } catch {
       setFeedback({
@@ -158,8 +169,36 @@ export function AiModelSettings({
     }
   }
 
-  const handleDisconnect = async (provider: "gemini" | "openrouter") => {
-    if (!confirm(`Möchtest du die hinterlegten Zugangsdaten für ${provider === "gemini" ? "Google Gemini" : "OpenRouter"} wirklich entfernen?`)) {
+  const handleSaveOpenAiKey = async () => {
+    if (!openAiKeyInput.trim()) return
+    setIsSavingKey(true)
+    setFeedback(null)
+    try {
+      const res = await saveAiKeyAction("openai_key", openAiKeyInput.trim(), true)
+      if (res.success) {
+        setOpenAiKeyInput("")
+        const status = await getAiConfigStatus()
+        setAiStatus(status)
+        setFeedback({
+          type: "success",
+          message: "OpenAI API-Key erfolgreich verschlüsselt gespeichert!",
+        })
+      } else {
+        setFeedback({ type: "error", message: res.error || "Fehler beim Speichern." })
+      }
+    } finally {
+      setIsSavingKey(false)
+    }
+  }
+
+  const handleDisconnect = async (provider: "gemini" | "openrouter" | "openai") => {
+    const providerLabel =
+      provider === "gemini"
+        ? "Google Gemini"
+        : provider === "openai"
+        ? "ChatGPT (OpenAI)"
+        : "OpenRouter"
+    if (!confirm(`Möchtest du die hinterlegten Zugangsdaten für ${providerLabel} wirklich entfernen?`)) {
       return
     }
     setFeedback(null)
@@ -169,7 +208,7 @@ export function AiModelSettings({
       setAiStatus(status)
       setFeedback({
         type: "success",
-        message: `Zugangsdaten für ${provider === "gemini" ? "Google Gemini" : "OpenRouter"} entfernt.`,
+        message: `Zugangsdaten für ${providerLabel} entfernt.`,
       })
     } catch {
       setFeedback({ type: "error", message: "Fehler beim Trennen." })
@@ -248,7 +287,7 @@ export function AiModelSettings({
         </p>
 
         {/* Provider Switch Buttons */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-4">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mt-4">
           <button
             type="button"
             onClick={() => handleProviderSwitch("gemini")}
@@ -294,6 +333,30 @@ export function AiModelSettings({
             </div>
             <p className="text-xs text-zinc-500 dark:text-zinc-400">
               1-Klick OAuth Login, hunderte Modelle (GPT-4o, Claude, Llama Free).
+            </p>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => handleProviderSwitch("openai")}
+            className={`p-4 rounded-xl border-2 text-left transition-all ${
+              activeProvider === "openai"
+                ? "border-emerald-600 bg-emerald-50/40 dark:bg-emerald-950/20"
+                : "border-zinc-200 dark:border-zinc-800 hover:bg-zinc-50 dark:hover:bg-zinc-800/40"
+            }`}
+          >
+            <div className="flex items-center justify-between mb-1">
+              <span className="font-bold text-sm text-zinc-900 dark:text-zinc-100 flex items-center gap-1.5">
+                🟢 ChatGPT (OpenAI)
+              </span>
+              {activeProvider === "openai" && (
+                <span className="text-xs bg-emerald-600 text-white font-medium px-2 py-0.5 rounded-full">
+                  Aktiv
+                </span>
+              )}
+            </div>
+            <p className="text-xs text-zinc-500 dark:text-zinc-400">
+              Direkte OpenAI API für GPT-4o und GPT-4o-mini Bild- und Textverarbeitung.
             </p>
           </button>
         </div>
@@ -373,6 +436,69 @@ export function AiModelSettings({
               >
                 {isSavingKey ? "Speichert..." : "Speichern"}
               </button>
+            </div>
+          </div>
+        </div>
+      ) : activeProvider === "openai" ? (
+        <div className="p-4 bg-emerald-50/30 dark:bg-emerald-950/10 border border-emerald-200 dark:border-emerald-900/40 rounded-xl space-y-4">
+          <div className="flex items-center justify-between">
+            <span className="font-bold text-sm text-zinc-900 dark:text-zinc-100">
+              ChatGPT (OpenAI) Verbindung
+            </span>
+            {aiStatus?.hasOpenAiKey ? (
+              <span className="inline-flex items-center gap-1 text-xs font-semibold px-2.5 py-1 rounded-full bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300">
+                <CheckCircle2 className="w-3.5 h-3.5" /> Eigener Key hinterlegt
+              </span>
+            ) : aiStatus?.hasEnvOpenAiKey ? (
+              <span className="inline-flex items-center gap-1 text-xs font-semibold px-2.5 py-1 rounded-full bg-blue-100 text-blue-800 dark:bg-blue-950/60 dark:text-blue-300">
+                <ShieldCheck className="w-3.5 h-3.5" /> Server-Schlüssel aktiv (.env)
+              </span>
+            ) : (
+              <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 dark:bg-amber-950/50 dark:text-amber-300">
+                Kein Schlüssel hinterlegt
+              </span>
+            )}
+          </div>
+
+          <div>
+            <label className="block text-xs font-medium text-zinc-700 dark:text-zinc-300 mb-1">
+              OpenAI API-Schlüssel eintragen:
+            </label>
+            <div className="flex gap-2">
+              <input
+                type="password"
+                value={openAiKeyInput}
+                onChange={(e) => setOpenAiKeyInput(e.target.value)}
+                placeholder="sk-proj-..."
+                className="flex-1 px-3 py-2 rounded-xl border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-xs text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+              />
+              <button
+                type="button"
+                disabled={isSavingKey}
+                onClick={handleSaveOpenAiKey}
+                className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-medium disabled:opacity-50"
+              >
+                {isSavingKey ? "Speichert..." : "Speichern"}
+              </button>
+            </div>
+            <div className="flex items-center justify-between mt-2">
+              <a
+                href="https://platform.openai.com/api-keys"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-xs text-emerald-600 hover:underline inline-flex items-center gap-1 font-medium"
+              >
+                API-Key auf platform.openai.com erstellen <ExternalLink className="w-3 h-3" />
+              </a>
+              {aiStatus?.hasOpenAiKey && (
+                <button
+                  type="button"
+                  onClick={() => handleDisconnect("openai")}
+                  className="inline-flex items-center gap-1 text-xs text-rose-600 hover:underline"
+                >
+                  <Trash2 className="w-3 h-3" /> Key löschen
+                </button>
+              )}
             </div>
           </div>
         </div>
