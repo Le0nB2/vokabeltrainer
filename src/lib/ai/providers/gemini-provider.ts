@@ -18,7 +18,7 @@ export class GeminiProvider implements IAiProvider {
   id = "gemini" as const
   name = "Google Gemini"
 
-  constructor(private apiKeys: string[]) {}
+  constructor(public readonly apiKeys: string[]) {}
 
   async generateStructuredJson<T>(options: AiGenerateOptions): Promise<T> {
     return callGeminiWithRetry({

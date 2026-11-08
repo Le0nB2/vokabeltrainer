@@ -72,6 +72,29 @@ export function AiModelSettings({
       setAiStatus(status)
       setActiveProvider(status.activeProvider)
     })
+
+    if (typeof window !== "undefined") {
+      const params = new URLSearchParams(window.location.search)
+      const connected = params.get("ai_connected")
+      const error = params.get("ai_error")
+      if (connected === "openrouter") {
+        setFeedback({
+          type: "success",
+          message: "OpenRouter erfolgreich verknüpft! Alle KI-Funktionen sind jetzt aktiv.",
+        })
+        const url = new URL(window.location.href)
+        url.searchParams.delete("ai_connected")
+        window.history.replaceState({}, document.title, url.pathname + (url.search ? url.search : ""))
+      } else if (error) {
+        setFeedback({
+          type: "error",
+          message: decodeURIComponent(error),
+        })
+        const url = new URL(window.location.href)
+        url.searchParams.delete("ai_error")
+        window.history.replaceState({}, document.title, url.pathname + (url.search ? url.search : ""))
+      }
+    }
   }, [])
 
   const handleProviderSwitch = async (newProvider: "gemini" | "openrouter") => {

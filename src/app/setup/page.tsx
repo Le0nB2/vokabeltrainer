@@ -10,12 +10,18 @@ export const metadata = {
   description: "Ersteinrichtung des N30 Vokabeltrainers",
 }
 
-export default async function SetupPage() {
+export default async function SetupPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ [key: string]: string | string[] | undefined }>
+}) {
   const setupState = await getSetupState()
+  const params = await searchParams
+  const hasAiConnected = Boolean(params.ai_connected || params.ai_error)
   const headersList = await headers()
   const isServerAction = Boolean(headersList.get("next-action"))
 
-  if (!setupState.needsSetup && !isServerAction) {
+  if (!setupState.needsSetup && !isServerAction && !hasAiConnected) {
     redirect("/")
   }
 

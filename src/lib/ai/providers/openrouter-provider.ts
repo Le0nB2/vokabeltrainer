@@ -85,7 +85,16 @@ export class OpenRouterProvider implements IAiProvider {
 
     const cleaned = cleanJsonText(content)
     try {
-      return JSON.parse(cleaned) as T
+      const parsed = JSON.parse(cleaned)
+      if (!Array.isArray(parsed) && typeof parsed === "object" && parsed !== null) {
+        if ((options.prompt.includes("Liste") || options.prompt.includes("Array") || options.prompt.includes("cards") || options.prompt.includes("Karten")) && !options.jsonSchema) {
+          const arrayKey = Object.keys(parsed).find((k) => Array.isArray(parsed[k]))
+          if (arrayKey) {
+            return parsed[arrayKey] as T
+          }
+        }
+      }
+      return parsed as T
     } catch (parseErr: any) {
       throw new Error(`Fehler beim Parsen der JSON-Antwort von OpenRouter: ${parseErr?.message}`)
     }

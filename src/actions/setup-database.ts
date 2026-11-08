@@ -30,27 +30,7 @@ export async function testAndMigrateDatabase(connectionString: string): Promise<
     }
   }
 
-  // 1. Connection test with Prisma
-  let testClient: PrismaClient | null = null
-  try {
-    testClient = new PrismaClient({
-      datasources: {
-        db: { url: cleanUrl },
-      },
-    })
-    await testClient.$queryRaw`SELECT 1;`
-  } catch (err: any) {
-    return {
-      success: false,
-      error: `Verbindung zur Neon-Datenbank fehlgeschlagen: ${err?.message || "Unbekannter Fehler"}`,
-    }
-  } finally {
-    if (testClient) {
-      await testClient.$disconnect().catch(() => {})
-    }
-  }
-
-  // 2. Run migrations
+  // 1. Connection test and migration via Prisma CLI
   try {
     const directUrl = cleanUrl.replace("-pooler.", ".")
     const schemaFile = fs.existsSync(path.join(process.cwd(), "prisma", "postgres", "schema.prisma"))
@@ -65,14 +45,26 @@ export async function testAndMigrateDatabase(connectionString: string): Promise<
       },
       timeout: 60000,
     })
+
+    if (schemaFile.includes("postgres")) {
+      await execAsync(`npx prisma generate --schema=${schemaFile}`, {
+        env: {
+          ...process.env,
+          DATABASE_URL: cleanUrl,
+          DIRECT_URL: directUrl,
+        },
+        timeout: 60000,
+      })
+    }
   } catch (err: any) {
+    const errorMsg = err?.stderr || err?.message || "Fehler beim Schema-Update"
     return {
       success: false,
-      error: `Fehler beim Ausführen der Datenbank-Migrationen: ${err?.message || "Fehler beim Schema-Update"}`,
+      error: `Verbindung zur Neon-Datenbank oder Migration fehlgeschlagen: ${errorMsg}`,
     }
   }
 
-  // 3. Save runtime configuration
+  // 2. Save runtime configuration
   try {
     const configDir = path.dirname(CONFIG_PATH)
     if (!fs.existsSync(configDir)) {
@@ -95,7 +87,7 @@ export async function testAndMigrateDatabase(connectionString: string): Promise<
     console.error("Failed to write runtime-db.json:", err)
   }
 
-  // 4. Reload prisma client
+  // 3. Reload prisma client
   reloadPrismaClient(cleanUrl)
 
   return {

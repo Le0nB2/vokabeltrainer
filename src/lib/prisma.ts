@@ -3,8 +3,9 @@ import fs from 'fs'
 import path from 'path'
 
 export function getRuntimeDbUrl(): string | undefined {
-  if (process.env.DATABASE_URL && process.env.DATABASE_URL.trim().length > 0) {
-    return process.env.DATABASE_URL.trim()
+  const envUrl = process.env.DATABASE_URL?.trim()
+  if (envUrl && envUrl.length > 0 && !envUrl.includes("localhost:5432")) {
+    return envUrl
   }
   try {
     const configPath = path.join(process.cwd(), 'prisma', 'runtime-db.json')
@@ -32,7 +33,21 @@ declare const globalThis: {
   prismaGlobal: ReturnType<typeof prismaClientSingleton> | undefined
 } & typeof global
 
-export const prisma = globalThis.prismaGlobal ?? prismaClientSingleton()
+const baseClient = prismaClientSingleton()
+globalThis.prismaGlobal = baseClient
+
+export const prisma: PrismaClient = new Proxy(baseClient, {
+  get(target, prop) {
+    const active = globalThis.prismaGlobal || target
+    const val = (active as any)[prop]
+    return typeof val === 'function' ? val.bind(active) : val
+  },
+  set(target, prop, value) {
+    const active = globalThis.prismaGlobal || target
+    ;(active as any)[prop] = value
+    return true
+  },
+})
 
 export function reloadPrismaClient(newDbUrl?: string): PrismaClient {
   if (newDbUrl) {
@@ -50,4 +65,4 @@ export function reloadPrismaClient(newDbUrl?: string): PrismaClient {
 
 export default prisma
 
-if (process.env.NODE_ENV !== 'production') globalThis.prismaGlobal = prisma
+if (process.env.NODE_ENV !== 'production') globalThis.prismaGlobal = baseClient

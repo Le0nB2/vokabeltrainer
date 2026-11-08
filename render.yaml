@@ -4,6 +4,9 @@ services:
     region: frankfurt
     env: docker
     plan: free
+    dockerBuildArgs:
+      - key: RENDER
+        value: "true"
     envVars:
       - key: DATABASE_URL
         sync: false

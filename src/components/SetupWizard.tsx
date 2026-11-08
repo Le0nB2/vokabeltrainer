@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import {
   ShieldCheck,
@@ -61,6 +61,27 @@ export function SetupWizard({
   // Single-User Mode PIN States
   const [singleUserPin, setSingleUserPin] = useState("")
   const [singleUserPinConfirm, setSingleUserPinConfirm] = useState("")
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const params = new URLSearchParams(window.location.search)
+      const connected = params.get("ai_connected")
+      const err = params.get("ai_error")
+      if (connected === "openrouter") {
+        setStep(4)
+        setAiSuccess("OpenRouter erfolgreich verknüpft! Dein Vokabeltrainer ist jetzt startklar.")
+        const url = new URL(window.location.href)
+        url.searchParams.delete("ai_connected")
+        window.history.replaceState({}, document.title, url.pathname + (url.search ? url.search : ""))
+      } else if (err) {
+        setStep(4)
+        setAiError(decodeURIComponent(err))
+        const url = new URL(window.location.href)
+        url.searchParams.delete("ai_error")
+        window.history.replaceState({}, document.title, url.pathname + (url.search ? url.search : ""))
+      }
+    }
+  }, [])
 
   // Step 2 Form States (Parent / Admin)
   const [username, setUsername] = useState("")

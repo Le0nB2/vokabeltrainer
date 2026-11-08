@@ -8,6 +8,10 @@ if [ -d "/app/prisma_static" ]; then
     mkdir -p /app/prisma/migrations
     cp -r /app/prisma_static/migrations/* /app/prisma/migrations/ 2>/dev/null || true
   fi
+  if [ -d "/app/prisma_static/postgres" ]; then
+    mkdir -p /app/prisma/postgres
+    cp -r /app/prisma_static/postgres/* /app/prisma/postgres/ 2>/dev/null || true
+  fi
 fi
 
 # 0. Prüfe, ob eine zur Laufzeit gespeicherte Datenbank-Konfiguration vorliegt
