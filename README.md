@@ -81,13 +81,9 @@ Klicke auf den Button, um die Bereitstellung auf Render zu starten:
 
 [![Deploy to Render](https://render.com/images/deploy-to-render-button.svg)](https://render.com/deploy?repo=https://github.com/Le0nB2/vokabeltrainer)
 
-> 💡 **Tipp:** Klicke mit gedrückter **`Strg`**-Taste (am Mac: **`Cmd`**-Taste) oder mit dem **Mausrad** auf den Button, um Render in einem neuen Tab zu öffnen. So bleibt diese Anleitung daneben geöffnet!
-
 > **Hinweis zum Free-Tier bei Render:** Falls du beim Erstellen deines Kontos oder beim Starten der Bereitstellung aufgefordert wirst, eine Kreditkarte zu hinterlegen: Dies ist eine standardmäßige Sicherheitsüberprüfung von Render zur Identitätsverifikation, um Missbrauch (wie automatisierte Bots) zu verhindern. Da der Vokabeltrainer auf dem kostenlosen Free-Plan läuft, bucht Render **kein Geld** ab.
 > 
 > Zudem geht die kostenlose Instanz nach 10 Minuten Inaktivität in einen Ruhezustand („Scale-to-Zero“). Beim ersten Aufruf nach einer Pause dauert das Laden der App ca. 30–50 Sekunden, da Render die App erst wieder hochfährt. Danach reagiert sie sofort.
-
-*(Alternativ: Auf [render.com](https://render.com/) einloggen, oben rechts auf **"New +"** -> **"Blueprint"** klicken und das Repository `https://github.com/Le0nB2/vokabeltrainer` auswählen).*
 
 ---
 
@@ -101,7 +97,7 @@ Folge den Anweisungen des Einrichtungsassistenten und konfiguriere die WebApp
     
 ---
 
-### Schritt 5: 📱 Als App auf dem Homescreen nutzen (PWA)
+### Schritt 4: 📱 Als App auf dem Homescreen nutzen (PWA)
 
 Die Web-App kann ohne App Store direkt als App auf dem Homescreen des Smartphones installiert werden (sogenannte Progressive Web App (PWA)):
 
