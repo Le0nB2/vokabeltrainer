@@ -16,7 +16,7 @@ export interface AiConfigStatus {
 }
 
 export async function getAiConfigStatus(): Promise<AiConfigStatus> {
-  let activeProvider: "gemini" | "openrouter" | "openai" = "openrouter"
+  let activeProvider: "gemini" | "openrouter" | "openai" = "gemini"
   try {
     const settings = await prisma.settings.findUnique({ where: { id: "default" } })
     if (settings?.activeAiProvider === "gemini") {
