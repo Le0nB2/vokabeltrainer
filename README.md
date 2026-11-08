@@ -93,22 +93,12 @@ Klicke auf den Button, um die Bereitstellung auf Render zu starten:
 
 ### Schritt 3: Ersteinrichtung im Web-Browser (`/setup`)
 
-Beim ersten Aufrufen deiner Web-Adresse startet automatisch der komfortable Einrichtungs-Assistent:
+Folge den Anweisungen des Einrichtungsassistenten und konfiguriere die WebApp
 
 1. **Datenbank auswählen & verbinden:**
-   - **Neon Cloud-Datenbank (PostgreSQL):** Wird auf Render automatisch vorausgewählt! Trage einfach deinen kopierten Neon Connection String ein und klicke auf **"Verbindung prüfen & initialisieren"** – der Assistent testet die Erreichbarkeit und richtet alle Datenbanktabellen vollautomatisch ein.
-   - **Lokale Datei-Datenbank (SQLite):** Für lokale Docker-Installationen zu Hause (NAS, Unraid, lokaler PC).
-2. **Modus wählen:**
-   - **Geschützter Modus (Empfohlen):** Schützt deine Vokabeln auf dem Server zuverlässig mit Benutzername und Passwort und ermöglicht getrennte Profile für Eltern und Kinder.
-   - **Einzelnutzer-Modus:** Für reine Einzelanwender gedacht.
-3. **Eltern-Konto anlegen & Kindersicherung (PIN):**
-   - Gib einen gewünschten Anmeldenamen ein und schütze die Einstellungen mit einer 4-stelligen Eltern-PIN (*„Kindersicherung: Verhindert, dass Kinder beim Vokabellernen Einstellungen verändern“*).
-4. **Kinder-Konto einrichten:**
-   - Lege direkt ein Profil für dein Kind mit eigenem Namen und Passwort an.
-5. **KI-Dienst verbinden (Optional):**
-   - **Option 1: OpenRouter (Empfohlen):** Verbinde deinen OpenRouter-Account mit 1 Klick per OAuth oder gib deinen Key ein. Ermöglicht Zugriff auf alle führenden Modelle (GPT-4o, Claude, Gemini) sowie dauerhaft kostenlose Free-Modelle.
-   - **Option 2: Google Gemini (Free Tier):** Trage deinen kostenlosen API-Key aus dem [Google AI Studio](https://aistudio.google.com/) ein (1-Klick-Link im Assistenten).
-
+2. **Eltern-Konto anlegen & Kindersicherung (PIN):**
+3. **KI-Dienst verbinden:**
+   
 ---
 
 ### Server-Standard & Umgebungsvariablen (Fallback im Hintergrund)
