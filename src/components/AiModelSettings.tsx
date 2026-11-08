@@ -397,9 +397,19 @@ export function AiModelSettings({
             )}
           </div>
 
+          <div className="p-3 rounded-xl bg-purple-50 dark:bg-purple-950/40 border border-purple-200 dark:border-purple-800 text-xs text-purple-950 dark:text-purple-200 space-y-1">
+            <div className="flex items-center gap-1.5 font-semibold text-purple-900 dark:text-purple-100">
+              <Sparkles className="w-4 h-4 text-purple-600 dark:text-purple-400 shrink-0" />
+              <span>Hinweis zur 1-Klick-Anbindung:</span>
+            </div>
+            <p className="text-zinc-600 dark:text-zinc-300 leading-relaxed">
+              Du wirst zu <strong>OpenRouter</strong> weitergeleitet. Bitte melde dich dort an (oder erstelle kostenlos ein Konto) und klicke auf <strong>„Authorize“</strong>, um den N30 Vokabeltrainer zu autorisieren. Du wirst danach automatisch wieder hierher zurückgeführt.
+            </p>
+          </div>
+
           <div className="flex flex-wrap items-center gap-3">
             <a
-              href="/api/auth/openrouter/login?returnTo=/settings"
+              href={`/api/auth/openrouter/login?returnTo=${encodeURIComponent("/settings")}`}
               className="inline-flex items-center gap-1.5 px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-xl text-xs sm:text-sm font-medium transition-colors shadow-sm"
             >
               <Sparkles className="w-4 h-4" /> Mit OpenRouter verbinden (1-Klick)

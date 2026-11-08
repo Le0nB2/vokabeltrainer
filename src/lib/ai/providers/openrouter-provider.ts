@@ -58,8 +58,8 @@ export class OpenRouterProvider implements IAiProvider {
       headers: {
         "Content-Type": "application/json",
         Authorization: `Bearer ${this.apiKey}`,
-        "HTTP-Referer": "https://vokabeltrainer.app",
-        "X-Title": "Vokabeltrainer",
+        "HTTP-Referer": process.env.RENDER_EXTERNAL_URL || "https://github.com/Le0nB2/vokabeltrainer",
+        "X-Title": "N30 Vokabeltrainer",
       },
       body: JSON.stringify(payload),
     })

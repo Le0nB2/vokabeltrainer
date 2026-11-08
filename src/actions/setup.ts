@@ -1,6 +1,9 @@
 "use server"
 
-import prisma, { getRuntimeDbUrl } from "@/lib/prisma"
+import fs from "fs"
+import path from "path"
+import prisma, { getRuntimeDbUrl, reloadPrismaClient } from "@/lib/prisma"
+import { decryptSecret } from "@/lib/security/crypto"
 import {
   getAppAuthCredentials,
   getAppSecret,
@@ -48,7 +51,51 @@ export async function getSetupState(): Promise<{
     (process.env.NODE_ENV === "production" && !process.env.DOCKER_LOCAL)
   )
 
-  const runtimeDbUrl = getRuntimeDbUrl()
+  let runtimeDbUrl = getRuntimeDbUrl()
+
+  // If not found in env or runtime-db.json, try restoring from encrypted cookie
+  if (!runtimeDbUrl) {
+    try {
+      const cookieStore = await cookies()
+      const encryptedCookie = cookieStore.get("runtime_db_url")?.value
+      if (encryptedCookie) {
+        const decrypted = decryptSecret(encryptedCookie)
+        if (
+          decrypted &&
+          (decrypted.startsWith("postgresql://") || decrypted.startsWith("postgres://"))
+        ) {
+          runtimeDbUrl = decrypted
+          process.env.DATABASE_URL = decrypted
+          reloadPrismaClient(decrypted)
+
+          try {
+            const configPath = path.join(process.cwd(), "prisma", "runtime-db.json")
+            const configDir = path.dirname(configPath)
+            if (!fs.existsSync(configDir)) {
+              fs.mkdirSync(configDir, { recursive: true })
+            }
+            fs.writeFileSync(
+              configPath,
+              JSON.stringify(
+                {
+                  databaseType: "postgres",
+                  databaseUrl: decrypted,
+                  restoredFromCookieAt: new Date().toISOString(),
+                },
+                null,
+                2
+              ),
+              "utf8"
+            )
+          } catch {
+            // ignore file write errors
+          }
+        }
+      }
+    } catch {
+      // ignore cookie errors
+    }
+  }
 
   // If running on Render without configured database, database setup is required
   if (isRender && !runtimeDbUrl) {

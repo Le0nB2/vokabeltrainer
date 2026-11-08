@@ -90,9 +90,9 @@ export function SetupWizard({
         )
         if (hasKey) {
           setIsAiConfigured(true)
-        }
-        if (status.activeProvider) {
-          setAiProviderChoice(status.activeProvider)
+          if (status.activeProvider) {
+            setAiProviderChoice(status.activeProvider)
+          }
         }
       })
       .catch(() => {})
@@ -1310,14 +1310,27 @@ export function SetupWizard({
                   </p>
 
                   {aiProviderChoice === "openrouter" && (
-                    <div className="mt-3 space-y-2 pt-2 border-t border-zinc-100 dark:border-zinc-800">
-                      <a
-                        href="/api/auth/openrouter/login?returnTo=/setup?step=4"
-                        className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-xl text-xs font-medium transition-colors shadow-sm"
-                      >
-                        <Sparkles className="w-3.5 h-3.5" /> Mit OpenRouter verbinden (1-Klick)
-                      </a>
-                      <p className="text-xs text-zinc-500">oder API-Schlüssel manuell eingeben:</p>
+                    <div className="mt-3 space-y-3 pt-2 border-t border-zinc-100 dark:border-zinc-800">
+                      <div className="p-3 rounded-xl bg-purple-50 dark:bg-purple-950/40 border border-purple-200 dark:border-purple-800 text-xs text-purple-950 dark:text-purple-200 space-y-1">
+                        <div className="flex items-center gap-1.5 font-semibold text-purple-900 dark:text-purple-100">
+                          <Sparkles className="w-4 h-4 text-purple-600 dark:text-purple-400 shrink-0" />
+                          <span>Hinweis zur 1-Klick-Anbindung:</span>
+                        </div>
+                        <p className="text-zinc-600 dark:text-zinc-300 leading-relaxed">
+                          Du wirst zu <strong>OpenRouter</strong> weitergeleitet. Bitte melde dich dort an (oder erstelle kostenlos ein Konto) und klicke auf <strong>„Authorize“</strong>, um den N30 Vokabeltrainer zu autorisieren. Anschließend kehrst du automatisch hierher zurück.
+                        </p>
+                      </div>
+
+                      <div>
+                        <a
+                          href={`/api/auth/openrouter/login?returnTo=${encodeURIComponent("/setup?step=4")}`}
+                          className="inline-flex items-center gap-1.5 px-4 py-2.5 bg-purple-600 hover:bg-purple-700 text-white rounded-xl text-xs font-semibold transition-colors shadow-sm"
+                        >
+                          <Sparkles className="w-3.5 h-3.5" /> Mit OpenRouter verbinden (1-Klick)
+                        </a>
+                      </div>
+
+                      <p className="text-xs text-zinc-500 pt-1">oder API-Schlüssel manuell eingeben:</p>
                       <div className="flex gap-2">
                         <input
                           type="password"

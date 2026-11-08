@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server"
-import prisma from "@/lib/prisma"
-import { encryptSecret } from "@/lib/security/crypto"
+import prisma, { reloadPrismaClient } from "@/lib/prisma"
+import { encryptSecret, decryptSecret } from "@/lib/security/crypto"
 import { getCurrentUser } from "@/lib/auth-guard"
+import { getPublicOrigin, getSafeRedirectUrl } from "@/lib/utils/url"
 
 export async function GET(req: NextRequest) {
   const code = req.nextUrl.searchParams.get("code")
@@ -9,7 +10,9 @@ export async function GET(req: NextRequest) {
   const returnTo = req.cookies.get("or_return_to")?.value || "/settings"
   const codeVerifier = req.cookies.get("or_code_verifier")?.value
 
-  const redirectUrl = new URL(returnTo, req.nextUrl.origin)
+  const publicOrigin = getPublicOrigin(req)
+  const safeReturnTo = getSafeRedirectUrl(returnTo, "/settings")
+  const redirectUrl = new URL(safeReturnTo, publicOrigin)
 
   if (error || !code) {
     redirectUrl.searchParams.set("ai_error", error || "Kein Autorisierungscode von OpenRouter erhalten.")
@@ -19,6 +22,22 @@ export async function GET(req: NextRequest) {
   if (!codeVerifier) {
     redirectUrl.searchParams.set("ai_error", "Sitzungs-Verifier abgelaufen. Bitte erneut versuchen.")
     return NextResponse.redirect(redirectUrl.toString())
+  }
+
+  // Restore database connection if container restarted
+  if (!process.env.DATABASE_URL) {
+    const encryptedDbCookie = req.cookies.get("runtime_db_url")?.value
+    if (encryptedDbCookie) {
+      try {
+        const decrypted = decryptSecret(encryptedDbCookie)
+        if (decrypted && (decrypted.startsWith("postgresql://") || decrypted.startsWith("postgres://"))) {
+          process.env.DATABASE_URL = decrypted
+          reloadPrismaClient(decrypted)
+        }
+      } catch {
+        // ignore
+      }
+    }
   }
 
   try {
@@ -49,21 +68,19 @@ export async function GET(req: NextRequest) {
       return NextResponse.redirect(redirectUrl.toString())
     }
 
-    const user = await getCurrentUser()
-    const userId = user?.id || null
-
     const encrypted = encryptSecret(apiKey)
 
-    const existing = await prisma.userAiCredential.findFirst({
+    // Save as global AI key for the whole app
+    const existingGlobal = await prisma.userAiCredential.findFirst({
       where: {
-        userId,
+        userId: null,
         provider: "openrouter_oauth",
       },
     })
 
-    if (existing) {
+    if (existingGlobal) {
       await prisma.userAiCredential.update({
-        where: { id: existing.id },
+        where: { id: existingGlobal.id },
         data: {
           apiKey: encrypted,
           accessToken: encrypted,
@@ -73,7 +90,7 @@ export async function GET(req: NextRequest) {
     } else {
       await prisma.userAiCredential.create({
         data: {
-          userId,
+          userId: null,
           provider: "openrouter_oauth",
           apiKey: encrypted,
           accessToken: encrypted,
@@ -82,6 +99,7 @@ export async function GET(req: NextRequest) {
       })
     }
 
+    // Also update settings table to activate OpenRouter
     await prisma.settings.upsert({
       where: { id: "default" },
       update: { activeAiProvider: "openrouter" },

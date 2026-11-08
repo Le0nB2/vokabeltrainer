@@ -4,8 +4,11 @@ import fs from "fs"
 import path from "path"
 import { exec } from "child_process"
 import { promisify } from "util"
+import { cookies, headers } from "next/headers"
 import { PrismaClient } from "@prisma/client"
 import { reloadPrismaClient } from "@/lib/prisma"
+import { encryptSecret } from "@/lib/security/crypto"
+import { isSecureRequest } from "@/lib/auth-utils"
 
 const execAsync = promisify(exec)
 
@@ -102,6 +105,22 @@ export async function testAndMigrateDatabase(connectionString: string): Promise<
 
   // 3. Reload prisma client
   reloadPrismaClient(cleanUrl)
+
+  // 4. Save encrypted database URL in persistent cookie
+  try {
+    const cookieStore = await cookies()
+    const headersList = await headers()
+    const isSecure = isSecureRequest(headersList)
+    cookieStore.set("runtime_db_url", encryptSecret(cleanUrl), {
+      httpOnly: true,
+      secure: isSecure,
+      sameSite: "lax",
+      path: "/",
+      maxAge: 365 * 24 * 60 * 60, // 1 year
+    })
+  } catch (cookieErr) {
+    console.warn("Could not set runtime_db_url cookie:", cookieErr)
+  }
 
   return {
     success: true,

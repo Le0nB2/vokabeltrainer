@@ -167,4 +167,27 @@ describe('SetupWizard Database & AI Setup', () => {
     const submitBtn = screen.getByRole('button', { name: /Weiter zum Abschluss|Einrichtung abschließen/i })
     expect(submitBtn.hasAttribute('disabled')).toBe(false)
   })
+
+  it('preselects OpenRouter by default, displays 1-Click explanation and properly encoded redirect', async () => {
+    vi.spyOn(aiActions, 'getAiConfigStatus').mockResolvedValue({
+      activeProvider: 'openrouter',
+      hasGeminiKey: false,
+      hasOpenRouterKey: false,
+      hasOpenAiKey: false,
+      hasEnvGeminiKey: false,
+      hasEnvOpenRouterKey: false,
+      hasEnvOpenAiKey: false,
+    })
+
+    render(<SetupWizard isPublicOrRender={false} initialStep={4} />)
+
+    // Explanation hint must be visible
+    expect(screen.getByText(/Hinweis zur 1-Klick-Anbindung:/i)).toBeDefined()
+    expect(screen.getByText(/melde dich dort an/i)).toBeDefined()
+    expect(screen.getByText(/Authorize/i)).toBeDefined()
+
+    // 1-Click button link must have encoded returnTo
+    const oneClickLink = screen.getByRole('link', { name: /Mit OpenRouter verbinden \(1-Klick\)/i })
+    expect(oneClickLink.getAttribute('href')).toContain('returnTo=%2Fsetup%3Fstep%3D4')
+  })
 })
