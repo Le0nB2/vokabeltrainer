@@ -72,12 +72,7 @@ Wenn du gleich auf den Deploy-Button klickst, leitet Render dich zum automatisch
 2. **Blueprint-Name vergeben:**  
    Ganz oben im Feld **"Blueprint Name"** einen beliebigen Projektnamen eingeben (z. B. `vokabeltrainer`).
 
-3. **Umgebungsvariablen (Optional):**  
-   Alle sicherheitsrelevanten Schlüssel (`AUTH_SECRET`, `NOTIFICATION_API_TOKEN`) generiert Render beim ersten Starten vollautomatisch für dich.
-   
-   > 💡 **Tipp:** Du musst auf Render **keine** Variablen manuell eintragen! Die Datenbank-Verbindung und die KI-Funktionen richtest du nach dem Starten ganz bequem Schritt für Schritt direkt im Browser-Assistenten ein. (Optional kannst du `DATABASE_URL` oder `GEMINI_API_KEY` natürlich auch hier schon vorgeben, siehe Abschnitt *Server-Standard*).
-
-4. **Bereitstellung starten:**  
+3. **Bereitstellung starten:**  
    Klicke ganz unten auf **"Apply"** (bzw. **"Deploy"**). Render richtet den Service und alle Sicherheitsschlüssel vollautomatisch ein. Nach ca. 4–5 Minuten siehst du den grünen Status **"Live"** und nach einem Klick auf "Create web service vokabeltrainer" deine persönliche Web-Adresse (z. B. `https://vokabeltrainer-xxxx.onrender.com`).
 
 #### Jetzt das Deployment starten:
