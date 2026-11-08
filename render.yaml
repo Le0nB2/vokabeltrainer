@@ -4,9 +4,6 @@ services:
     region: frankfurt
     env: docker
     plan: free
-    dockerBuildArgs:
-      - key: RENDER
-        value: "true"
     envVars:
       - key: DATABASE_URL
         sync: false
@@ -15,7 +12,7 @@ services:
       - key: OPENROUTER_API_KEY
         sync: false
       - key: RENDER
-        value: true
+        value: "true"
       - key: AUTH_SECRET
         generateValue: true
       - key: NOTIFICATION_API_TOKEN
