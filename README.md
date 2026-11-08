@@ -50,7 +50,7 @@ Du möchtest deinen Vokabeltrainer nicht lokal auf deinem eigenen PC laufen lass
 Du benötigst dafür kostenlose Konten und nur wenige Minuten:
 1. **Neon:** Kostenlose Cloud-Datenbank (PostgreSQL) für deine Vokabeln (Anmeldung z. B. per Google-Konto).
 2. **Render:** Führt die App in der Cloud aus (Anmeldung z. B. per Google-Konto).
-3. **KI-Funktionen:** Entweder 1-Klick-Login mit **OpenRouter** oder ein kostenloser **Google Gemini** oder **ChatGPT** API-Key.
+3. **KI-Funktionen:** Entweder über einen kostenlosen **Google Gemini** API Key oder **OpenRouter** / **ChatGPT** als kostenpflichtige Variante.
 
 ---
 
@@ -95,7 +95,16 @@ Geh auf deine persönliche Webadresse und folge den Anweisungen des Einrichtungs
 1. **Datenbank auswählen & verbinden:**
 2. **Eltern-/Kind-Konto anlegen & Kindersicherung (PIN) einrichten:**
 3. **KI-Dienst verbinden:**
-    
+
+Den **kostenlosen** API Key erhältst du im [Google AI Studio](https://aistudio.google.com/).
+Gehe dazu wie folgt vor:
+1. Besuche das [Google AI Studio](https://aistudio.google.com/) und melde dich mit deinem Google-Konto an.
+2. Klicke im Menü links auf **"Get API key"**.
+3. Klicke auf den Button **"Create API key"**.
+4. Wähle ein bestehendes Google Cloud Projekt aus oder klicke auf **"Create API key in new project"**.
+
+*Hinweis: Die Nutzung der Gemini API im Free Tier ist kostenlos und für den Vokabeltrainer völlig ausreichend.*
+
 ---
 
 ### Schritt 4: 📱 Als App auf dem Homescreen nutzen (PWA)
