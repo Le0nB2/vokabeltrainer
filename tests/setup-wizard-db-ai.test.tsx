@@ -125,6 +125,10 @@ describe('SetupWizard Database & AI Setup', () => {
     expect(screen.getByText(/Option 2: ChatGPT \(OpenAI API-Key\)/i)).toBeDefined()
     expect(screen.getByText(/Option 3: OpenRouter \(1-Klick-Verbindung\)/i)).toBeDefined()
 
+    // Pricing badges: Gemini is free, ChatGPT & OpenRouter are marked as "Kostenpflichtig"
+    expect(screen.getByText('Dauerhaft kostenlos')).toBeDefined()
+    expect(screen.getAllByText('Kostenpflichtig').length).toBe(2)
+
     // Google Gemini input should be visible by default
     expect(screen.getByPlaceholderText('AIzaSy...')).toBeDefined()
 

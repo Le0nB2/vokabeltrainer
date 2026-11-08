@@ -1385,15 +1385,23 @@ export function SetupWizard({
                   className="mt-1 text-emerald-600 focus:ring-emerald-500"
                 />
                 <div className="flex-1">
-                  <span className="font-bold text-xs sm:text-sm text-zinc-900 dark:text-zinc-100">
-                    🟢 Option 2: ChatGPT (OpenAI API-Key)
-                  </span>
+                  <div className="flex items-center justify-between">
+                    <span className="font-bold text-xs sm:text-sm text-zinc-900 dark:text-zinc-100">
+                      🟢 Option 2: ChatGPT (OpenAI API-Key)
+                    </span>
+                    <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-amber-100 dark:bg-amber-950/60 text-amber-800 dark:text-amber-300">
+                      Kostenpflichtig
+                    </span>
+                  </div>
                   <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">
-                    Direkte OpenAI API für GPT-4o, GPT-4o-mini und präzise optische Texterkennung (OCR). Erfordert OpenAI-Guthaben.
+                    Direkte OpenAI API für GPT-4o und GPT-4o-mini. Erfordert aufgeladenes OpenAI-Guthaben (Pay-as-you-go).
                   </p>
 
                   {aiProviderChoice === "openai" && (
-                    <div className="mt-3 space-y-2 pt-2 border-t border-zinc-100 dark:border-zinc-800">
+                    <div className="mt-3 space-y-2.5 pt-2 border-t border-zinc-100 dark:border-zinc-800">
+                      <div className="p-2.5 rounded-xl bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 text-xs text-amber-900 dark:text-amber-300 leading-relaxed">
+                        <em>Hinweis:</em> Bei OpenAI gibt es keine kostenlosen API-Tokens. Die Nutzung erfordert hinterlegtes Guthaben auf platform.openai.com. Für 100% kostenlose Nutzung wähle oben Google Gemini.
+                      </div>
                       <div className="flex gap-2">
                         <input
                           type="password"
@@ -1447,9 +1455,14 @@ export function SetupWizard({
                     <span className="font-bold text-xs sm:text-sm text-zinc-900 dark:text-zinc-100">
                       🟣 Option 3: OpenRouter (1-Klick-Verbindung)
                     </span>
-                    <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-purple-100 dark:bg-purple-950/60 text-purple-700 dark:text-purple-300">
-                      1-Klick
-                    </span>
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-amber-100 dark:bg-amber-950/60 text-amber-800 dark:text-amber-300">
+                        Kostenpflichtig
+                      </span>
+                      <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-purple-100 dark:bg-purple-950/60 text-purple-700 dark:text-purple-300">
+                        1-Klick
+                      </span>
+                    </div>
                   </div>
                   <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">
                     1-Klick-Verbindung oder API-Key für Gemini 3.6 Flash, GPT-4o und Claude. Erfordert OpenRouter-Guthaben (Pay-as-you-go).
