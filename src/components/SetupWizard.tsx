@@ -160,6 +160,7 @@ export function SetupWizard({
       const res = await testAndMigrateDatabase(neonUrl.trim())
       if (res.success) {
         setDbSuccess(res.message || "Neon-Datenbank erfolgreich verbunden!")
+        setStep(1)
       } else {
         setDbError(res.error || "Verbindung zur Neon-Datenbank fehlgeschlagen.")
       }
@@ -696,6 +697,20 @@ export function SetupWizard({
             )}
           </div>
 
+          {dbLoading && (
+            <div className="mb-4 p-3.5 bg-blue-50 dark:bg-blue-950/40 border border-blue-200 dark:border-blue-800 rounded-xl text-xs sm:text-sm text-blue-900 dark:text-blue-200 flex items-start sm:items-center gap-3 animate-pulse">
+              <div className="w-4 h-4 border-2 border-blue-600 border-t-transparent rounded-full animate-spin shrink-0 mt-0.5 sm:mt-0" />
+              <div className="space-y-0.5">
+                <p className="font-semibold text-blue-900 dark:text-blue-100">
+                  Datenbank wird initialisiert & Tabellen werden eingerichtet...
+                </p>
+                <p className="text-blue-700 dark:text-blue-300 text-xs">
+                  Bitte warten, dieser Vorgang kann bei der Ersteinrichtung bis zu 60 Sekunden dauern.
+                </p>
+              </div>
+            </div>
+          )}
+
           {dbError && (
             <div className="mb-4 p-3 bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-800 rounded-xl text-xs text-rose-700 dark:text-rose-300 flex items-center gap-2">
               <AlertTriangle className="w-4 h-4 shrink-0 text-rose-600" />
@@ -712,32 +727,41 @@ export function SetupWizard({
             </div>
           )}
 
-          <div className="pt-4 border-t border-zinc-100 dark:border-zinc-800 flex items-center justify-between">
+          <div className="pt-4 border-t border-zinc-100 dark:border-zinc-800 flex flex-col sm:flex-row items-center justify-between gap-3">
             <button
               type="button"
+              disabled={dbLoading}
               onClick={() => setStep("welcome")}
-              className="inline-flex items-center gap-1.5 text-xs text-zinc-500 hover:text-zinc-800 dark:text-zinc-400 dark:hover:text-zinc-200 transition-colors font-medium"
+              className="inline-flex items-center gap-1.5 text-xs text-zinc-500 hover:text-zinc-800 dark:text-zinc-400 dark:hover:text-zinc-200 transition-colors font-medium order-2 sm:order-1 disabled:opacity-50"
             >
               <ArrowLeft className="w-3.5 h-3.5" /> Zurück zur Einführung
             </button>
-            {dbSuccess ? (
-              <button
-                type="button"
-                onClick={() => setStep(1)}
-                className="py-2.5 px-6 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-medium text-xs sm:text-sm transition-colors flex items-center gap-2 shadow-sm"
-              >
-                Weiter zur Benutzereinrichtung <ArrowRight className="w-4 h-4" />
-              </button>
-            ) : (
+
+            <div className="flex flex-col items-end gap-1.5 w-full sm:w-auto order-1 sm:order-2">
               <button
                 type="button"
                 disabled={dbLoading}
-                onClick={handleConnectNeon}
-                className="py-2.5 px-6 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-medium text-xs sm:text-sm transition-colors flex items-center gap-2 shadow-sm disabled:opacity-50"
+                onClick={dbSuccess ? () => setStep(1) : handleConnectNeon}
+                className="w-full sm:w-auto py-2.5 px-6 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-medium text-xs sm:text-sm transition-colors flex items-center justify-center gap-2 shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                {dbLoading ? "Prüfe & migriere..." : dbType === "sqlite" ? "SQLite aktivieren & Weiter" : "Verbindung prüfen & initialisieren ⚡"}
+                {dbLoading ? (
+                  <>
+                    <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                    <span>Wird eingerichtet... (bis zu 60 Sek.)</span>
+                  </>
+                ) : (
+                  <>
+                    <span>Weiter zur Benutzereinrichtung</span>
+                    <ArrowRight className="w-4 h-4" />
+                  </>
+                )}
               </button>
-            )}
+              {!dbSuccess && !dbLoading && (
+                <span className="text-[11px] text-zinc-400 dark:text-zinc-500 text-right">
+                  ⏱️ Die Einrichtung & Migration kann bis zu 60 Sekunden dauern
+                </span>
+              )}
+            </div>
           </div>
         </div>
       )}

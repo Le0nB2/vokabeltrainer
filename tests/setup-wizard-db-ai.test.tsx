@@ -59,12 +59,12 @@ describe('SetupWizard Database & AI Setup', () => {
       target: { value: 'postgresql://test:pass@ep-test.neon.tech/neondb' },
     })
 
-    const submitBtn = screen.getByText(/Verbindung prüfen & initialisieren/i)
+    expect(screen.getByText(/Die Einrichtung & Migration kann bis zu 60 Sekunden dauern/i)).toBeDefined()
+    const submitBtn = screen.getByRole('button', { name: /Weiter zur Benutzereinrichtung/i })
     fireEvent.click(submitBtn)
 
     await waitFor(() => {
-      expect(screen.getByText('Neon-Datenbank erfolgreich verbunden!')).toBeDefined()
-      expect(screen.getByText(/Weiter zur Benutzereinrichtung/i)).toBeDefined()
+      expect(screen.getByText(/Geschützter Modus/i)).toBeDefined()
     })
   })
 
