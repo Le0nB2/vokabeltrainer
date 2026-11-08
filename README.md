@@ -73,7 +73,8 @@ Wenn du gleich auf den Deploy-Button klickst, leitet Render dich zum automatisch
    Ganz oben im Feld **"Blueprint Name"** einen beliebigen Projektnamen eingeben (z. B. `vokabeltrainer`).
 
 3. **Bereitstellung starten:**  
-   Klicke ganz unten auf **"Apply"** (bzw. **"Deploy"**). Render richtet den Service und alle Sicherheitsschlüssel vollautomatisch ein. Nach ca. 4–5 Minuten siehst du den grünen Status **"Live"** und nach einem Klick auf "Create web service vokabeltrainer" deine persönliche Web-Adresse (z. B. `https://vokabeltrainer-xxxx.onrender.com`).
+   Klicke ganz unten auf **"Deploy Blueprint"** (bzw. **"Apply"**). Render richtet den Service und alle Sicherheitsschlüssel vollautomatisch ein. Nach ca. 4–5 Minuten siehst du den grünen Status **"Live"**.
+   Klicke auf "Create web service vokabeltrainer" um deine persönliche Web-Adresse (z. B. `https://vokabeltrainer-xxxx.onrender.com`) zu sehen.
 
 #### Jetzt das Deployment starten:
 
@@ -89,7 +90,7 @@ Klicke auf den Button, um die Bereitstellung auf Render zu starten:
 
 ### Schritt 3: Ersteinrichtung im Web-Browser (`/setup`)
 
-Folge den Anweisungen des Einrichtungsassistenten und konfiguriere die WebApp
+Geh auf deine persönliche Webadresse und folge den Anweisungen des Einrichtungsassistenten.
 
 1. **Datenbank auswählen & verbinden:**
 2. **Eltern-/Kind-Konto anlegen & Kindersicherung (PIN) einrichten:**
