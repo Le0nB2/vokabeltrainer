@@ -122,7 +122,10 @@ export async function getActiveAiProvider(userId?: string): Promise<ResolvedAiCo
     })
     if (userCred?.apiKey) {
       const decrypted = decryptSecret(userCred.apiKey)
-      if (decrypted) geminiKeys.push(decrypted)
+      if (decrypted) {
+        const splitKeys = decrypted.split(/[,\n;]+/).map((k) => k.trim()).filter(Boolean)
+        geminiKeys.push(...splitKeys)
+      }
     }
   }
 
@@ -135,14 +138,17 @@ export async function getActiveAiProvider(userId?: string): Promise<ResolvedAiCo
     })
     if (globalCred?.apiKey) {
       const decrypted = decryptSecret(globalCred.apiKey)
-      if (decrypted) geminiKeys.push(decrypted)
+      if (decrypted) {
+        const splitKeys = decrypted.split(/[,\n;]+/).map((k) => k.trim()).filter(Boolean)
+        geminiKeys.push(...splitKeys)
+      }
     }
   }
 
   if (geminiKeys.length === 0) {
     const rawKeys = process.env.GEMINI_API_KEYS || process.env.GEMINI_API_KEY || ""
     const envKeys = rawKeys
-      .split(",")
+      .split(/[,\n;]+/)
       .map((k) => k.trim())
       .filter((k) => k.length > 0)
     geminiKeys.push(...envKeys)

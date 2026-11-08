@@ -171,25 +171,40 @@ export async function fetchAndPersistGoogleModels(customAiClient?: any): Promise
       };
     }
   } else {
-    const rawKeys = process.env.GEMINI_API_KEYS || process.env.GEMINI_API_KEY;
-    if (!rawKeys) {
-      return {
-        success: false,
-        count: 0,
-        error: "Kein GEMINI_API_KEY in der Konfiguration hinterlegt.",
-      };
+    let apiKeys: string[] = [];
+
+    // 1. Zuerst gespeicherte Keys aus der Datenbank prüfen (inkl. kommagetrennter Mehrfach-Keys)
+    try {
+      const cred = await prisma.userAiCredential.findFirst({
+        where: { provider: "gemini_key" },
+      });
+      if (cred?.apiKey) {
+        const { decryptSecret } = await import("@/lib/security/crypto");
+        const decrypted = decryptSecret(cred.apiKey);
+        if (decrypted) {
+          apiKeys = decrypted.split(/[,\n;]+/).map((k) => k.trim()).filter(Boolean);
+        }
+      }
+    } catch {
+      // Ignorieren falls DB noch nicht bereit
     }
 
-    const apiKeys = rawKeys
-      .split(",")
-      .map((k) => k.trim())
-      .filter((k) => k.length > 0);
+    // 2. Fallback auf Umgebungsvariablen
+    if (apiKeys.length === 0) {
+      const rawKeys = process.env.GEMINI_API_KEYS || process.env.GEMINI_API_KEY;
+      if (rawKeys) {
+        apiKeys = rawKeys
+          .split(/[,\n;]+/)
+          .map((k) => k.trim())
+          .filter(Boolean);
+      }
+    }
 
     if (apiKeys.length === 0) {
       return {
         success: false,
         count: 0,
-        error: "Keine gültigen API-Keys gefunden.",
+        error: "Kein GEMINI_API_KEY in der Konfiguration oder Datenbank hinterlegt.",
       };
     }
 

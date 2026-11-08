@@ -535,7 +535,7 @@ export function AiModelSettings({
 
           <div>
             <label className="block text-xs font-medium text-zinc-700 dark:text-zinc-300 mb-1">
-              Google AI Studio API-Schlüssel eintragen:
+              Google AI Studio API-Schlüssel eintragen (mehrere Keys kommagetrennt für automatisches Fallback &amp; mehr Kontingent):
             </label>
             <div className="flex gap-2">
               <input

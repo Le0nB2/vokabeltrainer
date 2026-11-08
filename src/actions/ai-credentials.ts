@@ -78,9 +78,18 @@ export async function saveAiKeyAction(
   rawKey: string,
   isGlobal = true
 ): Promise<{ success: boolean; error?: string }> {
-  const cleanKey = rawKey?.trim()
+  let cleanKey = rawKey?.trim()
   if (!cleanKey) {
     return { success: false, error: "Der API-Schlüssel darf nicht leer sein." }
+  }
+
+  if (provider === "gemini_key") {
+    // Normalisiere kommagetrennte Keys (z.B. "key1, key2"), damit jeder einzelne Key sauber getrimmt wird
+    cleanKey = cleanKey
+      .split(/[,\n;]+/)
+      .map((k) => k.trim())
+      .filter(Boolean)
+      .join(",")
   }
 
   const user = await getCurrentUser()

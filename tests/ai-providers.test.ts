@@ -221,4 +221,26 @@ describe("AI Providers & Router", () => {
       ).rejects.toThrow("Dein OpenAI/ChatGPT-Guthaben ist aufgebraucht")
     })
   })
+
+  describe("getActiveAiProvider with multiple Gemini keys", () => {
+    it("splits comma-separated Gemini keys into individual keys in GeminiProvider", async () => {
+      delete process.env.GEMINI_API_KEYS
+      delete process.env.GEMINI_API_KEY
+      vi.spyOn(prisma.settings, "findUnique").mockResolvedValue({
+        id: "default",
+        activeAiProvider: "gemini",
+      } as any)
+      vi.spyOn(prisma.userAiCredential, "findFirst").mockResolvedValue({
+        id: "cred-1",
+        userId: null,
+        provider: "gemini_key",
+        apiKey: encryptSecret("AIzaSyKeyOne111, AIzaSyKeyTwo222"),
+      } as any)
+
+      const config = await getActiveAiProvider()
+      expect(config.providerId).toBe("gemini")
+      const geminiProvider = config.provider as GeminiProvider
+      expect(geminiProvider.apiKeys).toEqual(["AIzaSyKeyOne111", "AIzaSyKeyTwo222"])
+    })
+  })
 })

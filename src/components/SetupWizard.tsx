@@ -1331,7 +1331,7 @@ export function SetupWizard({
                     </span>
                   </div>
                   <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">
-                    Kostenloser API-Schlüssel aus dem Google AI Studio (bis zu 1.500 Anfragen/Tag gratis, keine Zahlungsdaten nötig).
+                    Kostenloser API-Schlüssel aus dem Google AI Studio (bis zu 1.500 Anfragen/Tag gratis, keine Zahlungsdaten nötig). Mehrere Keys können kommagetrennt für automatisches Fallback eingegeben werden.
                   </p>
 
                   {aiProviderChoice === "gemini" && (
