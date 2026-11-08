@@ -92,9 +92,9 @@ Klicke auf den Button, um die Bereitstellung auf Render zu starten:
 
 Geh auf deine persönliche Webadresse und folge den Anweisungen des Einrichtungsassistenten.
 
-1. **Datenbank auswählen & verbinden:**
-2. **Eltern-/Kind-Konto anlegen & Kindersicherung (PIN) einrichten:**
-3. **KI-Dienst verbinden:**
+1. **Datenbank auswählen und verbinden, indem du die kopierte Zeile von NEON einfügst**
+2. **Eltern-/Kind-Konto anlegen & Kindersicherung (PIN) einrichten**
+3. **KI-Dienst verbinden**
 
 Den **kostenlosen** API Key erhältst du im [Google AI Studio](https://aistudio.google.com/).
 Gehe dazu wie folgt vor:
