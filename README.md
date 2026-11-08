@@ -78,7 +78,7 @@ Wenn du gleich auf den Deploy-Button klickst, leitet Render dich zum automatisch
    > 💡 **Tipp:** Du musst auf Render **keine** Variablen manuell eintragen! Die Datenbank-Verbindung und die KI-Funktionen richtest du nach dem Starten ganz bequem Schritt für Schritt direkt im Browser-Assistenten ein. (Optional kannst du `DATABASE_URL` oder `GEMINI_API_KEY` natürlich auch hier schon vorgeben, siehe Abschnitt *Server-Standard*).
 
 4. **Bereitstellung starten:**  
-   Klicke ganz unten auf **"Apply"** (bzw. **"Deploy"**). Render richtet den Service und alle Sicherheitsschlüssel vollautomatisch ein. Nach ca. 4–5 Minuten siehst du den grünen Status **"Live"** und deine persönliche Web-Adresse (z. B. `https://vokabeltrainer-xxxx.onrender.com`).
+   Klicke ganz unten auf **"Apply"** (bzw. **"Deploy"**). Render richtet den Service und alle Sicherheitsschlüssel vollautomatisch ein. Nach ca. 4–5 Minuten siehst du den grünen Status **"Live"** und nach einem Klick auf "Create web service vokabeltrainer" deine persönliche Web-Adresse (z. B. `https://vokabeltrainer-xxxx.onrender.com`).
 
 #### Jetzt das Deployment starten:
 
