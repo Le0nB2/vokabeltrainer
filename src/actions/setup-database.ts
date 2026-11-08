@@ -37,24 +37,37 @@ export async function testAndMigrateDatabase(connectionString: string): Promise<
       ? "prisma/postgres/schema.prisma"
       : "prisma/schema.prisma"
 
+    // Ensure cache dir exists for engine downloads
+    const enginesDir = "/tmp/prisma-engines"
+    if (!fs.existsSync(enginesDir)) {
+      try {
+        fs.mkdirSync(enginesDir, { recursive: true })
+      } catch {
+        // ignore
+      }
+    }
+
+    const execEnv = {
+      ...process.env,
+      PRISMA_ENGINES_CACHE_DIR: enginesDir,
+      DATABASE_URL: cleanUrl,
+      DIRECT_URL: directUrl,
+    }
+
     await execAsync(`npx prisma migrate deploy --schema=${schemaFile}`, {
-      env: {
-        ...process.env,
-        DATABASE_URL: cleanUrl,
-        DIRECT_URL: directUrl,
-      },
+      env: execEnv,
       timeout: 60000,
     })
 
     if (schemaFile.includes("postgres")) {
-      await execAsync(`npx prisma generate --schema=${schemaFile}`, {
-        env: {
-          ...process.env,
-          DATABASE_URL: cleanUrl,
-          DIRECT_URL: directUrl,
-        },
-        timeout: 60000,
-      })
+      try {
+        await execAsync(`npx prisma generate --schema=${schemaFile}`, {
+          env: execEnv,
+          timeout: 60000,
+        })
+      } catch (genErr: any) {
+        console.warn("prisma generate notice (client might already be generated):", genErr?.message)
+      }
     }
   } catch (err: any) {
     const errorMsg = err?.stderr || err?.message || "Fehler beim Schema-Update"
