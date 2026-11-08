@@ -103,9 +103,9 @@ describe('SetupWizard Database & AI Setup', () => {
     expect(screen.queryByText('Erweiterte Einstellungen')).toBeNull()
   })
 
-  it('renders Step 4 as dedicated mandatory AI setup with OpenRouter, ChatGPT (OpenAI), and Google Gemini', async () => {
+  it('renders Step 4 as dedicated mandatory AI setup with Google Gemini, ChatGPT (OpenAI), and OpenRouter', async () => {
     vi.spyOn(aiActions, 'getAiConfigStatus').mockResolvedValue({
-      activeProvider: 'openrouter',
+      activeProvider: 'gemini',
       hasGeminiKey: false,
       hasOpenRouterKey: false,
       hasOpenAiKey: false,
@@ -120,10 +120,13 @@ describe('SetupWizard Database & AI Setup', () => {
     expect(screen.getByText('KI-Assistent einrichten')).toBeDefined()
     expect(screen.getByText('Erforderlich')).toBeDefined()
 
-    // 3 options must be present
-    expect(screen.getByText(/Option 1: OpenRouter/i)).toBeDefined()
+    // 3 options must be present in order: Gemini first, ChatGPT second, OpenRouter third
+    expect(screen.getByText(/Option 1: Google Gemini \(Empfohlen & Kostenlos\)/i)).toBeDefined()
     expect(screen.getByText(/Option 2: ChatGPT \(OpenAI API-Key\)/i)).toBeDefined()
-    expect(screen.getByText(/Option 3: Google Gemini \(Free-Tier API-Key\)/i)).toBeDefined()
+    expect(screen.getByText(/Option 3: OpenRouter \(1-Klick-Verbindung\)/i)).toBeDefined()
+
+    // Google Gemini input should be visible by default
+    expect(screen.getByPlaceholderText('AIzaSy...')).toBeDefined()
 
     // Continue button must be disabled when AI is not configured
     const submitBtn = screen.getByRole('button', { name: /Weiter zum Abschluss|Einrichtung abschließen/i })
@@ -168,9 +171,9 @@ describe('SetupWizard Database & AI Setup', () => {
     expect(submitBtn.hasAttribute('disabled')).toBe(false)
   })
 
-  it('preselects OpenRouter by default, displays 1-Click explanation and properly encoded redirect', async () => {
+  it('preselects Google Gemini by default and displays 1-Click explanation and redirect when OpenRouter is selected', async () => {
     vi.spyOn(aiActions, 'getAiConfigStatus').mockResolvedValue({
-      activeProvider: 'openrouter',
+      activeProvider: 'gemini',
       hasGeminiKey: false,
       hasOpenRouterKey: false,
       hasOpenAiKey: false,
@@ -180,6 +183,12 @@ describe('SetupWizard Database & AI Setup', () => {
     })
 
     render(<SetupWizard isPublicOrRender={false} initialStep={4} />)
+
+    // Initially Gemini is selected
+    expect(screen.getByPlaceholderText('AIzaSy...')).toBeDefined()
+
+    // Switch to OpenRouter (Option 3)
+    fireEvent.click(screen.getByText(/Option 3: OpenRouter/i))
 
     // Explanation hint must be visible
     expect(screen.getByText(/Hinweis zur 1-Klick-Anbindung:/i)).toBeDefined()

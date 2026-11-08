@@ -104,13 +104,13 @@ describe('SetupWizard Component', () => {
       expect(screen.getByText('Erforderlich')).toBeDefined()
     })
 
-    // Save OpenRouter key to fulfill requirement
-    const openRouterInput = screen.getByPlaceholderText('sk-or-v1-...')
-    fireEvent.change(openRouterInput, { target: { value: 'sk-or-v1-test-token' } })
+    // Save Gemini key to fulfill requirement (Option 1 is preselected)
+    const geminiInput = screen.getByPlaceholderText('AIzaSy...')
+    fireEvent.change(geminiInput, { target: { value: 'AIzaSy-test-key' } })
     fireEvent.click(screen.getByRole('button', { name: 'Speichern' }))
 
     await waitFor(() => {
-      expect(screen.getByText(/OpenRouter erfolgreich konfiguriert!/)).toBeDefined()
+      expect(screen.getByText(/Google Gemini Key erfolgreich gespeichert!/)).toBeDefined()
     })
 
     // Proceed to Step 5

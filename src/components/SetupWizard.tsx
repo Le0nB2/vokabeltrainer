@@ -62,7 +62,7 @@ export function SetupWizard({
   const [showAdvancedMode, setShowAdvancedMode] = useState(initialShowAdvanced)
 
   // AI Step State (Step 4)
-  const [aiProviderChoice, setAiProviderChoice] = useState<"openrouter" | "openai" | "gemini">("openrouter")
+  const [aiProviderChoice, setAiProviderChoice] = useState<"gemini" | "openai" | "openrouter">("gemini")
   const [openRouterKey, setOpenRouterKey] = useState("")
   const [openAiKey, setOpenAiKey] = useState("")
   const [geminiKey, setGeminiKey] = useState("")
@@ -104,6 +104,7 @@ export function SetupWizard({
       if (connected === "openrouter") {
         setStep(4)
         setIsAiConfigured(true)
+        setAiProviderChoice("openrouter")
         setAiSuccess("OpenRouter erfolgreich verknüpft! Klicke auf 'Weiter', um fortzufahren.")
         const url = new URL(window.location.href)
         url.searchParams.delete("ai_connected")
@@ -535,7 +536,7 @@ export function SetupWizard({
                   </h3>
                 </div>
                 <p className="text-xs sm:text-sm text-zinc-600 dark:text-zinc-400 leading-relaxed">
-                  Verbinde OpenRouter (ChatGPT, Claude) oder Google Gemini, um Vokabelhefte automatisch per Foto einzuscannen, didaktische Beispielsätze &amp; Eselsbrücken zu erzeugen und individuelle PDF-Arbeitsblätter zu erstellen.
+                  Verbinde Google Gemini, ChatGPT oder OpenRouter, um Vokabelhefte automatisch per Foto einzuscannen, didaktische Beispielsätze &amp; Eselsbrücken zu erzeugen und individuelle PDF-Arbeitsblätter zu erstellen.
                 </p>
               </div>
             </div>
@@ -1303,7 +1304,128 @@ export function SetupWizard({
           )}
 
           <div className="space-y-4">
-            {/* Option 1: OpenRouter */}
+            {/* Option 1: Google Gemini */}
+            <div
+              onClick={() => setAiProviderChoice("gemini")}
+              className={`p-4 rounded-2xl border-2 cursor-pointer transition-all ${
+                aiProviderChoice === "gemini"
+                  ? "border-blue-600 bg-blue-50/30 dark:bg-blue-950/20"
+                  : "border-zinc-200 dark:border-zinc-800 hover:bg-zinc-50 dark:hover:bg-zinc-800/40"
+              }`}
+            >
+              <div className="flex items-start gap-3">
+                <input
+                  type="radio"
+                  name="aiChoice"
+                  checked={aiProviderChoice === "gemini"}
+                  onChange={() => setAiProviderChoice("gemini")}
+                  className="mt-1 text-blue-600 focus:ring-blue-500"
+                />
+                <div className="flex-1">
+                  <div className="flex items-center justify-between">
+                    <span className="font-bold text-xs sm:text-sm text-zinc-900 dark:text-zinc-100">
+                      🔵 Option 1: Google Gemini (Empfohlen &amp; Kostenlos)
+                    </span>
+                    <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-emerald-100 dark:bg-emerald-950/60 text-emerald-800 dark:text-emerald-300">
+                      Dauerhaft kostenlos
+                    </span>
+                  </div>
+                  <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">
+                    Kostenloser API-Schlüssel aus dem Google AI Studio (bis zu 1.500 Anfragen/Tag gratis, keine Zahlungsdaten nötig).
+                  </p>
+
+                  {aiProviderChoice === "gemini" && (
+                    <div className="mt-3 space-y-2 pt-2 border-t border-zinc-100 dark:border-zinc-800">
+                      <div className="flex gap-2">
+                        <input
+                          type="password"
+                          value={geminiKey}
+                          onChange={(e) => setGeminiKey(e.target.value)}
+                          placeholder="AIzaSy..."
+                          className="flex-1 px-3 py-2 rounded-xl border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-xs text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        />
+                        <button
+                          type="button"
+                          disabled={aiLoading}
+                          onClick={handleSaveAiCredentials}
+                          className="px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-medium disabled:opacity-50"
+                        >
+                          {aiLoading ? "Speichert..." : "Speichern"}
+                        </button>
+                      </div>
+                      <a
+                        href="https://aistudio.google.com/app/apikey"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-xs text-blue-600 hover:underline inline-flex items-center gap-1 font-medium"
+                      >
+                        Kostenlosen Key im Google AI Studio holen <ExternalLink className="w-3 h-3" />
+                      </a>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* Option 2: ChatGPT (OpenAI) */}
+            <div
+              onClick={() => setAiProviderChoice("openai")}
+              className={`p-4 rounded-2xl border-2 cursor-pointer transition-all ${
+                aiProviderChoice === "openai"
+                  ? "border-emerald-600 bg-emerald-50/30 dark:bg-emerald-950/20"
+                  : "border-zinc-200 dark:border-zinc-800 hover:bg-zinc-50 dark:hover:bg-zinc-800/40"
+              }`}
+            >
+              <div className="flex items-start gap-3">
+                <input
+                  type="radio"
+                  name="aiChoice"
+                  checked={aiProviderChoice === "openai"}
+                  onChange={() => setAiProviderChoice("openai")}
+                  className="mt-1 text-emerald-600 focus:ring-emerald-500"
+                />
+                <div className="flex-1">
+                  <span className="font-bold text-xs sm:text-sm text-zinc-900 dark:text-zinc-100">
+                    🟢 Option 2: ChatGPT (OpenAI API-Key)
+                  </span>
+                  <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">
+                    Direkte OpenAI API für GPT-4o, GPT-4o-mini und präzise optische Texterkennung (OCR). Erfordert OpenAI-Guthaben.
+                  </p>
+
+                  {aiProviderChoice === "openai" && (
+                    <div className="mt-3 space-y-2 pt-2 border-t border-zinc-100 dark:border-zinc-800">
+                      <div className="flex gap-2">
+                        <input
+                          type="password"
+                          value={openAiKey}
+                          onChange={(e) => setOpenAiKey(e.target.value)}
+                          placeholder="sk-proj-..."
+                          className="flex-1 px-3 py-2 rounded-xl border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-xs text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                        />
+                        <button
+                          type="button"
+                          disabled={aiLoading}
+                          onClick={handleSaveAiCredentials}
+                          className="px-3 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-medium disabled:opacity-50"
+                        >
+                          {aiLoading ? "Speichert..." : "Speichern"}
+                        </button>
+                      </div>
+                      <a
+                        href="https://platform.openai.com/api-keys"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-xs text-emerald-600 dark:text-emerald-400 hover:underline inline-flex items-center gap-1 font-medium"
+                      >
+                        API-Key auf platform.openai.com erstellen <ExternalLink className="w-3 h-3" />
+                      </a>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* Option 3: OpenRouter */}
             <div
               onClick={() => setAiProviderChoice("openrouter")}
               className={`p-4 rounded-2xl border-2 cursor-pointer transition-all ${
@@ -1323,14 +1445,14 @@ export function SetupWizard({
                 <div className="flex-1">
                   <div className="flex items-center justify-between">
                     <span className="font-bold text-xs sm:text-sm text-zinc-900 dark:text-zinc-100">
-                      🟣 Option 1: OpenRouter (Empfohlen)
+                      🟣 Option 3: OpenRouter (1-Klick-Verbindung)
                     </span>
                     <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-purple-100 dark:bg-purple-950/60 text-purple-700 dark:text-purple-300">
-                      Empfohlen
+                      1-Klick
                     </span>
                   </div>
                   <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">
-                    1-Klick-Verbindung oder API-Key. Universeller Zugriff auf GPT-4o, Claude und kostenlose Modelle.
+                    1-Klick-Verbindung oder API-Key für Gemini 3.6 Flash, GPT-4o und Claude. Erfordert OpenRouter-Guthaben (Pay-as-you-go).
                   </p>
 
                   {aiProviderChoice === "openrouter" && (
@@ -1341,7 +1463,9 @@ export function SetupWizard({
                           <span>Hinweis zur 1-Klick-Anbindung:</span>
                         </div>
                         <p className="text-zinc-600 dark:text-zinc-300 leading-relaxed">
-                          Du wirst zu <strong>OpenRouter</strong> weitergeleitet. Bitte melde dich dort an (oder erstelle kostenlos ein Konto) und klicke auf <strong>„Authorize“</strong>, um den N30 Vokabeltrainer zu autorisieren. Anschließend kehrst du automatisch hierher zurück.
+                          Du wirst zu <strong>OpenRouter</strong> weitergeleitet. Bitte melde dich dort an und klicke auf <strong>„Authorize“</strong>.
+                          <br />
+                          <em>Hinweis:</em> OpenRouter rechnet nach Verbrauch ab und erfordert Guthaben (z. B. 5 $). Für eine <strong>100% kostenlose Nutzung</strong> ohne Zahlungsdaten wähle oben <strong>Google Gemini</strong>.
                         </p>
                       </div>
 
@@ -1379,122 +1503,6 @@ export function SetupWizard({
                         className="text-xs text-purple-600 dark:text-purple-400 hover:underline inline-flex items-center gap-1 font-medium"
                       >
                         API-Key auf openrouter.ai erstellen <ExternalLink className="w-3 h-3" />
-                      </a>
-                    </div>
-                  )}
-                </div>
-              </div>
-            </div>
-
-            {/* Option 2: ChatGPT (OpenAI) */}
-            <div
-              onClick={() => setAiProviderChoice("openai")}
-              className={`p-4 rounded-2xl border-2 cursor-pointer transition-all ${
-                aiProviderChoice === "openai"
-                  ? "border-emerald-600 bg-emerald-50/30 dark:bg-emerald-950/20"
-                  : "border-zinc-200 dark:border-zinc-800 hover:bg-zinc-50 dark:hover:bg-zinc-800/40"
-              }`}
-            >
-              <div className="flex items-start gap-3">
-                <input
-                  type="radio"
-                  name="aiChoice"
-                  checked={aiProviderChoice === "openai"}
-                  onChange={() => setAiProviderChoice("openai")}
-                  className="mt-1 text-emerald-600 focus:ring-emerald-500"
-                />
-                <div className="flex-1">
-                  <span className="font-bold text-xs sm:text-sm text-zinc-900 dark:text-zinc-100">
-                    🟢 Option 2: ChatGPT (OpenAI API-Key)
-                  </span>
-                  <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">
-                    Direkte OpenAI API für GPT-4o, GPT-4o-mini und präzise optische Texterkennung (OCR).
-                  </p>
-
-                  {aiProviderChoice === "openai" && (
-                    <div className="mt-3 space-y-2 pt-2 border-t border-zinc-100 dark:border-zinc-800">
-                      <div className="flex gap-2">
-                        <input
-                          type="password"
-                          value={openAiKey}
-                          onChange={(e) => setOpenAiKey(e.target.value)}
-                          placeholder="sk-proj-..."
-                          className="flex-1 px-3 py-2 rounded-xl border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-xs text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-emerald-500"
-                        />
-                        <button
-                          type="button"
-                          disabled={aiLoading}
-                          onClick={handleSaveAiCredentials}
-                          className="px-3 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-medium disabled:opacity-50"
-                        >
-                          {aiLoading ? "Speichert..." : "Speichern"}
-                        </button>
-                      </div>
-                      <a
-                        href="https://platform.openai.com/api-keys"
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-xs text-emerald-600 dark:text-emerald-400 hover:underline inline-flex items-center gap-1 font-medium"
-                      >
-                        API-Key auf platform.openai.com erstellen <ExternalLink className="w-3 h-3" />
-                      </a>
-                    </div>
-                  )}
-                </div>
-              </div>
-            </div>
-
-            {/* Option 3: Google Gemini */}
-            <div
-              onClick={() => setAiProviderChoice("gemini")}
-              className={`p-4 rounded-2xl border-2 cursor-pointer transition-all ${
-                aiProviderChoice === "gemini"
-                  ? "border-blue-600 bg-blue-50/30 dark:bg-blue-950/20"
-                  : "border-zinc-200 dark:border-zinc-800 hover:bg-zinc-50 dark:hover:bg-zinc-800/40"
-              }`}
-            >
-              <div className="flex items-start gap-3">
-                <input
-                  type="radio"
-                  name="aiChoice"
-                  checked={aiProviderChoice === "gemini"}
-                  onChange={() => setAiProviderChoice("gemini")}
-                  className="mt-1 text-blue-600 focus:ring-blue-500"
-                />
-                <div className="flex-1">
-                  <span className="font-bold text-xs sm:text-sm text-zinc-900 dark:text-zinc-100">
-                    🔵 Option 3: Google Gemini (Free-Tier API-Key)
-                  </span>
-                  <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">
-                    Kostenloser Schlüssel aus dem Google AI Studio (15 Requests/Min kostenlos).
-                  </p>
-
-                  {aiProviderChoice === "gemini" && (
-                    <div className="mt-3 space-y-2 pt-2 border-t border-zinc-100 dark:border-zinc-800">
-                      <div className="flex gap-2">
-                        <input
-                          type="password"
-                          value={geminiKey}
-                          onChange={(e) => setGeminiKey(e.target.value)}
-                          placeholder="AIzaSy..."
-                          className="flex-1 px-3 py-2 rounded-xl border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-xs text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                        />
-                        <button
-                          type="button"
-                          disabled={aiLoading}
-                          onClick={handleSaveAiCredentials}
-                          className="px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-medium disabled:opacity-50"
-                        >
-                          {aiLoading ? "Speichert..." : "Speichern"}
-                        </button>
-                      </div>
-                      <a
-                        href="https://aistudio.google.com/app/apikey"
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-xs text-blue-600 hover:underline inline-flex items-center gap-1 font-medium"
-                      >
-                        Kostenlosen Key im Google AI Studio holen <ExternalLink className="w-3 h-3" />
                       </a>
                     </div>
                   )}
