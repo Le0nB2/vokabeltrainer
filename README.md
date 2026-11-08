@@ -50,7 +50,7 @@ Du möchtest deinen Vokabeltrainer nicht lokal auf deinem eigenen PC laufen lass
 Du benötigst dafür kostenlose Konten und nur wenige Minuten:
 1. **Neon:** Kostenlose Cloud-Datenbank (PostgreSQL) für deine Vokabeln (Anmeldung z. B. per Google-Konto).
 2. **Render:** Führt die App in der Cloud aus (Anmeldung z. B. per Google-Konto).
-3. **KI-Zugang (Optional):** Entweder 1-Klick-Login mit **OpenRouter** oder ein kostenloser **Google Gemini** API-Key.
+3. **KI-Funktionen:** Entweder 1-Klick-Login mit **OpenRouter** oder ein kostenloser **Google Gemini** oder **ChatGPT** API-Key.
 
 ---
 
