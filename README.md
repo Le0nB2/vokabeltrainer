@@ -98,22 +98,7 @@ Folge den Anweisungen des Einrichtungsassistenten und konfiguriere die WebApp
 1. **Datenbank auswählen & verbinden:**
 2. **Eltern-Konto anlegen & Kindersicherung (PIN):**
 3. **KI-Dienst verbinden:**
-   
----
-
-### Server-Standard & Umgebungsvariablen (Fallback im Hintergrund)
-
-Möchtest du den Vokabeltrainer als Administrator zentral für deine Familie oder Schule betreiben, kannst du die Zugänge auch direkt als Umgebungsvariablen im Docker-Container oder im Render-Dashboard hinterlegen:
-
-| Umgebungsvariable | Beschreibung |
-| :--- | :--- |
-| `DATABASE_URL` | Optional: PostgreSQL/Neon Connection String (wird sonst im Web-Assistenten abgefragt). |
-| `GEMINI_API_KEY` | Optional: Google Gemini API-Key (fungiert als stummer Server-Standard im Hintergrund). |
-| `OPENROUTER_API_KEY` | Optional: OpenRouter API-Key als Server-Fallback. |
-| `AUTH_SECRET` | 32-Byte Zufallsschlüssel zur Verschlüsselung von Sessions und hinterlegten KI-Credentials (wird auf Render automatisch erzeugt). |
-
-> 💡 **Hinweis:** Wenn ein Server-Schlüssel wie `GEMINI_API_KEY` in der Umgebung hinterlegt ist, funktioniert die KI automatisch für alle Nutzer im Hintergrund, ohne dass im Einrichtungsassistenten ein Key eingegeben werden muss! Nutzer können den KI-Schritt im Assistenten einfach überspringen.
-
+    
 ---
 
 ### Schritt 5: 📱 Als App auf dem Homescreen nutzen (PWA)
