@@ -19,12 +19,18 @@ describe('SetupWizard Database & AI Setup', () => {
     vi.clearAllMocks()
   })
 
-  it('shows database setup step when initialDatabaseNeedsSetup is true', async () => {
+  it('shows database setup step when initialDatabaseNeedsSetup is true and hides SQLite under advanced when isRender is true', async () => {
     render(<SetupWizard isPublicOrRender={true} isRender={true} initialDatabaseNeedsSetup={true} />)
 
     expect(screen.getByText('Datenbank auswählen & verbinden')).toBeDefined()
     expect(screen.getByText('Neon Cloud-Datenbank (PostgreSQL)')).toBeDefined()
-    expect(screen.getByText('Render-Cloud erkannt:')).toBeDefined()
+    expect(screen.queryByText(/Render-Cloud erkannt/i)).toBeNull()
+    expect(screen.getByText('Erweiterte Einstellungen')).toBeDefined()
+    expect(screen.queryByText('Lokale Datei-Datenbank (SQLite)')).toBeNull()
+
+    // Clicking "Erweiterte Einstellungen" reveals SQLite option
+    fireEvent.click(screen.getByText('Erweiterte Einstellungen'))
+    expect(screen.getByText('Lokale Datei-Datenbank (SQLite)')).toBeDefined()
   })
 
   it('preselects Neon and tests connection on submit', async () => {

@@ -17,6 +17,7 @@ import {
   ExternalLink,
   Copy,
   Check,
+  ChevronDown,
 } from "lucide-react"
 import { completeSetupSingleUser, completeSetupProtected } from "@/actions/setup"
 import { testAndMigrateDatabase, useLocalDatabase } from "@/actions/setup-database"
@@ -49,6 +50,7 @@ export function SetupWizard({
   const [dbSuccess, setDbSuccess] = useState<string | null>(null)
   const [dbError, setDbError] = useState<string | null>(null)
   const [copiedNeonUrl, setCopiedNeonUrl] = useState(false)
+  const [showAdvancedDb, setShowAdvancedDb] = useState(false)
 
   // AI Step State (in step 4 / completion)
   const [aiProviderChoice, setAiProviderChoice] = useState<"openrouter" | "gemini">("openrouter")
@@ -395,15 +397,6 @@ export function SetupWizard({
       {/* Screen 0: Database Configuration (Neon PostgreSQL vs SQLite) */}
       {step === 0 && (
         <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-3xl p-6 sm:p-8 shadow-xl">
-          {(isRender || isPublicOrRender) && (
-            <div className="mb-6 p-4 bg-blue-50 dark:bg-blue-950/40 border border-blue-200 dark:border-blue-800 rounded-2xl flex items-start gap-3">
-              <Sparkles className="w-5 h-5 text-blue-600 dark:text-blue-400 shrink-0 mt-0.5" />
-              <div className="text-xs sm:text-sm text-blue-800 dark:text-blue-200 leading-relaxed">
-                <strong>Render-Cloud erkannt:</strong> Da Render im kostenlosen Free-Plan flüchtigen Speicher nutzt, wähle bitte die kostenlose <strong>Neon PostgreSQL Cloud-Datenbank</strong>, damit deine Vokabeln dauerhaft gespeichert bleiben.
-              </div>
-            </div>
-          )}
-
           <div className="space-y-4 mb-6">
             {/* Neon Option */}
             <div
@@ -463,38 +456,80 @@ export function SetupWizard({
               </div>
             </div>
 
-            {/* SQLite Option */}
-            <div
-              onClick={() => setDbType("sqlite")}
-              className={`p-5 rounded-2xl border-2 cursor-pointer transition-all ${
-                dbType === "sqlite"
-                  ? "border-blue-600 bg-blue-50/30 dark:bg-blue-950/20"
-                  : "border-zinc-200 dark:border-zinc-800 hover:bg-zinc-50 dark:hover:bg-zinc-800/40"
-              }`}
-            >
-              <div className="flex items-start gap-3.5">
-                <input
-                  type="radio"
-                  name="dbType"
-                  checked={dbType === "sqlite"}
-                  onChange={() => setDbType("sqlite")}
-                  className="mt-1 text-blue-600 focus:ring-blue-500"
-                />
-                <div>
-                  <span className="font-bold text-sm sm:text-base text-zinc-900 dark:text-zinc-100">
-                    Lokale Datei-Datenbank (SQLite)
-                  </span>
-                  <p className="text-xs sm:text-sm text-zinc-600 dark:text-zinc-400 mt-1">
-                    Keine Cloud nötig. Perfekt für lokale Docker-Installationen zu Hause (Synology NAS, Unraid, Heimserver mit gemountetem Volume).
-                  </p>
-                  {(isRender || isPublicOrRender) && (
-                    <p className="text-xs text-amber-600 dark:text-amber-400 mt-1 font-medium">
-                      ⚠️ Hinweis: Auf Render Free gehen Daten im SQLite-Modus bei Server-Pausen verloren!
+            {/* SQLite Option - Collapsible when running on Render */}
+            {isRender ? (
+              <div className="pt-1">
+                <button
+                  type="button"
+                  onClick={() => setShowAdvancedDb(!showAdvancedDb)}
+                  className="flex items-center gap-1.5 text-xs text-zinc-500 hover:text-zinc-800 dark:text-zinc-400 dark:hover:text-zinc-200 transition-colors font-medium py-1.5"
+                >
+                  <ChevronDown className={`w-3.5 h-3.5 transition-transform duration-200 ${showAdvancedDb ? "rotate-180" : ""}`} />
+                  Erweiterte Einstellungen
+                </button>
+
+                {showAdvancedDb && (
+                  <div className="mt-3">
+                    <div
+                      onClick={() => setDbType("sqlite")}
+                      className={`p-4 rounded-2xl border-2 cursor-pointer transition-all ${
+                        dbType === "sqlite"
+                          ? "border-blue-600 bg-blue-50/30 dark:bg-blue-950/20"
+                          : "border-zinc-200 dark:border-zinc-800 hover:bg-zinc-50 dark:hover:bg-zinc-800/40"
+                      }`}
+                    >
+                      <div className="flex items-start gap-3">
+                        <input
+                          type="radio"
+                          name="dbType"
+                          checked={dbType === "sqlite"}
+                          onChange={() => setDbType("sqlite")}
+                          className="mt-1 text-blue-600 focus:ring-blue-500"
+                        />
+                        <div>
+                          <span className="font-bold text-xs sm:text-sm text-zinc-900 dark:text-zinc-100">
+                            Lokale Datei-Datenbank (SQLite)
+                          </span>
+                          <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">
+                            Keine Cloud nötig. Für lokale Docker-Installationen zu Hause (NAS, Unraid, lokaler PC).
+                          </p>
+                          <p className="text-xs text-amber-600 dark:text-amber-400 mt-1 font-medium">
+                            ⚠️ Hinweis: Auf Render Free gehen Daten im SQLite-Modus bei Server-Pausen verloren!
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+            ) : (
+              <div
+                onClick={() => setDbType("sqlite")}
+                className={`p-5 rounded-2xl border-2 cursor-pointer transition-all ${
+                  dbType === "sqlite"
+                    ? "border-blue-600 bg-blue-50/30 dark:bg-blue-950/20"
+                    : "border-zinc-200 dark:border-zinc-800 hover:bg-zinc-50 dark:hover:bg-zinc-800/40"
+                }`}
+              >
+                <div className="flex items-start gap-3.5">
+                  <input
+                    type="radio"
+                    name="dbType"
+                    checked={dbType === "sqlite"}
+                    onChange={() => setDbType("sqlite")}
+                    className="mt-1 text-blue-600 focus:ring-blue-500"
+                  />
+                  <div>
+                    <span className="font-bold text-sm sm:text-base text-zinc-900 dark:text-zinc-100">
+                      Lokale Datei-Datenbank (SQLite)
+                    </span>
+                    <p className="text-xs sm:text-sm text-zinc-600 dark:text-zinc-400 mt-1">
+                      Keine Cloud nötig. Perfekt für lokale Docker-Installationen zu Hause (Synology NAS, Unraid, Heimserver mit gemountetem Volume).
                     </p>
-                  )}
+                  </div>
                 </div>
               </div>
-            </div>
+            )}
           </div>
 
           {dbError && (
