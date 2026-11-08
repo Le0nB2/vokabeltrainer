@@ -23,6 +23,7 @@ import { completeSetupSingleUser, completeSetupProtected } from "@/actions/setup
 import { testAndMigrateDatabase, useLocalDatabase } from "@/actions/setup-database"
 import { saveAiKeyAction } from "@/actions/ai-credentials"
 import { ChildShareInfoCard } from "@/components/ChildShareInfoCard"
+import { AppLogoIcon } from "@/components/AppLogo"
 
 type Step = "welcome" | 0 | 1 | 2 | 3 | 4
 
@@ -365,7 +366,7 @@ export function SetupWizard({
       <div className="text-center mb-8">
         <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-blue-100 dark:bg-blue-900/40 text-blue-600 dark:text-blue-400 mb-3 shadow-sm">
           {step === "welcome" ? (
-            <Sparkles className="w-7 h-7" />
+            <AppLogoIcon className="w-8 h-8 text-blue-600 dark:text-blue-500" />
           ) : step === 4 ? (
             <CheckCircle2 className="w-7 h-7 text-emerald-600 dark:text-emerald-400" />
           ) : step === 3 ? (
@@ -377,15 +378,25 @@ export function SetupWizard({
           )}
         </div>
         <h1 className="text-2xl sm:text-3xl font-extrabold text-zinc-900 dark:text-zinc-100 tracking-tight">
-          {step === "welcome"
-            ? "Willkommen beim N30 Vokabeltrainer! 👋"
-            : step === 4
-            ? "Einrichtung fast abgeschlossen! 🎉"
-            : step === 3
-            ? "Kinder-Konto einrichten"
-            : step === 0
-            ? "Datenbank auswählen & verbinden"
-            : "Nutzungsmodus wählen"}
+          {step === "welcome" ? (
+            <span className="inline-flex items-center justify-center flex-wrap gap-x-2">
+              <span>Willkommen beim</span>
+              <span className="inline-flex items-center tracking-tight font-extrabold">
+                <span className="text-slate-900 dark:text-slate-100">N30</span>
+                <span className="text-blue-600 dark:text-blue-500">Vokabeltrainer</span>
+                <span>!</span>
+              </span>
+              <span>👋</span>
+            </span>
+          ) : step === 4 ? (
+            "Einrichtung fast abgeschlossen! 🎉"
+          ) : step === 3 ? (
+            "Kinder-Konto einrichten"
+          ) : step === 0 ? (
+            "Datenbank auswählen & verbinden"
+          ) : (
+            "Nutzungsmodus wählen"
+          )}
         </h1>
         <p className="text-sm sm:text-base text-zinc-600 dark:text-zinc-400 mt-2 max-w-md mx-auto">
           {step === "welcome"
@@ -437,7 +448,7 @@ export function SetupWizard({
                   </h3>
                 </div>
                 <p className="text-xs sm:text-sm text-zinc-600 dark:text-zinc-400 leading-relaxed">
-                  Sichere und dauerhafte Speicherung all deiner Vokabeln, Decks und individuellen Lernfortschritte &ndash; wahlweise dauerhaft kostenlos in der Cloud (Neon PostgreSQL) oder lokal.
+                  Sichere und dauerhafte Speicherung all deiner Vokabeln, Decks und individuellen Lernfortschritte &ndash; kostenlos in der Cloud (Neon PostgreSQL) oder lokal.
                 </p>
               </div>
             </div>
@@ -477,7 +488,7 @@ export function SetupWizard({
                   </h3>
                 </div>
                 <p className="text-xs sm:text-sm text-zinc-600 dark:text-zinc-400 leading-relaxed">
-                  Verbinde Google Gemini oder OpenRouter, um Vokabelhefte automatisch per Foto einzuscannen und didaktische Beispielsätze sowie Eselsbrücken zu generieren.
+                  Verbinde OpenRouter (ChatGPT, Claude) oder Google Gemini, um Vokabelhefte automatisch per Foto einzuscannen, didaktische Beispielsätze &amp; Eselsbrücken zu erzeugen und individuelle PDF-Arbeitsblätter zu erstellen.
                 </p>
               </div>
             </div>
