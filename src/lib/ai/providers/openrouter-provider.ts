@@ -1,7 +1,7 @@
 import { AiGenerateOptions, IAiProvider } from "../ai-provider.interface"
 import { QuotaExceededError } from "@/lib/services/gemini-executor"
 
-export const DEFAULT_OPENROUTER_MODEL = "google/gemini-2.5-flash"
+export const DEFAULT_OPENROUTER_MODEL = "google/gemini-3.6-flash"
 
 function cleanJsonText(rawText: string): string {
   let cleaned = rawText.trim()
