@@ -92,7 +92,7 @@ Klicke auf den Button, um die Bereitstellung auf Render zu starten:
 Folge den Anweisungen des Einrichtungsassistenten und konfiguriere die WebApp
 
 1. **Datenbank auswählen & verbinden:**
-2. **Eltern-Konto anlegen & Kindersicherung (PIN):**
+2. **Eltern-/Kind-Konto anlegen & Kindersicherung (PIN) einrichten:**
 3. **KI-Dienst verbinden:**
     
 ---
