@@ -39,14 +39,14 @@ export default async function SettingsPage() {
         <AudioSettings initialSettings={settings} />
         <MinigameSettings initialSettings={settings} />
         <NotificationSettings initialSettings={settings} />
+        <UserManagementSettings
+          initialData={userManagementData}
+          isSettingsProtected={isSettingsProtected}
+        />
         <AiModelSettings
           initialSettings={settings}
           initialModels={availableModels}
           apiStats={apiStats}
-        />
-        <UserManagementSettings
-          initialData={userManagementData}
-          isSettingsProtected={isSettingsProtected}
         />
         <ImportExport availableUsers={userManagementData.users} />
       </div>

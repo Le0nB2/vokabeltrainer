@@ -7,6 +7,7 @@ import { requireAppAuth, UnauthorizedError } from "@/lib/auth-guard";
 import { consumeRateLimit, formatRetryDuration, getClientIpFromHeaders } from "@/lib/rate-limit";
 import { callGeminiWithRetry, QuotaExceededError, GeminiStatusEvent } from "@/lib/services/gemini-executor";
 import { formatSseEvent } from "@/lib/services/ai-status";
+import { getActiveAiProvider } from "@/lib/ai/ai-router";
 
 const requestSchema = z.object({
   deckId: z.string().min(1, "No deckId provided").max(100, "deckId darf maximal 100 Zeichen lang sein"),
@@ -75,15 +76,22 @@ export async function POST(req: NextRequest) {
 
     const selectedCards = [...dueCards, ...notDueCards].slice(0, 60);
 
-    const rawKeys = process.env.GEMINI_API_KEYS || process.env.GEMINI_API_KEY;
-    if (!rawKeys) {
-      return NextResponse.json({ error: "GEMINI_API_KEYS is not configured" }, { status: 500 });
+    let aiConfig: any = null;
+    try {
+      aiConfig = await getActiveAiProvider();
+    } catch {
+      // ignore
     }
-    const apiKeys = rawKeys.split(',').map(k => k.trim()).filter(k => k.length > 0);
 
-    if (apiKeys.length === 0) {
-      return NextResponse.json({ error: "No valid API keys found" }, { status: 500 });
+    const rawKeys = process.env.GEMINI_API_KEYS || process.env.GEMINI_API_KEY;
+    const envApiKeys = rawKeys
+      ? rawKeys.split(',').map(k => k.trim()).filter(k => k.length > 0)
+      : [];
+
+    if (!aiConfig && envApiKeys.length === 0) {
+      return NextResponse.json({ error: "Kein aktiver KI-Dienst konfiguriert. Bitte verbinde Google Gemini, ChatGPT oder OpenRouter." }, { status: 500 });
     }
+    const apiKeys = (aiConfig?.provider as any)?.apiKeys || envApiKeys;
 
 
     const promptText = `
@@ -187,50 +195,74 @@ ${JSON.stringify(selectedCards.map(c => ({ englisch: c.front, deutsch: c.back })
       onGeminiStatus?: (event: GeminiStatusEvent) => void | Promise<void>,
       onProgress?: (message: string) => void
     ) => {
-      const parsedWorksheet = await callGeminiWithRetry({
-        endpoint: "worksheet",
-        apiKeys,
-        onStatus: onGeminiStatus,
-        execute: async (ai, modelToUse) => {
-          const response = await ai.models.generateContent({
-            model: modelToUse,
-            contents: [promptText],
-            config: {
-              responseMimeType: "application/json",
-              responseJsonSchema: responseSchema,
-              temperature: 0.2, // low temp for structured task
-            },
-          });
+      let parsedWorksheet: any;
 
-          const textResponse = response.text;
-          if (!textResponse) {
-            throw new Error("Failed to generate text from Gemini");
-          }
+      if (aiConfig?.providerId === "openrouter" || aiConfig?.providerId === "openai") {
+        const providerLabel = aiConfig.providerId === "openai" ? "ChatGPT (OpenAI)" : "OpenRouter";
+        onProgress?.(`Sende Anfrage an ${providerLabel}...`);
+        parsedWorksheet = await aiConfig.provider.generateStructuredJson({
+          prompt: promptText + "\n\nAntworte strikt im geforderten JSON-Format mit den Hauptfeldern 'exercises' und 'solutions'.",
+        });
 
-          const data = JSON.parse(textResponse);
-
-          // Shuffle multiple choice options manually to ensure uniform distribution
-          if (data?.exercises?.multipleChoice && Array.isArray(data.exercises.multipleChoice)) {
-            data.exercises.multipleChoice = data.exercises.multipleChoice.map((mc: { options?: string[], correctIndex?: number }) => {
-              if (mc.options && Array.isArray(mc.options) && typeof mc.correctIndex === 'number') {
-                const correctAnswer = mc.options[mc.correctIndex];
-
-                // Fisher-Yates shuffle
-                for (let j = mc.options.length - 1; j > 0; j--) {
-                  const k = Math.floor(Math.random() * (j + 1));
-                  [mc.options[j], mc.options[k]] = [mc.options[k], mc.options[j]];
-                }
-
-                // Find new correct index
-                mc.correctIndex = mc.options.indexOf(correctAnswer);
+        if (parsedWorksheet?.exercises?.multipleChoice && Array.isArray(parsedWorksheet.exercises.multipleChoice)) {
+          parsedWorksheet.exercises.multipleChoice = parsedWorksheet.exercises.multipleChoice.map((mc: { options?: string[], correctIndex?: number }) => {
+            if (mc.options && Array.isArray(mc.options) && typeof mc.correctIndex === 'number') {
+              const correctAnswer = mc.options[mc.correctIndex];
+              for (let j = mc.options.length - 1; j > 0; j--) {
+                const k = Math.floor(Math.random() * (j + 1));
+                [mc.options[j], mc.options[k]] = [mc.options[k], mc.options[j]];
               }
-              return mc;
+              mc.correctIndex = mc.options.indexOf(correctAnswer);
+            }
+            return mc;
+          });
+        }
+      } else {
+        parsedWorksheet = await callGeminiWithRetry({
+          endpoint: "worksheet",
+          apiKeys,
+          onStatus: onGeminiStatus,
+          execute: async (ai, modelToUse) => {
+            const response = await ai.models.generateContent({
+              model: modelToUse,
+              contents: [promptText],
+              config: {
+                responseMimeType: "application/json",
+                responseJsonSchema: responseSchema,
+                temperature: 0.2, // low temp for structured task
+              },
             });
-          }
 
-          return data;
-        },
-      });
+            const textResponse = response.text;
+            if (!textResponse) {
+              throw new Error("Failed to generate text from Gemini");
+            }
+
+            const data = JSON.parse(textResponse);
+
+            // Shuffle multiple choice options manually to ensure uniform distribution
+            if (data?.exercises?.multipleChoice && Array.isArray(data.exercises.multipleChoice)) {
+              data.exercises.multipleChoice = data.exercises.multipleChoice.map((mc: { options?: string[], correctIndex?: number }) => {
+                if (mc.options && Array.isArray(mc.options) && typeof mc.correctIndex === 'number') {
+                  const correctAnswer = mc.options[mc.correctIndex];
+
+                  // Fisher-Yates shuffle
+                  for (let j = mc.options.length - 1; j > 0; j--) {
+                    const k = Math.floor(Math.random() * (j + 1));
+                    [mc.options[j], mc.options[k]] = [mc.options[k], mc.options[j]];
+                  }
+
+                  // Find new correct index
+                  mc.correctIndex = mc.options.indexOf(correctAnswer);
+                }
+                return mc;
+              });
+            }
+
+            return data;
+          },
+        });
+      }
 
       onProgress?.("Aufgaben generiert! Optimiere Layout für maximal 4 Druckseiten...");
 
@@ -365,6 +397,8 @@ ${JSON.stringify(selectedCards.map(c => ({ englisch: c.front, deutsch: c.back })
             const errorMsg =
               err instanceof QuotaExceededError
                 ? err.message
+                : err instanceof Error && err.message
+                ? err.message
                 : "Fehler beim Erstellen des Arbeitsblatts. Bitte versuche es erneut.";
 
             safeEnqueue(
@@ -402,6 +436,10 @@ ${JSON.stringify(selectedCards.map(c => ({ englisch: c.front, deutsch: c.back })
       return NextResponse.json({ error: error.message }, { status: 429 });
     }
     console.error("Worksheet error:", error);
-    return NextResponse.json({ error: "Fehler beim Erstellen des Arbeitsblatts. Bitte versuche es erneut." }, { status: 500 });
+    const msg =
+      error instanceof Error && error.message
+        ? error.message
+        : "Fehler beim Erstellen des Arbeitsblatts. Bitte versuche es erneut.";
+    return NextResponse.json({ error: msg }, { status: 500 });
   }
 }

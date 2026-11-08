@@ -64,17 +64,24 @@ export async function POST(req: NextRequest) {
 
     const { cards } = parseResult.data;
 
+    let aiConfig = null;
+    try {
+      const { getActiveAiProvider } = await import("@/lib/ai/ai-router");
+      aiConfig = await getActiveAiProvider();
+    } catch {
+      // ignore
+    }
+
     const rawKeys = process.env.GEMINI_API_KEYS || process.env.GEMINI_API_KEY;
-    if (!rawKeys) {
+    if (!rawKeys && !aiConfig) {
       return NextResponse.json({ error: "GEMINI_API_KEYS is not configured" }, { status: 500 });
     }
-    const apiKeys = rawKeys.split(',').map(k => k.trim()).filter(k => k.length > 0);
 
-    if (apiKeys.length === 0) {
-      return NextResponse.json({ error: "No valid API keys found" }, { status: 500 });
-    }
+    const apiKeys = rawKeys
+      ? rawKeys.split(',').map(k => k.trim()).filter(k => k.length > 0)
+      : undefined;
 
-    const enrichedCards = await enrichCards(cards, apiKeys);
+    const enrichedCards = await enrichCards(cards, apiKeys && apiKeys.length > 0 ? apiKeys : undefined);
 
     return NextResponse.json({ cards: enrichedCards });
 

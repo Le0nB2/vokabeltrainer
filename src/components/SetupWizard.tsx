@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import {
   ShieldCheck,
@@ -12,24 +12,112 @@ import {
   CheckCircle2,
   Sparkles,
   UserPlus,
+  Database,
+  Key,
+  ExternalLink,
+  Copy,
+  Check,
+  ChevronDown,
 } from "lucide-react"
 import { completeSetupSingleUser, completeSetupProtected } from "@/actions/setup"
+import { testAndMigrateDatabase, useLocalDatabase } from "@/actions/setup-database"
+import { saveAiKeyAction, getAiConfigStatus } from "@/actions/ai-credentials"
 import { ChildShareInfoCard } from "@/components/ChildShareInfoCard"
+import { AppLogoIcon } from "@/components/AppLogo"
+
+type Step = "welcome" | 0 | 1 | 2 | 3 | 4 | 5
 
 interface SetupWizardProps {
   isPublicOrRender: boolean
+  isRender?: boolean
+  initialDatabaseNeedsSetup?: boolean
+  initialStep?: Step
+  initialShowAdvanced?: boolean
 }
 
-export function SetupWizard({ isPublicOrRender }: SetupWizardProps) {
+export function SetupWizard({
+  isPublicOrRender,
+  isRender = false,
+  initialDatabaseNeedsSetup = false,
+  initialStep,
+  initialShowAdvanced = false,
+}: SetupWizardProps) {
   const router = useRouter()
-  const [step, setStep] = useState<1 | 2 | 3 | 4>(1)
+  const [step, setStep] = useState<Step>(
+    initialStep ?? (initialDatabaseNeedsSetup ? "welcome" : 1)
+  )
   const [showSingleUserModal, setShowSingleUserModal] = useState(false)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
+  // Step 0 Database States
+  const [dbType, setDbType] = useState<"postgres" | "sqlite">(
+    isRender || isPublicOrRender ? "postgres" : "sqlite"
+  )
+  const [neonUrl, setNeonUrl] = useState("")
+  const [dbLoading, setDbLoading] = useState(false)
+  const [dbSuccess, setDbSuccess] = useState<string | null>(null)
+  const [dbError, setDbError] = useState<string | null>(null)
+  const [showAdvancedDb, setShowAdvancedDb] = useState(false)
+  const [showAdvancedMode, setShowAdvancedMode] = useState(initialShowAdvanced)
+
+  // AI Step State (Step 4)
+  const [aiProviderChoice, setAiProviderChoice] = useState<"gemini" | "openai" | "openrouter">("gemini")
+  const [openRouterKey, setOpenRouterKey] = useState("")
+  const [openAiKey, setOpenAiKey] = useState("")
+  const [geminiKey, setGeminiKey] = useState("")
+  const [aiLoading, setAiLoading] = useState(false)
+  const [aiSuccess, setAiSuccess] = useState<string | null>(null)
+  const [aiError, setAiError] = useState<string | null>(null)
+  const [isAiConfigured, setIsAiConfigured] = useState(false)
+  const [isSingleUserMode, setIsSingleUserMode] = useState(false)
+
   // Single-User Mode PIN States
   const [singleUserPin, setSingleUserPin] = useState("")
   const [singleUserPinConfirm, setSingleUserPinConfirm] = useState("")
+
+  useEffect(() => {
+    // Check if any AI key or env var is configured
+    getAiConfigStatus()
+      .then((status) => {
+        const hasKey = Boolean(
+          status.hasGeminiKey ||
+            status.hasOpenRouterKey ||
+            status.hasOpenAiKey ||
+            status.hasEnvGeminiKey ||
+            status.hasEnvOpenRouterKey ||
+            status.hasEnvOpenAiKey
+        )
+        if (hasKey) {
+          setIsAiConfigured(true)
+          if (status.activeProvider) {
+            setAiProviderChoice(status.activeProvider)
+          }
+        }
+      })
+      .catch(() => {})
+
+    if (typeof window !== "undefined") {
+      const params = new URLSearchParams(window.location.search)
+      const connected = params.get("ai_connected")
+      const err = params.get("ai_error")
+      if (connected === "openrouter") {
+        setStep(4)
+        setIsAiConfigured(true)
+        setAiProviderChoice("openrouter")
+        setAiSuccess("OpenRouter erfolgreich verknüpft! Klicke auf 'Weiter', um fortzufahren.")
+        const url = new URL(window.location.href)
+        url.searchParams.delete("ai_connected")
+        window.history.replaceState({}, document.title, url.pathname + (url.search ? url.search : ""))
+      } else if (err) {
+        setStep(4)
+        setAiError(decodeURIComponent(err))
+        const url = new URL(window.location.href)
+        url.searchParams.delete("ai_error")
+        window.history.replaceState({}, document.title, url.pathname + (url.search ? url.search : ""))
+      }
+    }
+  }, [])
 
   // Step 2 Form States (Parent / Admin)
   const [username, setUsername] = useState("")
@@ -45,6 +133,96 @@ export function SetupWizard({ isPublicOrRender }: SetupWizardProps) {
   const [hasManuallyEditedChildUsername, setHasManuallyEditedChildUsername] = useState(false)
   const [childPassword, setChildPassword] = useState("")
   const [childConfirmPassword, setChildConfirmPassword] = useState("")
+
+  const handleConnectNeon = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault()
+    setDbError(null)
+    setDbSuccess(null)
+
+    if (dbType === "sqlite") {
+      setDbLoading(true)
+      const res = await useLocalDatabase()
+      setDbLoading(false)
+      if (res.success) {
+        setStep(1)
+      } else {
+        setDbError(res.error || "Fehler beim Initialisieren von SQLite.")
+      }
+      return
+    }
+
+    if (!neonUrl.trim()) {
+      setDbError("Bitte gib einen Neon Connection String ein.")
+      return
+    }
+
+    setDbLoading(true)
+    try {
+      const res = await testAndMigrateDatabase(neonUrl.trim())
+      if (res.success) {
+        setDbSuccess(res.message || "Neon-Datenbank erfolgreich verbunden!")
+        setStep(1)
+      } else {
+        setDbError(res.error || "Verbindung zur Neon-Datenbank fehlgeschlagen.")
+      }
+    } catch (err: any) {
+      setDbError(err?.message || "Unerwarteter Fehler bei der Verbindung.")
+    } finally {
+      setDbLoading(false)
+    }
+  }
+
+  const handleSaveAiCredentials = async () => {
+    setAiError(null)
+    setAiSuccess(null)
+    setAiLoading(true)
+    try {
+      if (aiProviderChoice === "openrouter") {
+        if (!openRouterKey.trim()) {
+          setAiError("Bitte gib einen OpenRouter API-Key ein.")
+          setAiLoading(false)
+          return
+        }
+        const res = await saveAiKeyAction("openrouter_key", openRouterKey.trim(), true)
+        if (res.success) {
+          setAiSuccess("OpenRouter erfolgreich konfiguriert!")
+          setIsAiConfigured(true)
+        } else {
+          setAiError(res.error || "Fehler beim Speichern des Schlüssels.")
+        }
+      } else if (aiProviderChoice === "openai") {
+        if (!openAiKey.trim()) {
+          setAiError("Bitte gib einen OpenAI (ChatGPT) API-Key ein.")
+          setAiLoading(false)
+          return
+        }
+        const res = await saveAiKeyAction("openai_key", openAiKey.trim(), true)
+        if (res.success) {
+          setAiSuccess("OpenAI (ChatGPT) API-Key erfolgreich gespeichert!")
+          setIsAiConfigured(true)
+        } else {
+          setAiError(res.error || "Fehler beim Speichern des Schlüssels.")
+        }
+      } else {
+        if (!geminiKey.trim()) {
+          setAiError("Bitte gib einen Google AI Studio Key ein.")
+          setAiLoading(false)
+          return
+        }
+        const res = await saveAiKeyAction("gemini_key", geminiKey.trim(), true)
+        if (res.success) {
+          setAiSuccess("Google Gemini Key erfolgreich gespeichert!")
+          setIsAiConfigured(true)
+        } else {
+          setAiError(res.error || "Fehler beim Speichern des Schlüssels.")
+        }
+      }
+    } catch (err: any) {
+      setAiError(err?.message || "Fehler beim Speichern.")
+    } finally {
+      setAiLoading(false)
+    }
+  }
 
   const handleStartSingleUser = async (e?: React.FormEvent) => {
     if (e) e.preventDefault()
@@ -72,11 +250,11 @@ export function SetupWizard({ isPublicOrRender }: SetupWizardProps) {
         settingsPin: cleanPin || undefined,
       })
       if (res.success) {
-        router.push("/")
-        router.refresh()
-        if (typeof window !== "undefined") {
-          window.location.href = "/"
-        }
+        setIsSingleUserMode(true)
+        setShowSingleUserModal(false)
+        setLoading(false)
+        // AI is mandatory! Navigate to Step 4 so user sets up AI provider
+        setStep(4)
       } else {
         setError(res.error || "Fehler beim Abschließen der Einrichtung.")
         setLoading(false)
@@ -98,31 +276,27 @@ export function SetupWizard({ isPublicOrRender }: SetupWizardProps) {
     }
 
     if (!/^[a-zA-Z0-9_\-\.]+$/.test(cleanUsername)) {
-      setError("Der Eltern-Benutzername darf nur Buchstaben, Zahlen, Bindestriche und Punkte enthalten.")
+      setError("Der Benutzername darf nur Buchstaben, Zahlen, Punkte, Binde- und Unterstriche enthalten.")
       return
     }
 
-    if (cleanUsername.toLowerCase() === "default" || cleanUsername.toLowerCase() === "env-admin") {
-      setError("Dieser Benutzername ist reserviert.")
-      return
-    }
-
-    if (password.length < 8 || !/[^a-zA-Z0-9]/.test(password)) {
-      setError("Das Eltern-Passwort muss mindestens 8 Zeichen lang sein und mindestens ein Sonderzeichen enthalten.")
+    if (!password || password.length < 8) {
+      setError("Das Passwort muss mindestens 8 Zeichen lang sein.")
       return
     }
 
     if (password !== confirmPassword) {
-      setError("Die Passwörter für das Eltern-Konto stimmen nicht überein.")
+      setError("Die Passwörter stimmen nicht überein.")
       return
     }
 
-    if (!settingsPin || settingsPin.trim().length < 4) {
+    const cleanPin = settingsPin.trim()
+    if (!cleanPin || cleanPin.length < 4) {
       setError("Die Einstellungs-PIN muss mindestens 4 Zeichen lang sein.")
       return
     }
 
-    if (settingsPin !== settingsPinConfirm) {
+    if (cleanPin !== settingsPinConfirm.trim()) {
       setError("Die Einstellungs-PINs stimmen nicht überein.")
       return
     }
@@ -130,50 +304,62 @@ export function SetupWizard({ isPublicOrRender }: SetupWizardProps) {
     setStep(3)
   }
 
-  const handleChildDisplayNameChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const val = e.target.value
+  const handleChildDisplayNameChange = (val: string) => {
     setChildDisplayName(val)
     if (!hasManuallyEditedChildUsername) {
-      const suggested = val.toLowerCase().replace(/[^a-z0-9_\-\.]/g, "")
-      setChildUsername(suggested)
+      const slug = val
+        .toLowerCase()
+        .replace(/ä/g, "ae")
+        .replace(/ö/g, "oe")
+        .replace(/ü/g, "ue")
+        .replace(/ß/g, "ss")
+        .replace(/[^a-z0-9_\-]/g, "")
+      setChildUsername(slug)
     }
   }
 
-  const handleProtectedSubmit = async (e?: React.FormEvent) => {
+  const handleChildUsernameChange = (val: string) => {
+    setHasManuallyEditedChildUsername(true)
+    setChildUsername(val)
+  }
+
+  const handleCompleteProtected = async (e?: React.FormEvent) => {
     if (e) e.preventDefault()
     setError(null)
 
+    let childData: { username: string; displayName?: string; password: string } | undefined
+
     if (createChild) {
       const cleanChildUser = childUsername.trim()
-
       if (!cleanChildUser || cleanChildUser.length < 2 || cleanChildUser.length > 50) {
-        setError("Der Benutzername des Kindes muss zwischen 2 und 50 Zeichen lang sein.")
+        setError("Der Kinder-Benutzername muss zwischen 2 und 50 Zeichen lang sein.")
         return
       }
 
       if (!/^[a-zA-Z0-9_\-\.]+$/.test(cleanChildUser)) {
-        setError("Der Benutzername des Kindes darf nur Buchstaben, Zahlen, Bindestriche und Punkte enthalten.")
+        setError("Der Kinder-Benutzername darf nur Buchstaben, Zahlen, Punkte, Binde- und Unterstriche enthalten.")
         return
       }
 
       if (cleanChildUser.toLowerCase() === username.trim().toLowerCase()) {
-        setError("Eltern-Konto und Kinder-Konto müssen unterschiedliche Benutzernamen haben.")
+        setError("Der Kinder-Benutzername muss sich vom Eltern-Benutzernamen unterscheiden.")
         return
       }
 
-      if (cleanChildUser.toLowerCase() === "default" || cleanChildUser.toLowerCase() === "env-admin") {
-        setError("Dieser Benutzername für das Kind ist reserviert.")
-        return
-      }
-
-      if (childPassword.length < 8 || !/[^a-zA-Z0-9]/.test(childPassword)) {
-        setError("Das Passwort für das Kind muss mindestens 8 Zeichen lang sein und mindestens ein Sonderzeichen enthalten.")
+      if (!childPassword || childPassword.length < 8) {
+        setError("Das Kinder-Passwort muss mindestens 8 Zeichen lang sein.")
         return
       }
 
       if (childPassword !== childConfirmPassword) {
         setError("Die Passwörter für das Kinder-Konto stimmen nicht überein.")
         return
+      }
+
+      childData = {
+        username: cleanChildUser,
+        displayName: childDisplayName.trim() || undefined,
+        password: childPassword,
       }
     }
 
@@ -194,16 +380,8 @@ export function SetupWizard({ isPublicOrRender }: SetupWizardProps) {
       })
 
       if (res.success) {
-        if (createChild) {
-          setLoading(false)
-          setStep(4)
-        } else {
-          router.push("/")
-          router.refresh()
-          if (typeof window !== "undefined") {
-            window.location.href = "/"
-          }
-        }
+        setLoading(false)
+        setStep(4)
       } else {
         setError(res.error || "Fehler beim Einrichten.")
         setLoading(false)
@@ -227,29 +405,59 @@ export function SetupWizard({ isPublicOrRender }: SetupWizardProps) {
       {/* Top Header */}
       <div className="text-center mb-8">
         <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-blue-100 dark:bg-blue-900/40 text-blue-600 dark:text-blue-400 mb-3 shadow-sm">
-          {step === 4 ? (
+          {step === "welcome" ? (
+            <AppLogoIcon className="w-8 h-8 text-blue-600 dark:text-blue-500" />
+          ) : step === 5 ? (
             <CheckCircle2 className="w-7 h-7 text-emerald-600 dark:text-emerald-400" />
+          ) : step === 4 ? (
+            <Sparkles className="w-7 h-7 text-purple-600 dark:text-purple-400" />
           ) : step === 3 ? (
             <UserPlus className="w-7 h-7" />
+          ) : step === 0 ? (
+            <Database className="w-7 h-7 text-blue-600 dark:text-blue-400" />
           ) : (
-            <Sparkles className="w-7 h-7" />
+            <Users className="w-7 h-7" />
           )}
         </div>
         <h1 className="text-2xl sm:text-3xl font-extrabold text-zinc-900 dark:text-zinc-100 tracking-tight">
-          {step === 4
-            ? "Einrichtung abgeschlossen! 🎉"
-            : step === 3
-            ? "Kinder-Konto einrichten"
-            : "Willkommen beim N30 Vokabeltrainer! 👋"}
+          {step === "welcome" ? (
+            <span className="inline-flex items-center justify-center flex-wrap gap-x-2">
+              <span>Willkommen beim</span>
+              <span className="inline-flex items-center tracking-tight font-extrabold">
+                <span className="text-slate-900 dark:text-slate-100">N30</span>
+                <span className="text-blue-600 dark:text-blue-500">Vokabeltrainer</span>
+                <span>!</span>
+              </span>
+              <span>👋</span>
+            </span>
+          ) : step === 5 ? (
+            "Einrichtung abgeschlossen! 🎉"
+          ) : step === 4 ? (
+            "KI-Assistent einrichten"
+          ) : step === 3 ? (
+            "Kinder-Konto einrichten"
+          ) : step === 0 ? (
+            "Datenbank auswählen & verbinden"
+          ) : (
+            "Nutzungsmodus wählen"
+          )}
         </h1>
         <p className="text-sm sm:text-base text-zinc-600 dark:text-zinc-400 mt-2 max-w-md mx-auto">
-          {step === 1
+          {step === "welcome"
+            ? "Lass uns deinen Vokabeltrainer in wenigen Minuten gemeinsam startklar machen."
+            : step === 0
+            ? "Wähle aus, wo deine Vokabeln, Decks und Lernfortschritte gespeichert werden sollen."
+            : step === 1
             ? "Wähle bitte, wie du den N30 Vokabeltrainer auf diesem System nutzen möchtest:"
             : step === 2
             ? "Richte dein Eltern-Konto und die Einstellungs-PIN ein (Schritt 1 von 2)."
             : step === 3
             ? "Möchtest du direkt ein Profil für dein Kind anlegen (Schritt 2 von 2)?"
-            : "Alles ist bereit. Hier sind die wichtigsten Informationen für dein Kind:"}
+            : step === 4
+            ? "Verbinde einen KI-Provider für Scan per Foto, Beispielsätze und PDF-Arbeitsblätter."
+            : createChild
+            ? "Hier sind die Zugangsdaten für dein Kind zum Teilen oder Ausdrucken:"
+            : "Dein Vokabeltrainer ist nun startklar eingerichtet!"}
         </p>
       </div>
 
@@ -260,116 +468,538 @@ export function SetupWizard({ isPublicOrRender }: SetupWizardProps) {
         </div>
       )}
 
-      {/* Screen 1: Mode Selection */}
-      {step === 1 && (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-          {/* Option A: Geschützter Modus (Recommended) */}
-          <div className="bg-white dark:bg-zinc-900 rounded-2xl p-6 border-2 border-blue-500/70 dark:border-blue-500 shadow-md flex flex-col justify-between relative overflow-hidden">
-            <div className="absolute top-4 right-4 bg-blue-100 dark:bg-blue-950/80 text-blue-700 dark:text-blue-300 text-xs px-2.5 py-0.5 rounded-full font-semibold border border-blue-200 dark:border-blue-800">
-              Empfohlen
-            </div>
-
-            <div>
-              <div className="w-12 h-12 rounded-xl bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 flex items-center justify-center mb-4">
-                <Users className="w-6 h-6" />
-              </div>
-
-              <h2 className="text-lg font-bold text-zinc-900 dark:text-zinc-100 mb-1">
-                Geschützter Modus
-              </h2>
-              <p className="text-xs text-zinc-500 dark:text-zinc-400 mb-4">
-                Ideal für Familien, mehrere Profile und für öffentliche Server im Internet.
-              </p>
-
-              <ul className="space-y-2.5 text-xs sm:text-sm text-zinc-700 dark:text-zinc-300 mb-6">
-                <li className="flex items-center gap-2">
-                  <CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0" />
-                  <span>Benutzerkonten mit eigenem Fortschritt</span>
-                </li>
-                <li className="flex items-center gap-2">
-                  <CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0" />
-                  <span>Kindersicherung per PIN für Einstellungen</span>
-                </li>
-                <li className="flex items-center gap-2">
-                  <CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0" />
-                  <span>Sicherer Login mit Passwort</span>
-                </li>
-              </ul>
-            </div>
-
-            <button
-              type="button"
-              onClick={() => setStep(2)}
-              className="w-full py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-medium text-sm transition-colors flex items-center justify-center gap-2 shadow-sm"
-            >
-              <span>Geschützt einrichten</span>
-              <ArrowRight className="w-4 h-4" />
-            </button>
+      {/* Screen 'welcome': Ersteinrichtungs-Willkommensseite */}
+      {step === "welcome" && (
+        <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-3xl p-6 sm:p-8 shadow-xl">
+          <div className="mb-6">
+            <h2 className="text-xl sm:text-2xl font-bold text-zinc-900 dark:text-zinc-100 tracking-tight mb-2">
+              Lass uns loslegen! 🚀
+            </h2>
+            <p className="text-sm text-zinc-600 dark:text-zinc-400 leading-relaxed">
+              Bevor es mit dem spielerischen Vokabellernen losgeht, konfigurieren wir gemeinsam kurz die wichtigsten Grundlagen für Speicherung, Sicherheit und KI-Funktionen:
+            </p>
           </div>
 
-          {/* Option B: Einzelnutzer-Modus */}
-          <div className="bg-white dark:bg-zinc-900 rounded-2xl p-6 border border-zinc-200 dark:border-zinc-800 shadow-sm flex flex-col justify-between">
-            <div>
-              <div className="w-12 h-12 rounded-xl bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 flex items-center justify-center mb-4">
-                <User className="w-6 h-6" />
+          <div className="space-y-3.5 mb-8">
+            {/* Schritt 1: Datenbank */}
+            <div className="flex items-start gap-3.5 p-4 rounded-2xl bg-zinc-50 dark:bg-zinc-800/40 border border-zinc-200/80 dark:border-zinc-800 transition-colors">
+              <div className="w-10 h-10 rounded-xl bg-blue-100 dark:bg-blue-950/60 text-blue-600 dark:text-blue-400 flex items-center justify-center shrink-0 mt-0.5">
+                <Database className="w-5 h-5" />
               </div>
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2 mb-1">
+                  <span className="px-2 py-0.5 text-[11px] font-bold rounded-full bg-blue-100 dark:bg-blue-950/60 text-blue-700 dark:text-blue-300">
+                    Schritt 1
+                  </span>
+                  <h3 className="font-bold text-sm sm:text-base text-zinc-900 dark:text-zinc-100">
+                    Datenbank verbinden
+                  </h3>
+                </div>
+                <p className="text-xs sm:text-sm text-zinc-600 dark:text-zinc-400 leading-relaxed">
+                  Sichere und dauerhafte Speicherung all deiner Vokabeln, Decks und individuellen Lernfortschritte &ndash; kostenlos in der Cloud (Neon PostgreSQL) oder lokal.
+                </p>
+              </div>
+            </div>
 
-              <h2 className="text-lg font-bold text-zinc-900 dark:text-zinc-100 mb-1">
-                Einzelnutzer-Modus
-              </h2>
-              <p className="text-xs text-zinc-500 dark:text-zinc-400 mb-4">
-                Schnellstart ohne Benutzerkonten. Einstellungen werden mit einer PIN geschützt.
-              </p>
+            {/* Schritt 2: Konten & Schutz */}
+            <div className="flex items-start gap-3.5 p-4 rounded-2xl bg-zinc-50 dark:bg-zinc-800/40 border border-zinc-200/80 dark:border-zinc-800 transition-colors">
+              <div className="w-10 h-10 rounded-xl bg-purple-100 dark:bg-purple-950/60 text-purple-600 dark:text-purple-400 flex items-center justify-center shrink-0 mt-0.5">
+                <ShieldCheck className="w-5 h-5" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2 mb-1">
+                  <span className="px-2 py-0.5 text-[11px] font-bold rounded-full bg-purple-100 dark:bg-purple-950/60 text-purple-700 dark:text-purple-300">
+                    Schritt 2
+                  </span>
+                  <h3 className="font-bold text-sm sm:text-base text-zinc-900 dark:text-zinc-100">
+                    Benutzerkonten &amp; Kindersicherung
+                  </h3>
+                </div>
+                <p className="text-xs sm:text-sm text-zinc-600 dark:text-zinc-400 leading-relaxed">
+                  Erstelle getrennte Profile für Eltern und Kinder. Eine Eltern-PIN schützt sensible Einstellungen und den Zugriff auf KI-Schlüssel zuverlässig ab.
+                </p>
+              </div>
+            </div>
 
-              <ul className="space-y-2.5 text-xs sm:text-sm text-zinc-700 dark:text-zinc-300 mb-6">
-                <li className="flex items-center gap-2">
-                  <CheckCircle2 className="w-4 h-4 text-blue-500 shrink-0" />
-                  <span>Kein Login beim Vokabellernen nötig</span>
-                </li>
-                <li className="flex items-center gap-2">
-                  <CheckCircle2 className="w-4 h-4 text-blue-500 shrink-0" />
-                  <span>Einstellungsmenü mit PIN geschützt</span>
-                </li>
-                <li className="flex items-center gap-2">
-                  <CheckCircle2 className="w-4 h-4 text-blue-500 shrink-0" />
-                  <span>Alle Vokabeln in einer gemeinsamen Übersicht</span>
-                </li>
-              </ul>
+            {/* Schritt 3: KI-Assistent */}
+            <div className="flex items-start gap-3.5 p-4 rounded-2xl bg-zinc-50 dark:bg-zinc-800/40 border border-zinc-200/80 dark:border-zinc-800 transition-colors">
+              <div className="w-10 h-10 rounded-xl bg-amber-100 dark:bg-amber-950/60 text-amber-600 dark:text-amber-400 flex items-center justify-center shrink-0 mt-0.5">
+                <Sparkles className="w-5 h-5" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2 mb-1">
+                  <span className="px-2 py-0.5 text-[11px] font-bold rounded-full bg-amber-100 dark:bg-amber-950/60 text-amber-700 dark:text-amber-300">
+                    Schritt 3
+                  </span>
+                  <h3 className="font-bold text-sm sm:text-base text-zinc-900 dark:text-zinc-100">
+                    KI-Assistent anbinden
+                  </h3>
+                </div>
+                <p className="text-xs sm:text-sm text-zinc-600 dark:text-zinc-400 leading-relaxed">
+                  Verbinde Google Gemini, ChatGPT oder OpenRouter, um Vokabelhefte automatisch per Foto einzuscannen, didaktische Beispielsätze &amp; Eselsbrücken zu erzeugen und individuelle PDF-Arbeitsblätter zu erstellen.
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <div className="pt-5 border-t border-zinc-100 dark:border-zinc-800 flex flex-col sm:flex-row items-center justify-between gap-4">
+            <div className="flex items-center gap-2 text-xs text-zinc-500 dark:text-zinc-400">
+              <span className="inline-block w-2 h-2 rounded-full bg-emerald-500" />
+              <span>Dauer: ca. 2–3 Minuten • Alle Angaben später anpassbar</span>
             </div>
 
             <button
               type="button"
-              disabled={loading}
-              onClick={() => {
-                setError(null)
-                setShowSingleUserModal(true)
-              }}
-              className="w-full py-3 bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-zinc-800 dark:text-zinc-200 rounded-xl font-medium text-sm transition-colors"
+              onClick={() => setStep(initialDatabaseNeedsSetup ? 0 : 1)}
+              className="w-full sm:w-auto py-3 px-6 bg-blue-600 hover:bg-blue-700 active:scale-[0.98] text-white rounded-xl font-semibold text-sm transition-all shadow-md hover:shadow-lg flex items-center justify-center gap-2"
             >
-              Als Einzelnutzer starten
+              <span>Einrichtung jetzt starten</span>
+              <ArrowRight className="w-4 h-4" />
             </button>
           </div>
         </div>
       )}
 
-      {/* Screen 2: Protected Setup Form */}
+      {/* Screen 0: Database Configuration (Neon PostgreSQL vs SQLite) */}
+      {step === 0 && (
+        <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-3xl p-6 sm:p-8 shadow-xl">
+          <div className="space-y-4 mb-6">
+            {/* Neon Option */}
+            <div
+              onClick={() => setDbType("postgres")}
+              className={`p-5 rounded-2xl border-2 cursor-pointer transition-all ${
+                dbType === "postgres"
+                  ? "border-blue-600 bg-blue-50/30 dark:bg-blue-950/20"
+                  : "border-zinc-200 dark:border-zinc-800 hover:bg-zinc-50 dark:hover:bg-zinc-800/40"
+              }`}
+            >
+              <div className="flex items-start gap-3.5">
+                <input
+                  type="radio"
+                  name="dbType"
+                  checked={dbType === "postgres"}
+                  onChange={() => setDbType("postgres")}
+                  className="mt-1 text-blue-600 focus:ring-blue-500"
+                />
+                <div className="flex-1">
+                  <div className="flex items-center gap-2">
+                    <span className="font-bold text-sm sm:text-base text-zinc-900 dark:text-zinc-100">
+                      Neon Cloud-Datenbank (PostgreSQL)
+                    </span>
+                    <span className="px-2 py-0.5 text-xs font-semibold rounded-full bg-blue-100 text-blue-800 dark:bg-blue-950/50 dark:text-blue-300">
+                      Erforderlich
+                    </span>
+                  </div>
+                  <p className="text-xs sm:text-sm text-zinc-600 dark:text-zinc-400 mt-1">
+                    Dauerhaft kostenlos, serverless und ideal für den Betrieb auf Render und in der Cloud.
+                  </p>
+
+                  {dbType === "postgres" && (
+                    <div className="mt-4 space-y-3 pt-3 border-t border-zinc-100 dark:border-zinc-800">
+                      <label className="block text-xs font-medium text-zinc-700 dark:text-zinc-300">
+                        Neon Connection String *
+                      </label>
+                      <input
+                        type="password"
+                        value={neonUrl}
+                        onChange={(e) => setNeonUrl(e.target.value)}
+                        placeholder="postgresql://user:password@endpoint.neon.tech/neondb?sslmode=require"
+                        className="w-full px-3.5 py-2.5 rounded-xl border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      />
+                      <div className="flex items-center justify-between text-xs">
+                        <a
+                          href="https://neon.tech"
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-blue-600 hover:underline flex items-center gap-1 font-medium"
+                        >
+                          Kostenlose Datenbank auf neon.tech erstellen <ExternalLink className="w-3 h-3" />
+                        </a>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* SQLite Option - Collapsible when running on Render */}
+            {isRender ? (
+              <div className="pt-1">
+                <button
+                  type="button"
+                  onClick={() => setShowAdvancedDb(!showAdvancedDb)}
+                  className="flex items-center gap-1.5 text-xs text-zinc-500 hover:text-zinc-800 dark:text-zinc-400 dark:hover:text-zinc-200 transition-colors font-medium py-1.5"
+                >
+                  <ChevronDown className={`w-3.5 h-3.5 transition-transform duration-200 ${showAdvancedDb ? "rotate-180" : ""}`} />
+                  Erweiterte Einstellungen
+                </button>
+
+                {showAdvancedDb && (
+                  <div className="mt-3">
+                    <div
+                      onClick={() => setDbType("sqlite")}
+                      className={`p-4 rounded-2xl border-2 cursor-pointer transition-all ${
+                        dbType === "sqlite"
+                          ? "border-blue-600 bg-blue-50/30 dark:bg-blue-950/20"
+                          : "border-zinc-200 dark:border-zinc-800 hover:bg-zinc-50 dark:hover:bg-zinc-800/40"
+                      }`}
+                    >
+                      <div className="flex items-start gap-3">
+                        <input
+                          type="radio"
+                          name="dbType"
+                          checked={dbType === "sqlite"}
+                          onChange={() => setDbType("sqlite")}
+                          className="mt-1 text-blue-600 focus:ring-blue-500"
+                        />
+                        <div>
+                          <span className="font-bold text-xs sm:text-sm text-zinc-900 dark:text-zinc-100">
+                            Lokale Datei-Datenbank (SQLite)
+                          </span>
+                          <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">
+                            Keine Cloud nötig. Für lokale Docker-Installationen zu Hause (NAS, Unraid, lokaler PC).
+                          </p>
+                          <p className="text-xs text-amber-600 dark:text-amber-400 mt-1 font-medium">
+                            ⚠️ Hinweis: Auf Render Free gehen Daten im SQLite-Modus bei Server-Pausen verloren!
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+            ) : (
+              <div
+                onClick={() => setDbType("sqlite")}
+                className={`p-5 rounded-2xl border-2 cursor-pointer transition-all ${
+                  dbType === "sqlite"
+                    ? "border-blue-600 bg-blue-50/30 dark:bg-blue-950/20"
+                    : "border-zinc-200 dark:border-zinc-800 hover:bg-zinc-50 dark:hover:bg-zinc-800/40"
+                }`}
+              >
+                <div className="flex items-start gap-3.5">
+                  <input
+                    type="radio"
+                    name="dbType"
+                    checked={dbType === "sqlite"}
+                    onChange={() => setDbType("sqlite")}
+                    className="mt-1 text-blue-600 focus:ring-blue-500"
+                  />
+                  <div>
+                    <span className="font-bold text-sm sm:text-base text-zinc-900 dark:text-zinc-100">
+                      Lokale Datei-Datenbank (SQLite)
+                    </span>
+                    <p className="text-xs sm:text-sm text-zinc-600 dark:text-zinc-400 mt-1">
+                      Keine Cloud nötig. Perfekt für lokale Docker-Installationen zu Hause (Synology NAS, Unraid, Heimserver mit gemountetem Volume).
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {dbLoading && (
+            <div className="mb-4 p-3.5 bg-blue-50 dark:bg-blue-950/40 border border-blue-200 dark:border-blue-800 rounded-xl text-xs sm:text-sm text-blue-900 dark:text-blue-200 flex items-start sm:items-center gap-3 animate-pulse">
+              <div className="w-4 h-4 border-2 border-blue-600 border-t-transparent rounded-full animate-spin shrink-0 mt-0.5 sm:mt-0" />
+              <div className="space-y-0.5">
+                <p className="font-semibold text-blue-900 dark:text-blue-100">
+                  Datenbank wird initialisiert & Tabellen werden eingerichtet...
+                </p>
+                <p className="text-blue-700 dark:text-blue-300 text-xs">
+                  Bitte warten, dieser Vorgang kann bei der Ersteinrichtung bis zu 60 Sekunden dauern.
+                </p>
+              </div>
+            </div>
+          )}
+
+          {dbError && (
+            <div className="mb-4 p-3 bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-800 rounded-xl text-xs text-rose-700 dark:text-rose-300 flex items-center gap-2">
+              <AlertTriangle className="w-4 h-4 shrink-0 text-rose-600" />
+              <span>{dbError}</span>
+            </div>
+          )}
+
+          {dbSuccess && (
+            <div className="mb-4">
+              <div className="p-3 bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800 rounded-xl text-xs sm:text-sm text-emerald-800 dark:text-emerald-200 flex items-center gap-2">
+                <CheckCircle2 className="w-5 h-5 text-emerald-600 shrink-0" />
+                <span className="font-semibold">{dbSuccess}</span>
+              </div>
+            </div>
+          )}
+
+          <div className="pt-4 border-t border-zinc-100 dark:border-zinc-800 flex flex-col sm:flex-row items-center justify-between gap-3">
+            <button
+              type="button"
+              disabled={dbLoading}
+              onClick={() => setStep("welcome")}
+              className="inline-flex items-center gap-1.5 text-xs text-zinc-500 hover:text-zinc-800 dark:text-zinc-400 dark:hover:text-zinc-200 transition-colors font-medium order-2 sm:order-1 disabled:opacity-50"
+            >
+              <ArrowLeft className="w-3.5 h-3.5" /> Zurück zur Einführung
+            </button>
+
+            <div className="flex flex-col items-end gap-1.5 w-full sm:w-auto order-1 sm:order-2">
+              <button
+                type="button"
+                disabled={dbLoading}
+                onClick={dbSuccess ? () => setStep(1) : handleConnectNeon}
+                className="w-full sm:w-auto py-2.5 px-6 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-medium text-xs sm:text-sm transition-colors flex items-center justify-center gap-2 shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {dbLoading ? (
+                  <>
+                    <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                    <span>Wird eingerichtet... (bis zu 60 Sek.)</span>
+                  </>
+                ) : (
+                  <>
+                    <span>Weiter zur Benutzereinrichtung</span>
+                    <ArrowRight className="w-4 h-4" />
+                  </>
+                )}
+              </button>
+              {!dbSuccess && !dbLoading && (
+                <span className="text-[11px] text-zinc-400 dark:text-zinc-500 text-right">
+                  ⏱️ Die Einrichtung & Migration kann bis zu 60 Sekunden dauern
+                </span>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Screen 1: Mode Selection */}
+      {step === 1 && (
+        <div>
+          {!isRender ? (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {/* Option A: Protected Mode */}
+              <div className="bg-white dark:bg-zinc-900 border-2 border-blue-500/30 hover:border-blue-500 dark:border-blue-500/20 dark:hover:border-blue-500/60 rounded-3xl p-6 sm:p-7 shadow-lg flex flex-col justify-between transition-all">
+                <div>
+                  <div className="w-12 h-12 rounded-2xl bg-blue-100 dark:bg-blue-950/60 text-blue-600 dark:text-blue-400 flex items-center justify-center mb-4">
+                    <Users className="w-6 h-6" />
+                  </div>
+                  <div className="flex items-center gap-2 mb-2">
+                    <h3 className="text-lg font-bold text-zinc-900 dark:text-zinc-100">
+                      Geschützter Modus
+                    </h3>
+                    <span className="px-2.5 py-0.5 text-xs font-semibold rounded-full bg-blue-100 text-blue-800 dark:bg-blue-950/60 dark:text-blue-300">
+                      Empfohlen
+                    </span>
+                  </div>
+                  <p className="text-xs sm:text-sm text-zinc-600 dark:text-zinc-400 leading-relaxed mb-4">
+                    Ideal für Familien & geteilte Geräte. Schützt Einstellungen und API-Keys mit einer Eltern-PIN und trennt Lernstände sauber voneinander.
+                  </p>
+                  <ul className="text-xs sm:text-sm text-zinc-600 dark:text-zinc-400 space-y-2 mb-6">
+                    <li className="flex items-center gap-2">
+                      <CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0" />
+                      <span>Kindersichere PIN für sensible Einstellungen</span>
+                    </li>
+                    <li className="flex items-center gap-2">
+                      <CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0" />
+                      <span>Getrennte Vokabelstapel & Statistiken</span>
+                    </li>
+                    <li className="flex items-center gap-2">
+                      <CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0" />
+                      <span>Einfacher Kinder-Login ohne E-Mail-Adresse</span>
+                    </li>
+                  </ul>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => setStep(2)}
+                  className="w-full py-3 px-4 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-medium text-xs sm:text-sm transition-colors flex items-center justify-center gap-2 shadow-sm"
+                >
+                  Geschützt einrichten <ArrowRight className="w-4 h-4" />
+                </button>
+              </div>
+
+              {/* Option B: Single-User Mode */}
+              <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 hover:border-zinc-300 dark:hover:border-zinc-700 rounded-3xl p-6 sm:p-7 shadow-sm flex flex-col justify-between transition-all">
+                <div>
+                  <div className="w-12 h-12 rounded-2xl bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 flex items-center justify-center mb-4">
+                    <User className="w-6 h-6" />
+                  </div>
+                  <h3 className="text-lg font-bold text-zinc-900 dark:text-zinc-100 mb-2">
+                    Einzelnutzer-Modus
+                  </h3>
+                  <p className="text-xs sm:text-sm text-zinc-600 dark:text-zinc-400 leading-relaxed mb-4">
+                    Schnellstart ohne Benutzerkonten. Alle Daten werden zentral für einen einzelnen Nutzer gespeichert.
+                  </p>
+                  <ul className="text-xs sm:text-sm text-zinc-600 dark:text-zinc-400 space-y-2 mb-6">
+                    <li className="flex items-center gap-2">
+                      <CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0" />
+                      <span>Sofort startklar ohne Passwörter</span>
+                    </li>
+                    <li className="flex items-center gap-2">
+                      <CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0" />
+                      <span>Optional mit Einstellungs-PIN absicherbar</span>
+                    </li>
+                    <li className="flex items-center gap-2">
+                      <CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0" />
+                      <span>Jederzeit später auf Benutzerkonten erweiterbar</span>
+                    </li>
+                  </ul>
+                </div>
+
+                <button
+                  type="button"
+                  disabled={loading}
+                  onClick={() => {
+                    setError(null)
+                    setShowSingleUserModal(true)
+                  }}
+                  className="w-full py-3 bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-zinc-800 dark:text-zinc-200 rounded-xl font-medium text-sm transition-colors"
+                >
+                  Als Einzelnutzer starten
+                </button>
+              </div>
+            </div>
+          ) : (
+            /* Render Cloud Mode: Geschützter Modus prominently displayed as "Erforderlich", Einzelnutzer hidden under "Erweiterte Einstellungen" */
+            <div className="space-y-4">
+              <div className="bg-white dark:bg-zinc-900 border-2 border-blue-600 dark:border-blue-500 rounded-3xl p-6 sm:p-8 shadow-xl">
+                <div className="flex items-start gap-4 mb-4">
+                  <div className="w-12 h-12 rounded-2xl bg-blue-100 dark:bg-blue-950/60 text-blue-600 dark:text-blue-400 flex items-center justify-center shrink-0">
+                    <Users className="w-6 h-6" />
+                  </div>
+                  <div className="flex-1">
+                    <div className="flex items-center gap-2 mb-1">
+                      <h3 className="text-xl font-bold text-zinc-900 dark:text-zinc-100">
+                        Geschützter Modus
+                      </h3>
+                      <span className="px-2.5 py-0.5 text-xs font-semibold rounded-full bg-blue-100 text-blue-800 dark:bg-blue-950/60 dark:text-blue-300">
+                        Erforderlich
+                      </span>
+                    </div>
+                    <p className="text-xs sm:text-sm text-zinc-600 dark:text-zinc-400 leading-relaxed">
+                      Für Render und Cloud-Betrieb: Schützt Einstellungen, API-Keys und Datenbankverbindung zuverlässig mit einer Eltern-PIN und trennt Profile für Eltern und Kinder.
+                    </p>
+                  </div>
+                </div>
+
+                <ul className="text-xs sm:text-sm text-zinc-600 dark:text-zinc-400 space-y-2.5 my-6 p-4 rounded-2xl bg-zinc-50 dark:bg-zinc-800/40 border border-zinc-200/80 dark:border-zinc-800">
+                  <li className="flex items-center gap-2.5">
+                    <CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0" />
+                    <span>Kindersichere PIN für sensible Einstellungen &amp; API-Keys</span>
+                  </li>
+                  <li className="flex items-center gap-2.5">
+                    <CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0" />
+                    <span>Getrennte Vokabelstapel, Lernstände &amp; Statistiken</span>
+                  </li>
+                  <li className="flex items-center gap-2.5">
+                    <CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0" />
+                    <span>Einfacher Kinder-Login ohne E-Mail-Adresse</span>
+                  </li>
+                </ul>
+
+                <button
+                  type="button"
+                  onClick={() => setStep(2)}
+                  className="w-full py-3.5 px-6 bg-blue-600 hover:bg-blue-700 active:scale-[0.99] text-white rounded-xl font-semibold text-sm transition-all shadow-md hover:shadow-lg flex items-center justify-center gap-2"
+                >
+                  <span>Geschützt einrichten</span>
+                  <ArrowRight className="w-4 h-4" />
+                </button>
+              </div>
+
+              {/* Collapsed Option B under "Erweiterte Einstellungen" */}
+              <div className="pt-1">
+                <button
+                  type="button"
+                  onClick={() => setShowAdvancedMode(!showAdvancedMode)}
+                  className="flex items-center gap-1.5 text-xs text-zinc-500 hover:text-zinc-800 dark:text-zinc-400 dark:hover:text-zinc-200 transition-colors font-medium px-2 py-1"
+                >
+                  <ChevronDown
+                    className={`w-3.5 h-3.5 transition-transform duration-200 ${
+                      showAdvancedMode ? "rotate-180" : ""
+                    }`}
+                  />
+                  Erweiterte Einstellungen
+                </button>
+
+                {showAdvancedMode && (
+                  <div className="mt-3 bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-3xl p-6 shadow-sm transition-all">
+                    <div className="flex items-start gap-3.5 mb-3">
+                      <div className="w-10 h-10 rounded-xl bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 flex items-center justify-center shrink-0">
+                        <User className="w-5 h-5" />
+                      </div>
+                      <div className="flex-1">
+                        <h3 className="text-base font-bold text-zinc-900 dark:text-zinc-100 mb-1">
+                          Einzelnutzer-Modus
+                        </h3>
+                        <p className="text-xs sm:text-sm text-zinc-600 dark:text-zinc-400 leading-relaxed">
+                          Schnellstart ohne Benutzerkonten. Alle Daten werden zentral für einen einzelnen Nutzer gespeichert.
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="p-3 bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800 rounded-xl text-xs text-amber-800 dark:text-amber-300 flex items-start gap-2 mb-4">
+                      <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5 text-amber-600" />
+                      <span>
+                        Hinweis: Im Cloud-Betrieb auf Render wird der geschützte Modus dringend empfohlen, damit Einstellungen und API-Keys durch eine Eltern-PIN geschützt bleiben.
+                      </span>
+                    </div>
+
+                    <div className="flex justify-end">
+                      <button
+                        type="button"
+                        disabled={loading}
+                        onClick={() => {
+                          setError(null)
+                          setShowSingleUserModal(true)
+                        }}
+                        className="py-2.5 px-4 bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-zinc-800 dark:text-zinc-200 rounded-xl font-medium text-xs sm:text-sm transition-colors"
+                      >
+                        Trotzdem als Einzelnutzer starten
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {initialDatabaseNeedsSetup && (
+            <div className="mt-6 flex justify-start">
+              <button
+                type="button"
+                onClick={() => setStep(0)}
+                className="inline-flex items-center gap-1.5 text-xs text-zinc-500 hover:text-zinc-800 dark:text-zinc-400 dark:hover:text-zinc-200 transition-colors font-medium"
+              >
+                <ArrowLeft className="w-3.5 h-3.5" /> Zurück zur Datenbankauswahl
+              </button>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Screen 2: Parent Admin Credentials & PIN */}
       {step === 2 && (
-        <div className="bg-white dark:bg-zinc-900 rounded-2xl p-6 sm:p-8 border border-zinc-200 dark:border-zinc-800 shadow-sm">
-          <div className="flex items-center justify-between text-xs font-semibold text-zinc-500 dark:text-zinc-400 mb-6 uppercase tracking-wider pb-2 border-b border-zinc-100 dark:border-zinc-800">
-            <span>Schritt 1 von 2: Eltern-Konto</span>
-            <span>Geschützter Modus</span>
+        <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-3xl p-6 sm:p-8 shadow-xl">
+          <div className="mb-6 flex items-center justify-between pb-4 border-b border-zinc-100 dark:border-zinc-800">
+            <span className="text-xs sm:text-sm font-semibold text-blue-600 dark:text-blue-400">
+              Schritt 1 von 2: Eltern-Konto
+            </span>
+            <button
+              type="button"
+              onClick={() => setStep(1)}
+              className="text-xs text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-200 flex items-center gap-1"
+            >
+              <ArrowLeft className="w-3.5 h-3.5" /> Modus wechseln
+            </button>
           </div>
 
           <form onSubmit={handleProceedToChildStep} className="space-y-6">
-            {/* Account Information */}
             <div className="space-y-4">
-              <h2 className="text-base font-bold text-zinc-900 dark:text-zinc-100 pb-1 border-b border-zinc-100 dark:border-zinc-800">
+              <h2 className="text-base font-bold text-zinc-900 dark:text-zinc-100 pb-1 border-b border-zinc-100 dark:border-zinc-800 flex items-center gap-2">
+                <User className="w-5 h-5 text-blue-600 dark:text-blue-400" />
                 1. Eltern- / Administrator-Konto
               </h2>
 
               <div>
                 <label className="block text-xs sm:text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-1.5">
-                  Anmeldename *
+                  Eltern-Benutzername *
                 </label>
                 <input
                   type="text"
@@ -377,6 +1007,8 @@ export function SetupWizard({ isPublicOrRender }: SetupWizardProps) {
                   onChange={(e) => setUsername(e.target.value)}
                   placeholder="z. B. Papa, Mama oder Admin"
                   required
+                  minLength={2}
+                  maxLength={50}
                   autoFocus
                   className="w-full px-3.5 py-2.5 rounded-xl border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
@@ -461,45 +1093,47 @@ export function SetupWizard({ isPublicOrRender }: SetupWizardProps) {
             <div className="pt-4 border-t border-zinc-100 dark:border-zinc-800 flex items-center justify-between gap-3">
               <button
                 type="button"
-                onClick={() => {
-                  setStep(1)
-                  setError(null)
-                }}
+                onClick={() => setStep(1)}
                 className="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-xl border border-zinc-300 dark:border-zinc-700 text-xs sm:text-sm font-medium text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
               >
                 <ArrowLeft className="w-4 h-4" /> Zurück
               </button>
+
               <button
                 type="submit"
-                className="py-2.5 px-5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-medium text-xs sm:text-sm transition-colors flex items-center justify-center gap-2 shadow-sm"
+                className="py-2.5 px-6 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-medium text-xs sm:text-sm transition-colors flex items-center justify-center gap-2 shadow-sm"
               >
-                <span>Weiter: Kinder-Konto einrichten</span>
-                <ArrowRight className="w-4 h-4" />
+                Weiter: Kinder-Konto einrichten <ArrowRight className="w-4 h-4" />
               </button>
             </div>
           </form>
         </div>
       )}
 
-      {/* Screen 3: Child Account Setup Prompt */}
+      {/* Screen 3: Child Account */}
       {step === 3 && (
-        <div className="bg-white dark:bg-zinc-900 rounded-2xl p-6 sm:p-8 border border-zinc-200 dark:border-zinc-800 shadow-sm">
-          <div className="flex items-center justify-between text-xs font-semibold text-blue-600 dark:text-blue-400 mb-6 uppercase tracking-wider pb-2 border-b border-zinc-100 dark:border-zinc-800">
-            <span>Schritt 2 von 2: Kinder-Konto</span>
-            <span>Geschützter Modus</span>
+        <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-3xl p-6 sm:p-8 shadow-xl">
+          <div className="mb-6 flex items-center justify-between pb-4 border-b border-zinc-100 dark:border-zinc-800">
+            <span className="text-xs sm:text-sm font-semibold text-blue-600 dark:text-blue-400">
+              Schritt 2 von 2: Kinder-Konto
+            </span>
+            <button
+              type="button"
+              onClick={() => {
+                setStep(2)
+                setError(null)
+              }}
+              className="text-xs text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-200 flex items-center gap-1"
+            >
+              <ArrowLeft className="w-3.5 h-3.5" /> Zurück zu Eltern-Konto
+            </button>
           </div>
 
-          <div className="mb-6">
-            <h2 className="text-lg font-bold text-zinc-900 dark:text-zinc-100 mb-1">
+          <form onSubmit={handleCompleteProtected} className="space-y-6">
+            <h3 className="text-base font-bold text-zinc-900 dark:text-zinc-100">
               Möchtest du direkt ein Kinder-Konto einrichten?
-            </h2>
-            <p className="text-xs sm:text-sm text-zinc-600 dark:text-zinc-400">
-              Mit einem Kinder-Konto kann dein Kind direkt mit eigenem Namen und Lernstand Vokabeln üben, ohne Zugriff auf deine Einstellungen.
-            </p>
-          </div>
+            </h3>
 
-          <form onSubmit={handleProtectedSubmit} className="space-y-6">
-            {/* Choice: Create Child Account Now vs Later */}
             <div className="space-y-3">
               <label
                 onClick={() => setCreateChild(true)}
@@ -516,59 +1150,51 @@ export function SetupWizard({ isPublicOrRender }: SetupWizardProps) {
                   onChange={() => setCreateChild(true)}
                   className="mt-1 text-blue-600 focus:ring-blue-500"
                 />
-                <div className="w-full">
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm font-bold text-zinc-900 dark:text-zinc-100">
-                      Ja, jetzt ein Kinder-Konto anlegen
-                    </span>
-                    <span className="text-[11px] font-semibold bg-blue-100 dark:bg-blue-900/60 text-blue-700 dark:text-blue-300 px-2 py-0.5 rounded-full">
-                      Empfohlen
-                    </span>
-                  </div>
+                <div className="flex-1">
+                  <span className="text-sm font-bold text-zinc-900 dark:text-zinc-100">
+                    Ja, jetzt ein Kinder-Konto anlegen
+                  </span>
                   <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">
-                    Richte die Zugangsdaten für dein Kind ein.
+                    Dein Kind erhält einen kindgerechten Benutzernamen und ein eigenes Passwort.
                   </p>
 
                   {createChild && (
-                    <div className="mt-4 pt-4 border-t border-blue-200/60 dark:border-blue-900/40 space-y-4">
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                        <div>
-                          <label className="block text-xs font-medium text-zinc-700 dark:text-zinc-300 mb-1">
-                            Rufname / Vorname *
-                          </label>
-                          <input
-                            type="text"
-                            value={childDisplayName}
-                            onChange={handleChildDisplayNameChange}
-                            placeholder="z. B. Leon oder Anna"
-                            required={createChild}
-                            autoFocus
-                            className="w-full px-3 py-2 rounded-xl border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                          />
-                        </div>
-
-                        <div>
-                          <label className="block text-xs font-medium text-zinc-700 dark:text-zinc-300 mb-1">
-                            Anmeldename *
-                          </label>
-                          <input
-                            type="text"
-                            value={childUsername}
-                            onChange={(e) => {
-                              setHasManuallyEditedChildUsername(true)
-                              setChildUsername(e.target.value)
-                            }}
-                            placeholder="z. B. leon"
-                            required={createChild}
-                            className="w-full px-3 py-2 rounded-xl border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                          />
-                        </div>
+                    <div className="mt-4 space-y-4 pt-3 border-t border-zinc-100 dark:border-zinc-800">
+                      <div>
+                        <label className="block text-xs font-medium text-zinc-700 dark:text-zinc-300 mb-1">
+                          Name des Kindes *
+                        </label>
+                        <input
+                          type="text"
+                          value={childDisplayName}
+                          onChange={(e) => handleChildDisplayNameChange(e.target.value)}
+                          placeholder="z. B. Leon oder Anna"
+                          required={createChild}
+                          autoFocus
+                          className="w-full px-3 py-2 rounded-xl border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        />
                       </div>
 
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-xs font-medium text-zinc-700 dark:text-zinc-300 mb-1">
+                          Benutzername für die Anmeldung *
+                        </label>
+                        <input
+                          type="text"
+                          value={childUsername}
+                          onChange={(e) => handleChildUsernameChange(e.target.value)}
+                          placeholder="z. B. leon"
+                          required={createChild}
+                          minLength={2}
+                          maxLength={50}
+                          className="w-full px-3 py-2 rounded-xl border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        />
+                      </div>
+
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                         <div>
                           <label className="block text-xs font-medium text-zinc-700 dark:text-zinc-300 mb-1">
-                            Passwort für Kind *
+                            Kinder-Passwort *
                           </label>
                           <input
                             type="password"
@@ -651,13 +1277,314 @@ export function SetupWizard({ isPublicOrRender }: SetupWizardProps) {
         </div>
       )}
 
-      {/* Screen 4: Child Account Sharing & Completion */}
+      {/* Screen 4: Dedicated AI Provider Setup (Mandatory) */}
       {step === 4 && (
-        <ChildShareInfoCard
-          childName={childDisplayName || childUsername}
-          childUsername={childUsername.trim()}
-          onFinish={handleFinalRedirect}
-        />
+        <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-3xl p-6 sm:p-8 shadow-xl text-left space-y-6">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2.5">
+              <Sparkles className="w-5 h-5 text-purple-600 dark:text-purple-400" />
+              <h3 className="text-base sm:text-lg font-bold text-zinc-900 dark:text-zinc-100">
+                KI-Assistent verbinden
+              </h3>
+            </div>
+            <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-amber-100 text-amber-800 dark:bg-amber-950/60 dark:text-amber-300">
+              Erforderlich
+            </span>
+          </div>
+
+          <p className="text-xs sm:text-sm text-zinc-600 dark:text-zinc-400 leading-relaxed">
+            Die KI ist ein zentraler Bestandteil des N30 Vokabeltrainers: Sie ermöglicht das Einlesen von Vokabellisten und Schulbuchseiten per Foto, generiert didaktische Eselsbrücken, Beispielsätze und erstellt druckbare PDF-Arbeitsblätter mit Lückentexten.
+          </p>
+
+          {isAiConfigured && (
+            <div className="p-3.5 bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-800 rounded-2xl flex items-center gap-2.5 text-xs sm:text-sm text-emerald-800 dark:text-emerald-300 font-medium">
+              <CheckCircle2 className="w-5 h-5 shrink-0 text-emerald-600 dark:text-emerald-400" />
+              <span>KI-Assistent ist einsatzbereit! Du kannst jetzt fortfahren oder einen anderen Anbieter wählen.</span>
+            </div>
+          )}
+
+          <div className="space-y-4">
+            {/* Option 1: Google Gemini */}
+            <div
+              onClick={() => setAiProviderChoice("gemini")}
+              className={`p-4 rounded-2xl border-2 cursor-pointer transition-all ${
+                aiProviderChoice === "gemini"
+                  ? "border-blue-600 bg-blue-50/30 dark:bg-blue-950/20"
+                  : "border-zinc-200 dark:border-zinc-800 hover:bg-zinc-50 dark:hover:bg-zinc-800/40"
+              }`}
+            >
+              <div className="flex items-start gap-3">
+                <input
+                  type="radio"
+                  name="aiChoice"
+                  checked={aiProviderChoice === "gemini"}
+                  onChange={() => setAiProviderChoice("gemini")}
+                  className="mt-1 text-blue-600 focus:ring-blue-500"
+                />
+                <div className="flex-1">
+                  <div className="flex items-center justify-between">
+                    <span className="font-bold text-xs sm:text-sm text-zinc-900 dark:text-zinc-100">
+                      🔵 Option 1: Google Gemini (Empfohlen &amp; Kostenlos)
+                    </span>
+                    <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-emerald-100 dark:bg-emerald-950/60 text-emerald-800 dark:text-emerald-300">
+                      Dauerhaft kostenlos
+                    </span>
+                  </div>
+                  <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">
+                    Kostenloser API-Schlüssel aus dem Google AI Studio (bis zu 1.500 Anfragen/Tag gratis, keine Zahlungsdaten nötig). Mehrere Keys können kommagetrennt für automatisches Fallback eingegeben werden.
+                  </p>
+
+                  {aiProviderChoice === "gemini" && (
+                    <div className="mt-3 space-y-2 pt-2 border-t border-zinc-100 dark:border-zinc-800">
+                      <div className="flex gap-2">
+                        <input
+                          type="password"
+                          value={geminiKey}
+                          onChange={(e) => setGeminiKey(e.target.value)}
+                          placeholder="AIzaSy..."
+                          className="flex-1 px-3 py-2 rounded-xl border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-xs text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        />
+                        <button
+                          type="button"
+                          disabled={aiLoading}
+                          onClick={handleSaveAiCredentials}
+                          className="px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-medium disabled:opacity-50"
+                        >
+                          {aiLoading ? "Speichert..." : "Speichern"}
+                        </button>
+                      </div>
+                      <a
+                        href="https://aistudio.google.com/app/apikey"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-xs text-blue-600 hover:underline inline-flex items-center gap-1 font-medium"
+                      >
+                        Kostenlosen Key im Google AI Studio holen <ExternalLink className="w-3 h-3" />
+                      </a>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* Option 2: ChatGPT (OpenAI) */}
+            <div
+              onClick={() => setAiProviderChoice("openai")}
+              className={`p-4 rounded-2xl border-2 cursor-pointer transition-all ${
+                aiProviderChoice === "openai"
+                  ? "border-emerald-600 bg-emerald-50/30 dark:bg-emerald-950/20"
+                  : "border-zinc-200 dark:border-zinc-800 hover:bg-zinc-50 dark:hover:bg-zinc-800/40"
+              }`}
+            >
+              <div className="flex items-start gap-3">
+                <input
+                  type="radio"
+                  name="aiChoice"
+                  checked={aiProviderChoice === "openai"}
+                  onChange={() => setAiProviderChoice("openai")}
+                  className="mt-1 text-emerald-600 focus:ring-emerald-500"
+                />
+                <div className="flex-1">
+                  <div className="flex items-center justify-between">
+                    <span className="font-bold text-xs sm:text-sm text-zinc-900 dark:text-zinc-100">
+                      🟢 Option 2: ChatGPT (OpenAI API-Key)
+                    </span>
+                    <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-amber-100 dark:bg-amber-950/60 text-amber-800 dark:text-amber-300">
+                      Kostenpflichtig
+                    </span>
+                  </div>
+                  <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">
+                    Direkte OpenAI API für GPT-4o und GPT-4o-mini. Erfordert aufgeladenes OpenAI-Guthaben (Pay-as-you-go).
+                  </p>
+
+                  {aiProviderChoice === "openai" && (
+                    <div className="mt-3 space-y-2.5 pt-2 border-t border-zinc-100 dark:border-zinc-800">
+                      <div className="p-2.5 rounded-xl bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 text-xs text-amber-900 dark:text-amber-300 leading-relaxed">
+                        <em>Hinweis:</em> Bei OpenAI gibt es keine kostenlosen API-Tokens. Die Nutzung erfordert hinterlegtes Guthaben auf platform.openai.com. Für 100% kostenlose Nutzung wähle oben Google Gemini.
+                      </div>
+                      <div className="flex gap-2">
+                        <input
+                          type="password"
+                          value={openAiKey}
+                          onChange={(e) => setOpenAiKey(e.target.value)}
+                          placeholder="sk-proj-..."
+                          className="flex-1 px-3 py-2 rounded-xl border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-xs text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                        />
+                        <button
+                          type="button"
+                          disabled={aiLoading}
+                          onClick={handleSaveAiCredentials}
+                          className="px-3 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-medium disabled:opacity-50"
+                        >
+                          {aiLoading ? "Speichert..." : "Speichern"}
+                        </button>
+                      </div>
+                      <a
+                        href="https://platform.openai.com/api-keys"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-xs text-emerald-600 dark:text-emerald-400 hover:underline inline-flex items-center gap-1 font-medium"
+                      >
+                        API-Key auf platform.openai.com erstellen <ExternalLink className="w-3 h-3" />
+                      </a>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* Option 3: OpenRouter */}
+            <div
+              onClick={() => setAiProviderChoice("openrouter")}
+              className={`p-4 rounded-2xl border-2 cursor-pointer transition-all ${
+                aiProviderChoice === "openrouter"
+                  ? "border-purple-600 bg-purple-50/30 dark:bg-purple-950/20"
+                  : "border-zinc-200 dark:border-zinc-800 hover:bg-zinc-50 dark:hover:bg-zinc-800/40"
+              }`}
+            >
+              <div className="flex items-start gap-3">
+                <input
+                  type="radio"
+                  name="aiChoice"
+                  checked={aiProviderChoice === "openrouter"}
+                  onChange={() => setAiProviderChoice("openrouter")}
+                  className="mt-1 text-purple-600 focus:ring-purple-500"
+                />
+                <div className="flex-1">
+                  <div className="flex items-center justify-between">
+                    <span className="font-bold text-xs sm:text-sm text-zinc-900 dark:text-zinc-100">
+                      🟣 Option 3: OpenRouter (1-Klick-Verbindung)
+                    </span>
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-amber-100 dark:bg-amber-950/60 text-amber-800 dark:text-amber-300">
+                        Kostenpflichtig
+                      </span>
+                      <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-purple-100 dark:bg-purple-950/60 text-purple-700 dark:text-purple-300">
+                        1-Klick
+                      </span>
+                    </div>
+                  </div>
+                  <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">
+                    1-Klick-Verbindung oder API-Key für Gemini 3.6 Flash, GPT-4o und Claude. Erfordert OpenRouter-Guthaben (Pay-as-you-go).
+                  </p>
+
+                  {aiProviderChoice === "openrouter" && (
+                    <div className="mt-3 space-y-3 pt-2 border-t border-zinc-100 dark:border-zinc-800">
+                      <div className="p-3 rounded-xl bg-purple-50 dark:bg-purple-950/40 border border-purple-200 dark:border-purple-800 text-xs text-purple-950 dark:text-purple-200 space-y-1">
+                        <div className="flex items-center gap-1.5 font-semibold text-purple-900 dark:text-purple-100">
+                          <Sparkles className="w-4 h-4 text-purple-600 dark:text-purple-400 shrink-0" />
+                          <span>Hinweis zur 1-Klick-Anbindung:</span>
+                        </div>
+                        <p className="text-zinc-600 dark:text-zinc-300 leading-relaxed">
+                          Du wirst zu <strong>OpenRouter</strong> weitergeleitet. Bitte melde dich dort an und klicke auf <strong>„Authorize“</strong>.
+                          <br />
+                          <em>Hinweis:</em> OpenRouter rechnet nach Verbrauch ab und erfordert Guthaben (z. B. 5 $). Für eine <strong>100% kostenlose Nutzung</strong> ohne Zahlungsdaten wähle oben <strong>Google Gemini</strong>.
+                        </p>
+                      </div>
+
+                      <div>
+                        <a
+                          href={`/api/auth/openrouter/login?returnTo=${encodeURIComponent("/setup?step=4")}`}
+                          className="inline-flex items-center gap-1.5 px-4 py-2.5 bg-purple-600 hover:bg-purple-700 text-white rounded-xl text-xs font-semibold transition-colors shadow-sm"
+                        >
+                          <Sparkles className="w-3.5 h-3.5" /> Mit OpenRouter verbinden (1-Klick)
+                        </a>
+                      </div>
+
+                      <p className="text-xs text-zinc-500 pt-1">oder API-Schlüssel manuell eingeben:</p>
+                      <div className="flex gap-2">
+                        <input
+                          type="password"
+                          value={openRouterKey}
+                          onChange={(e) => setOpenRouterKey(e.target.value)}
+                          placeholder="sk-or-v1-..."
+                          className="flex-1 px-3 py-2 rounded-xl border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-xs text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-purple-500"
+                        />
+                        <button
+                          type="button"
+                          disabled={aiLoading}
+                          onClick={handleSaveAiCredentials}
+                          className="px-3 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-xl text-xs font-medium disabled:opacity-50"
+                        >
+                          {aiLoading ? "Speichert..." : "Speichern"}
+                        </button>
+                      </div>
+                      <a
+                        href="https://openrouter.ai/keys"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-xs text-purple-600 dark:text-purple-400 hover:underline inline-flex items-center gap-1 font-medium"
+                      >
+                        API-Key auf openrouter.ai erstellen <ExternalLink className="w-3 h-3" />
+                      </a>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {aiSuccess && <p className="text-xs text-emerald-600 dark:text-emerald-400 font-semibold">✅ {aiSuccess}</p>}
+          {aiError && <p className="text-xs text-rose-600 dark:text-rose-400 font-medium">⚠️ {aiError}</p>}
+
+          <div className="pt-4 border-t border-zinc-100 dark:border-zinc-800 flex items-center justify-between gap-3">
+            <button
+              type="button"
+              onClick={() => {
+                if (isSingleUserMode) {
+                  setStep(1)
+                } else {
+                  setStep(3)
+                }
+              }}
+              className="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-xl border border-zinc-300 dark:border-zinc-700 text-xs sm:text-sm font-medium text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
+            >
+              <ArrowLeft className="w-4 h-4" /> {isSingleUserMode ? "Zurück zur Moduswahl" : "Zurück zu Kinder-Konto"}
+            </button>
+
+            {isSingleUserMode || !createChild ? (
+              <button
+                type="button"
+                disabled={!isAiConfigured}
+                onClick={handleFinalRedirect}
+                className="py-2.5 px-6 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-medium text-xs sm:text-sm transition-colors flex items-center gap-2 shadow-sm disabled:opacity-40 disabled:cursor-not-allowed"
+                title={!isAiConfigured ? "Bitte verbinde zuerst einen KI-Provider" : undefined}
+              >
+                Einrichtung abschließen & zur App 🚀
+              </button>
+            ) : (
+              <button
+                type="button"
+                disabled={!isAiConfigured}
+                onClick={() => setStep(5)}
+                className="py-2.5 px-6 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-medium text-xs sm:text-sm transition-colors flex items-center gap-2 shadow-sm disabled:opacity-40 disabled:cursor-not-allowed"
+                title={!isAiConfigured ? "Bitte verbinde zuerst einen KI-Provider" : undefined}
+              >
+                Weiter zum Abschluss ➔
+              </button>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Screen 5: Final Completion & Child Credentials Sharing */}
+      {step === 5 && (
+        <div className="space-y-6">
+          <ChildShareInfoCard
+            childName={childDisplayName || childUsername}
+            childUsername={childUsername.trim()}
+            onFinish={handleFinalRedirect}
+          />
+          <div className="flex justify-start">
+            <button
+              type="button"
+              onClick={() => setStep(4)}
+              className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl border border-zinc-300 dark:border-zinc-700 text-xs sm:text-sm font-medium text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
+            >
+              <ArrowLeft className="w-4 h-4" /> Zurück zur KI-Einrichtung
+            </button>
+          </div>
+        </div>
       )}
 
       {/* Modal for Single-User Mode Settings PIN */}
@@ -673,7 +1600,7 @@ export function SetupWizard({ isPublicOrRender }: SetupWizardProps) {
             </h3>
 
             <p className="text-xs sm:text-sm text-zinc-600 dark:text-zinc-400 mb-4 leading-relaxed">
-              Zum Vokabellernen ist kein Login nötig. Du kannst deine Einstellungen optional mit einer <strong>PIN für das Einstellungsmenü</strong> schützen.
+              Möchtest du eine PIN für den Schutz des Einstellungsmenüs vergeben?
             </p>
 
             <form onSubmit={handleStartSingleUser} className="space-y-4">

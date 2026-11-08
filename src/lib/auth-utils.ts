@@ -153,6 +153,7 @@ export function getAppSecret(password?: string): string {
   return (
     process.env.AUTH_SECRET ||
     process.env.SESSION_SECRET ||
+    (process.env.RENDER_SERVICE_ID ? `render-sec-${process.env.RENDER_SERVICE_ID}` : undefined) ||
     (password ? deriveSecretFromPassword(password) : undefined) ||
     (process.env.SETTINGS_PASSWORD ? deriveSecretFromPassword(process.env.SETTINGS_PASSWORD) : undefined) ||
     getFallbackSecret()

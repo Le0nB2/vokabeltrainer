@@ -48,32 +48,23 @@ Eine moderne, lokal lauffähige Vokabeltrainer-Webanwendung, gebaut mit Next.js 
 Du möchtest deinen Vokabeltrainer nicht lokal auf deinem eigenen PC laufen lassen, sondern ihn rund um die Uhr aus dem Internet erreichbar machen? Dank der automatischen **Render-Blueprint**-Konfiguration geht das mit minimalem Aufwand und völlig **kostenlos**.
 
 Du benötigst dafür kostenlose Konten und nur wenige Minuten:
-1. **Google Gemini:** Kostenloser KI-Schlüssel für das Auslesen der Vokabeln per Foto, Eselsbrücken, Beispielsätze und Korrekturen.
-2. **Neon:** Kostenlose Cloud-Datenbank (PostgreSQL) für deine Vokabeln (Anmeldung z. B. per Google-Konto).
-3. **Render:** Führt die App in der Cloud aus (Anmeldung z. B. per Google-Konto).
+1. **Neon:** Kostenlose Cloud-Datenbank (PostgreSQL) für deine Vokabeln (Anmeldung z. B. per Google-Konto).
+2. **Render:** Führt die App in der Cloud aus (Anmeldung z. B. per Google-Konto).
+3. **KI-Funktionen:** Entweder über einen kostenlosen **Google Gemini** API Key oder **OpenRouter** / **ChatGPT** als kostenpflichtige Variante.
 
 ---
 
-### Schritt 1: Google Gemini API Key holen (1 Minute)
-1. Besuche das [Google AI Studio](https://aistudio.google.com/) und melde dich mit deinem Google-Konto an.
-2. Klicke im Menü links auf **"Get API key"** und dann auf **"Create API key"**.
-3. Kopiere den erstellten Schlüssel.
-
-*(Hinweis: Die Nutzung der Gemini API im Free Tier ist kostenlos und für den Vokabeltrainer völlig ausreichend).*
-
----
-
-### Schritt 2: Datenbank bei Neon erstellen (1 Minute)
+### Schritt 1: Datenbank bei Neon erstellen (1 Minute)
 1. Gehe auf [neon.tech](https://neon.tech/) und registriere dich kostenlos (z. B. mit deinem Google-Konto).
 2. Klicke auf **"New Project"**, gib dem Projekt einen Namen (z. B. `vokabeltrainer-db`, Region am besten `Frankfurt`) und klicke auf **"Create Project"**.
 3. Klicke im Dashboard auf **"Connect"** und kopiere den angezeigten **Connection String** (fängt mit `postgresql://...` an).
-   > **Fertig:** Du musst bei Neon nichts weiter einstellen!
+   > **Fertig:** Du musst bei Neon nichts weiter einstellen! Den Connection String trägst du gleich bequem direkt im Browser im Einrichtungs-Assistenten ein.
 
 ---
 
-### Schritt 3: Bereitstellung auf Render (Render Blueprint)
+### Schritt 2: Bereitstellung auf Render (Render Blueprint)
 
-Wenn du gleich auf den Deploy-Button klickst, leitet Render dich zum automatischen Setup weiter. Lies dir kurz die folgenden Schritte durch, damit du weißt, was einzutragen ist:
+Wenn du gleich auf den Deploy-Button klickst, leitet Render dich zum automatischen Setup weiter:
 
 1. **Bei Render anmelden (falls nötig):**  
    Falls du noch kein Render-Konto hast oder nicht eingeloggt bist, wirst du zunächst zur Anmeldeseite weitergeleitet. Du kannst dich dort bequem mit einem Klick kostenlos mit deinem **Google-Konto** registrieren bzw. einloggen. Danach landest du direkt in der Blueprint-Einrichtungsmaske.
@@ -81,19 +72,9 @@ Wenn du gleich auf den Deploy-Button klickst, leitet Render dich zum automatisch
 2. **Blueprint-Name vergeben:**  
    Ganz oben im Feld **"Blueprint Name"** einen beliebigen Projektnamen eingeben (z. B. `vokabeltrainer`).
 
-3. **Nach unten scrollen zu den Umgebungsvariablen:**  
-   Scrolle auf der Render-Seite etwas nach unten zum Bereich **"Environment Variables"** unter dem Service *vokabeltrainer*. Trage dort in die entsprechenden Eingabefelder die folgenden beiden Schlüssel ein:
-
-   | Feld | Was du eintragen musst |
-   | :--- | :--- |
-   | **`DATABASE_URL`** | Der kopierte Connection String von Neon aus Schritt 2 |
-   | **`GEMINI_API_KEY`** | Dein Google Gemini API Key aus Schritt 1 |
-
-4. **Was ist mit weiteren Variablen?**  
-   Du musst **ausschließlich** die 2 oben genannten Felder ausfüllen. Benutzername und Passwörter vergibst du nach dem Starten ganz bequem und sicher direkt im Browser. Automatische Werte (wie `AUTH_SECRET` oder `NOTIFICATION_API_TOKEN`) lässt du einfach unverändert – Render generiert diese Sicherheitsschlüssel beim ersten Starten vollautomatisch für dich.
-
-5. **Bereitstellung starten:**  
-   Klicke ganz unten auf **"Apply"** (bzw. **"Deploy"**). Render richtet den Service und alle Sicherheitsschlüssel vollautomatisch ein. Nach ca. 5 Minuten siehst du den grünen Status **"Live"** und deine persönliche Web-Adresse (z. B. `https://vokabeltrainer-xxxx.onrender.com`).
+3. **Bereitstellung starten:**  
+   Klicke ganz unten auf **"Deploy Blueprint"** (bzw. **"Apply"**). Render richtet den Service und alle Sicherheitsschlüssel vollautomatisch ein. Nach ca. 4–5 Minuten siehst du den grünen Status **"Live"**.
+   Klicke auf "Create web service vokabeltrainer" um deine persönliche Web-Adresse (z. B. `https://vokabeltrainer-xxxx.onrender.com`) zu sehen.
 
 #### Jetzt das Deployment starten:
 
@@ -101,36 +82,32 @@ Klicke auf den Button, um die Bereitstellung auf Render zu starten:
 
 [![Deploy to Render](https://render.com/images/deploy-to-render-button.svg)](https://render.com/deploy?repo=https://github.com/Le0nB2/vokabeltrainer)
 
-> 💡 **Tipp:** Klicke mit gedrückter **`Strg`**-Taste (am Mac: **`Cmd`**-Taste) oder mit dem **Mausrad** auf den Button, um Render in einem neuen Tab zu öffnen. So bleibt diese Anleitung daneben geöffnet!
-
 > **Hinweis zum Free-Tier bei Render:** Falls du beim Erstellen deines Kontos oder beim Starten der Bereitstellung aufgefordert wirst, eine Kreditkarte zu hinterlegen: Dies ist eine standardmäßige Sicherheitsüberprüfung von Render zur Identitätsverifikation, um Missbrauch (wie automatisierte Bots) zu verhindern. Da der Vokabeltrainer auf dem kostenlosen Free-Plan läuft, bucht Render **kein Geld** ab.
 > 
 > Zudem geht die kostenlose Instanz nach 10 Minuten Inaktivität in einen Ruhezustand („Scale-to-Zero“). Beim ersten Aufruf nach einer Pause dauert das Laden der App ca. 30–50 Sekunden, da Render die App erst wieder hochfährt. Danach reagiert sie sofort.
 
-*(Alternativ: Auf [render.com](https://render.com/) einloggen, oben rechts auf **"New +"** -> **"Blueprint"** klicken und das Repository `https://github.com/Le0nB2/vokabeltrainer` auswählen).*
+---
+
+### Schritt 3: Ersteinrichtung im Web-Browser (`/setup`)
+
+Geh auf deine persönliche Webadresse und folge den Anweisungen des Einrichtungsassistenten.
+
+1. **Datenbank auswählen und verbinden, indem du die kopierte Zeile von NEON einfügst**
+2. **Eltern-/Kind-Konto anlegen & Kindersicherung (PIN) einrichten**
+3. **KI-Dienst verbinden**
+
+Den **kostenlosen** API Key erhältst du im [Google AI Studio](https://aistudio.google.com/).
+Gehe dazu wie folgt vor:
+1. Besuche das [Google AI Studio](https://aistudio.google.com/) und melde dich mit deinem Google-Konto an.
+2. Klicke im Menü links auf **"Get API key"**.
+3. Klicke auf den Button **"Create API key"**.
+4. Wähle ein bestehendes Google Cloud Projekt aus oder klicke auf **"Create API key in new project"**.
+
+*Hinweis: Die Nutzung der Gemini API im Free Tier ist kostenlos und für den Vokabeltrainer völlig ausreichend.*
 
 ---
 
-### Schritt 4: Ersteinrichtung im Web-Browser (`/setup`)
-
-Beim ersten Aufrufen deiner Web-Adresse startet automatisch der Einrichtungs-Assistent:
-
-1. **Modus wählen:**
-   - **Geschützter Modus (Empfohlen):** Schützt deine Vokabeln auf dem öffentlichen Server zuverlässig mit Benutzername und Passwort und ermöglicht getrennte Profile für Eltern und Kinder.
-   - **Einzelnutzer-Modus:** Nur für rein private Heimnetzwerke ohne Passwort gedacht.
-
-2. **Eltern-Konto anlegen:**
-   - Gib einen gewünschten Anmeldenamen (z. B. deinen Vornamen oder `eltern`) und ein Passwort ein.
-
-3. **Kindersicherung einstellen:**
-   - Wähle, ob die Einstellungen mit dem gleichen Anmeldepasswort, einer kurzen PIN (z. B. 4 Ziffern) oder ungeschützt zugänglich sein sollen (*„Kindersicherung: Verhindert, dass Kinder beim Vokabellernen Einstellungen verändern“*).
-   - *Tipp:* Das Einstellungskennwort kann jederzeit auch mit dem Eltern-Anmeldepasswort entsperrt werden.
-
-> 🛡️ **Schutz vor Aussperren:** Solltest du dein Eltern-Passwort einmal vergessen, kannst du in Render unter **Environment** einfach die Variable `ADMIN_PASSWORD` mit einem neuen Passwort setzen und dich sofort wieder einloggen.
-
----
-
-### Schritt 5: 📱 Als App auf dem Homescreen nutzen (PWA)
+### Schritt 4: 📱 Als App auf dem Homescreen nutzen (PWA)
 
 Die Web-App kann ohne App Store direkt als App auf dem Homescreen des Smartphones installiert werden (sogenannte Progressive Web App (PWA)):
 
@@ -165,8 +142,9 @@ Die App ist vollständig containerisiert und kann ohne lokale Node.js Installati
 Erstelle eine `.env` Datei im Hauptverzeichnis (falls nicht vorhanden) und füge deinen Gemini API Key ein:
 
 ```env
-# Google Gemini API-Key für Foto-Scan & Beispielsätze
-GEMINI_API_KEY="DEIN_GEMINI_API_KEY_HIER"
+# Optional: Google Gemini API-Key als Server-Standard
+# (Alternativ kannst du OpenRouter oder Gemini nach dem Starten bequem direkt im Browser-Assistenten verbinden)
+# GEMINI_API_KEY="DEIN_GEMINI_API_KEY_HIER"
 
 # Optional: Verbindung zu einer externen PostgreSQL/Neon-Datenbank
 # (Wird keine DATABASE_URL angegeben, nutzt Docker automatisch die interne SQLite-Datei)

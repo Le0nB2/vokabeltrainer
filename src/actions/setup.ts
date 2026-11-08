@@ -1,6 +1,9 @@
 "use server"
 
-import prisma from "@/lib/prisma"
+import fs from "fs"
+import path from "path"
+import prisma, { getRuntimeDbUrl, reloadPrismaClient } from "@/lib/prisma"
+import { decryptSecret } from "@/lib/security/crypto"
 import {
   getAppAuthCredentials,
   getAppSecret,
@@ -38,51 +41,106 @@ async function getClientIp(): Promise<string> {
 export async function getSetupState(): Promise<{
   needsSetup: boolean
   isPublicOrRender: boolean
+  isRender: boolean
+  databaseNeedsSetup: boolean
 }> {
-  const { isConfigured } = getAppAuthCredentials()
+  const isRender = Boolean(process.env.RENDER)
   const isPublicOrRender = Boolean(
     process.env.RENDER ||
     process.env.IS_PUBLIC ||
     (process.env.NODE_ENV === "production" && !process.env.DOCKER_LOCAL)
   )
 
-  // 1. If environment credentials are configured, setup is already done (backwards compatibility)
+  let runtimeDbUrl = getRuntimeDbUrl()
+
+  // If not found in env or runtime-db.json, try restoring from encrypted cookie
+  if (!runtimeDbUrl) {
+    try {
+      const cookieStore = await cookies()
+      const encryptedCookie = cookieStore.get("runtime_db_url")?.value
+      if (encryptedCookie) {
+        const decrypted = decryptSecret(encryptedCookie)
+        if (
+          decrypted &&
+          (decrypted.startsWith("postgresql://") || decrypted.startsWith("postgres://"))
+        ) {
+          runtimeDbUrl = decrypted
+          process.env.DATABASE_URL = decrypted
+          reloadPrismaClient(decrypted)
+
+          try {
+            const configPath = path.join(process.cwd(), "prisma", "runtime-db.json")
+            const configDir = path.dirname(configPath)
+            if (!fs.existsSync(configDir)) {
+              fs.mkdirSync(configDir, { recursive: true })
+            }
+            fs.writeFileSync(
+              configPath,
+              JSON.stringify(
+                {
+                  databaseType: "postgres",
+                  databaseUrl: decrypted,
+                  restoredFromCookieAt: new Date().toISOString(),
+                },
+                null,
+                2
+              ),
+              "utf8"
+            )
+          } catch {
+            // ignore file write errors
+          }
+        }
+      }
+    } catch {
+      // ignore cookie errors
+    }
+  }
+
+  // If running on Render without configured database, database setup is required
+  if (isRender && !runtimeDbUrl) {
+    return {
+      needsSetup: true,
+      isPublicOrRender,
+      isRender,
+      databaseNeedsSetup: true,
+    }
+  }
+
+  const { isConfigured } = getAppAuthCredentials()
   if (isConfigured) {
-    return { needsSetup: false, isPublicOrRender }
+    return { needsSetup: false, isPublicOrRender, isRender, databaseNeedsSetup: false }
   }
 
   try {
-    // 2. Check if an admin user already exists in the database
     const adminCount = await prisma.user.count({
       where: { role: "ADMIN" },
     })
     if (adminCount > 0) {
-      return { needsSetup: false, isPublicOrRender }
+      return { needsSetup: false, isPublicOrRender, isRender, databaseNeedsSetup: false }
     }
 
-    // 3. Check if setup was explicitly completed in settings (e.g. single user mode chosen)
     const settings = await prisma.settings.findUnique({
       where: { id: "default" },
     })
     if (settings?.isSetupCompleted) {
-      return { needsSetup: false, isPublicOrRender }
+      return { needsSetup: false, isPublicOrRender, isRender, databaseNeedsSetup: false }
     }
 
-    // 4. Also check if any users exist at all
     const userCount = await prisma.user.count()
     if (userCount > 0) {
-      return { needsSetup: false, isPublicOrRender }
+      return { needsSetup: false, isPublicOrRender, isRender, databaseNeedsSetup: false }
     }
 
-    return { needsSetup: true, isPublicOrRender }
+    return { needsSetup: true, isPublicOrRender, isRender, databaseNeedsSetup: false }
   } catch (err: unknown) {
     console.error("Error checking setup state:", err)
-    const errCode = (err as { code?: string })?.code
-    const errMsg = String((err as { message?: string })?.message || "")
-    if (errCode === "P2021" || errMsg.includes("does not exist")) {
-      return { needsSetup: true, isPublicOrRender }
+    return {
+      needsSetup: true,
+      isPublicOrRender,
+      isRender,
+      databaseNeedsSetup: true,
     }
-    return { needsSetup: false, isPublicOrRender }
   }
 }
 
