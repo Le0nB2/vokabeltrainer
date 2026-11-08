@@ -3,6 +3,7 @@ import { Type } from "@google/genai";
 import { requireAppAuth, UnauthorizedError } from "@/lib/auth-guard";
 import { consumeRateLimit, formatRetryDuration, getClientIpFromHeaders } from "@/lib/rate-limit";
 import { callGeminiWithRetry, QuotaExceededError } from "@/lib/services/gemini-executor";
+import { getActiveAiProvider } from "@/lib/ai/ai-router";
 
 export async function POST(req: NextRequest) {
   try {
@@ -51,15 +52,21 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Ungültiger Dateityp (nur JPEG, PNG, WebP erlaubt)" }, { status: 400 });
     }
 
+    let aiConfig: any = null;
+    try {
+      aiConfig = await getActiveAiProvider();
+    } catch {
+      // ignore
+    }
+
     // Read multiple keys or fallback to single key
     const rawKeys = process.env.GEMINI_API_KEYS || process.env.GEMINI_API_KEY;
-    if (!rawKeys) {
-      return NextResponse.json({ error: "GEMINI_API_KEYS is not configured" }, { status: 500 });
-    }
-    const apiKeys = rawKeys.split(',').map(k => k.trim()).filter(k => k.length > 0);
+    const envApiKeys = rawKeys
+      ? rawKeys.split(',').map(k => k.trim()).filter(k => k.length > 0)
+      : [];
 
-    if (apiKeys.length === 0) {
-      return NextResponse.json({ error: "No valid API keys found" }, { status: 500 });
+    if (!aiConfig && envApiKeys.length === 0) {
+      return NextResponse.json({ error: "Kein aktiver KI-Dienst konfiguriert. Bitte hinterlege einen Key oder verbinde OpenRouter." }, { status: 500 });
     }
 
     // Convert File to base64
@@ -86,7 +93,24 @@ WICHTIGE REGELN:
 8. Erstelle zwingend einen Lückentext ('gapText'), der EXAKT derselbe Satz wie 'contextSentence' ist, bei dem jedoch AUSSCHLIESSLICH das Zielwort oder die Kernphrase aus 'front' durch '___' ersetzt wurde.
 9. Ignoriere Seitenzahlen und Überschriften.`;
 
-    const parsedCards = await callGeminiWithRetry({
+    let parsedCards: any;
+
+    if (aiConfig?.providerId === "openrouter") {
+      parsedCards = await aiConfig.provider.generateStructuredJson({
+        prompt: prompt + "\n\nAntworte ausschließlich im JSON-Format als Liste von Objekten mit den Feldern: front, back, phonetic, notes, mnemonic, contextSentence, gapText.",
+        image: { data: base64Image, mimeType },
+      });
+      if (Array.isArray(parsedCards)) {
+        parsedCards = parsedCards.map((card: any) => {
+          if (card.gapText && card.gapText.trim() === "___") {
+            return { ...card, gapText: null };
+          }
+          return card;
+        });
+      }
+    } else {
+      const apiKeys = (aiConfig?.provider as any)?.apiKeys || envApiKeys;
+      parsedCards = await callGeminiWithRetry({
       endpoint: "scan-image",
       apiKeys,
       execute: async (ai, modelToUse) => {
@@ -158,6 +182,7 @@ WICHTIGE REGELN:
         return cards;
       },
     });
+    }
 
     return NextResponse.json({ cards: parsedCards });
   } catch (error: unknown) {

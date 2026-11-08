@@ -113,20 +113,36 @@ Klicke auf den Button, um die Bereitstellung auf Render zu starten:
 
 ### Schritt 4: Ersteinrichtung im Web-Browser (`/setup`)
 
-Beim ersten Aufrufen deiner Web-Adresse startet automatisch der Einrichtungs-Assistent:
+Beim ersten Aufrufen deiner Web-Adresse startet automatisch der komfortable Einrichtungs-Assistent:
 
-1. **Modus wählen:**
-   - **Geschützter Modus (Empfohlen):** Schützt deine Vokabeln auf dem öffentlichen Server zuverlässig mit Benutzername und Passwort und ermöglicht getrennte Profile für Eltern und Kinder.
-   - **Einzelnutzer-Modus:** Nur für rein private Heimnetzwerke ohne Passwort gedacht.
+1. **Datenbank auswählen & verbinden:**
+   - **Neon Cloud-Datenbank (PostgreSQL):** Wird auf Render automatisch vorausgewählt! Trage einfach deinen Neon Connection String ein – der Assistent prüft die Verbindung und initialisiert die Datenbank vollautomatisch.
+   - **Lokale Datei-Datenbank (SQLite):** Für lokale Docker-Installationen zu Hause (NAS, Unraid, lokaler PC).
+2. **Modus wählen:**
+   - **Geschützter Modus (Empfohlen):** Schützt deine Vokabeln auf dem Server zuverlässig mit Benutzername und Passwort und ermöglicht getrennte Profile für Eltern und Kinder.
+   - **Einzelnutzer-Modus:** Für reine Einzelanwender gedacht.
+3. **Eltern-Konto anlegen & Kindersicherung (PIN):**
+   - Gib einen gewünschten Anmeldenamen ein und schütze die Einstellungen mit einer 4-stelligen Eltern-PIN (*„Kindersicherung: Verhindert, dass Kinder beim Vokabellernen Einstellungen verändern“*).
+4. **Kinder-Konto einrichten:**
+   - Lege direkt ein Profil für dein Kind mit eigenem Namen und Passwort an.
+5. **KI-Dienst verbinden (Optional):**
+   - **Option 1: OpenRouter (Empfohlen):** Verbinde deinen OpenRouter-Account mit 1 Klick per OAuth oder gib deinen Key ein. Ermöglicht Zugriff auf alle führenden Modelle (GPT-4o, Claude, Gemini) sowie dauerhaft kostenlose Free-Modelle.
+   - **Option 2: Google Gemini (Free Tier):** Trage deinen kostenlosen API-Key aus dem Google AI Studio ein.
 
-2. **Eltern-Konto anlegen:**
-   - Gib einen gewünschten Anmeldenamen (z. B. deinen Vornamen oder `eltern`) und ein Passwort ein.
+---
 
-3. **Kindersicherung einstellen:**
-   - Wähle, ob die Einstellungen mit dem gleichen Anmeldepasswort, einer kurzen PIN (z. B. 4 Ziffern) oder ungeschützt zugänglich sein sollen (*„Kindersicherung: Verhindert, dass Kinder beim Vokabellernen Einstellungen verändern“*).
-   - *Tipp:* Das Einstellungskennwort kann jederzeit auch mit dem Eltern-Anmeldepasswort entsperrt werden.
+### Server-Standard & Umgebungsvariablen (Fallback im Hintergrund)
 
-> 🛡️ **Schutz vor Aussperren:** Solltest du dein Eltern-Passwort einmal vergessen, kannst du in Render unter **Environment** einfach die Variable `ADMIN_PASSWORD` mit einem neuen Passwort setzen und dich sofort wieder einloggen.
+Möchtest du den Vokabeltrainer als Administrator zentral für deine Familie oder Schule betreiben, kannst du die Zugänge auch direkt als Umgebungsvariablen im Docker-Container oder im Render-Dashboard hinterlegen:
+
+| Umgebungsvariable | Beschreibung |
+| :--- | :--- |
+| `DATABASE_URL` | Optional: PostgreSQL/Neon Connection String (wird sonst im Web-Assistenten abgefragt). |
+| `GEMINI_API_KEY` | Optional: Google Gemini API-Key (fungiert als stummer Server-Standard im Hintergrund). |
+| `OPENROUTER_API_KEY` | Optional: OpenRouter API-Key als Server-Fallback. |
+| `AUTH_SECRET` | 32-Byte Zufallsschlüssel zur Verschlüsselung von Sessions und hinterlegten KI-Credentials (wird auf Render automatisch erzeugt). |
+
+> 💡 **Hinweis:** Wenn ein Server-Schlüssel wie `GEMINI_API_KEY` in der Umgebung hinterlegt ist, funktioniert die KI automatisch für alle Nutzer im Hintergrund, ohne dass im Einrichtungsassistenten ein Key eingegeben werden muss! Nutzer können den KI-Schritt im Assistenten einfach überspringen.
 
 ---
 

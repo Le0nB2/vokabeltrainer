@@ -10,12 +10,31 @@ if [ -d "/app/prisma_static" ]; then
   fi
 fi
 
+# 0. Prüfe, ob eine zur Laufzeit gespeicherte Datenbank-Konfiguration vorliegt
+if [ -f "/app/prisma/runtime-db.json" ]; then
+  RUNTIME_DB_URL=$(node -e "try { const c = JSON.parse(require('fs').readFileSync('/app/prisma/runtime-db.json')); if (c.databaseUrl) console.log(c.databaseUrl); } catch(e){}" 2>/dev/null || true)
+  if [ -n "$RUNTIME_DB_URL" ]; then
+    echo "Found runtime database configuration in runtime-db.json."
+    export DATABASE_URL="$RUNTIME_DB_URL"
+  fi
+fi
+
 # Fallback: Falls DIRECT_URL nicht gesetzt ist oder dem Build-Default entspricht,
 # leite DIRECT_URL von DATABASE_URL ab (entfernt -pooler. für direkte Verbindung bei Neon/PgBouncer)
 DEFAULT_BUILD_DIRECT_URL="postgresql://postgres:postgres@localhost:5432/vokabeltrainer?schema=public"
 if [ -z "$DIRECT_URL" ] || [ "$DIRECT_URL" = "$DEFAULT_BUILD_DIRECT_URL" ]; then
   if [ -n "$DATABASE_URL" ]; then
     export DIRECT_URL=$(echo "$DATABASE_URL" | sed 's/-pooler\././')
+  fi
+fi
+
+# Wenn im PostgreSQL/Render-Betrieb noch keine DATABASE_URL hinterlegt ist, starte direkt im Setup-Modus
+if [ -z "$DATABASE_URL" ] || [ "$DATABASE_URL" = "$DEFAULT_BUILD_DIRECT_URL" ]; then
+  if [ "$RENDER" = "true" ] || [ -f "prisma/schema.prisma" ] && grep -q "postgresql" prisma/schema.prisma 2>/dev/null; then
+    echo "Notice: No DATABASE_URL configured yet. Starting Next.js in setup mode..."
+    echo "You can configure your Neon PostgreSQL database directly in the web setup wizard."
+    echo "Starting Next.js..."
+    exec node server.js
   fi
 fi
 
