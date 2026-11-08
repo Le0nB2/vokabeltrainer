@@ -420,8 +420,8 @@ export function SetupWizard({
                     <span className="font-bold text-sm sm:text-base text-zinc-900 dark:text-zinc-100">
                       Neon Cloud-Datenbank (PostgreSQL)
                     </span>
-                    <span className="px-2 py-0.5 text-xs font-semibold rounded-full bg-emerald-100 text-emerald-800 dark:bg-emerald-950/50 dark:text-emerald-300">
-                      Empfohlen für Render
+                    <span className="px-2 py-0.5 text-xs font-semibold rounded-full bg-blue-100 text-blue-800 dark:bg-blue-950/50 dark:text-blue-300">
+                      Erforderlich
                     </span>
                   </div>
                   <p className="text-xs sm:text-sm text-zinc-600 dark:text-zinc-400 mt-1">
