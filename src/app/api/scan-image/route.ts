@@ -66,7 +66,7 @@ export async function POST(req: NextRequest) {
       : [];
 
     if (!aiConfig && envApiKeys.length === 0) {
-      return NextResponse.json({ error: "Kein aktiver KI-Dienst konfiguriert. Bitte hinterlege einen Key oder verbinde OpenRouter." }, { status: 500 });
+      return NextResponse.json({ error: "Kein aktiver KI-Dienst konfiguriert. Bitte verbinde Google Gemini, ChatGPT oder OpenRouter." }, { status: 500 });
     }
 
     // Convert File to base64
@@ -95,7 +95,7 @@ WICHTIGE REGELN:
 
     let parsedCards: any;
 
-    if (aiConfig?.providerId === "openrouter") {
+    if (aiConfig?.providerId === "openrouter" || aiConfig?.providerId === "openai") {
       parsedCards = await aiConfig.provider.generateStructuredJson({
         prompt: prompt + "\n\nAntworte ausschließlich im JSON-Format als Liste von Objekten mit den Feldern: front, back, phonetic, notes, mnemonic, contextSentence, gapText.",
         image: { data: base64Image, mimeType },

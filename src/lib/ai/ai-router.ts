@@ -156,7 +156,38 @@ export async function getActiveAiProvider(userId?: string): Promise<ResolvedAiCo
     }
   }
 
-  // 4. Fallbacks from ENV:
+  // 4. Fallback to stored DB credentials (OpenAI or OpenRouter) if Gemini has no keys configured:
+  const dbOpenAi = await prisma.userAiCredential.findFirst({
+    where: userId ? { OR: [{ userId }, { userId: null }], provider: "openai_key" } : { provider: "openai_key" },
+  })
+  if (dbOpenAi?.apiKey) {
+    const key = decryptSecret(dbOpenAi.apiKey)
+    if (key) {
+      return {
+        providerId: "openai",
+        provider: new OpenAiProvider(key),
+        source: dbOpenAi.userId ? "user_credential" : "global_credential",
+      }
+    }
+  }
+
+  const dbOpenRouter = await prisma.userAiCredential.findFirst({
+    where: userId
+      ? { OR: [{ userId }, { userId: null }], provider: { in: ["openrouter_oauth", "openrouter_key"] } }
+      : { provider: { in: ["openrouter_oauth", "openrouter_key"] } },
+  })
+  if (dbOpenRouter?.apiKey || dbOpenRouter?.accessToken) {
+    const key = decryptSecret((dbOpenRouter.apiKey || dbOpenRouter.accessToken)!)
+    if (key) {
+      return {
+        providerId: "openrouter",
+        provider: new OpenRouterProvider(key),
+        source: dbOpenRouter.userId ? "user_credential" : "global_credential",
+      }
+    }
+  }
+
+  // 5. Fallbacks from ENV:
   if (process.env.OPENAI_API_KEY) {
     return {
       providerId: "openai",

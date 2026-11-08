@@ -143,4 +143,48 @@ describe("POST /api/worksheet (SEC-06)", () => {
       "Englisch Vokabeln"
     );
   });
+
+  it("generates worksheet using OpenAI provider when active provider is openai", async () => {
+    delete process.env.GEMINI_API_KEYS;
+    const aiRouter = await import("@/lib/ai/ai-router");
+    const mockGenerateJson = vi.fn().mockResolvedValue({
+      exercises: { multipleChoice: [] },
+      solutions: {},
+    });
+    vi.spyOn(aiRouter, "getActiveAiProvider").mockResolvedValue({
+      providerId: "openai",
+      provider: {
+        id: "openai",
+        name: "ChatGPT (OpenAI)",
+        generateStructuredJson: mockGenerateJson,
+      } as any,
+      source: "global_credential",
+    });
+
+    vi.spyOn(prisma.deck, "findUnique").mockResolvedValueOnce({
+      id: "deck-openai",
+      title: "OpenAI Deck",
+      cards: Array.from({ length: 6 }, (_, i) => ({
+        id: `card-${i}`,
+        front: `word${i}`,
+        back: `wort${i}`,
+        dueDate: new Date(),
+      })),
+    } as any);
+
+    vi.spyOn(pdfHelper, "generateOptimizedPdf").mockResolvedValueOnce({
+      finalExercises: { multipleChoice: [] },
+      finalSolutions: {},
+      pageCount: 2,
+    } as any);
+
+    const { POST } = await import("@/app/api/worksheet/route");
+    const req = new MockNextRequest({ deckId: "deck-openai", stream: false }) as any;
+    const res = await POST(req);
+
+    expect(res.status).toBe(200);
+    const data = await res.json();
+    expect(mockGenerateJson).toHaveBeenCalledTimes(1);
+    expect(data.deckName).toBe("OpenAI Deck");
+  });
 });

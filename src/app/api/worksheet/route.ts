@@ -89,7 +89,7 @@ export async function POST(req: NextRequest) {
       : [];
 
     if (!aiConfig && envApiKeys.length === 0) {
-      return NextResponse.json({ error: "Kein aktiver KI-Dienst konfiguriert. Bitte verbinde OpenRouter oder trage einen Google AI Studio Key ein." }, { status: 500 });
+      return NextResponse.json({ error: "Kein aktiver KI-Dienst konfiguriert. Bitte verbinde Google Gemini, ChatGPT oder OpenRouter." }, { status: 500 });
     }
     const apiKeys = (aiConfig?.provider as any)?.apiKeys || envApiKeys;
 
@@ -197,8 +197,9 @@ ${JSON.stringify(selectedCards.map(c => ({ englisch: c.front, deutsch: c.back })
     ) => {
       let parsedWorksheet: any;
 
-      if (aiConfig?.providerId === "openrouter") {
-        onProgress?.("Sende Anfrage an OpenRouter...");
+      if (aiConfig?.providerId === "openrouter" || aiConfig?.providerId === "openai") {
+        const providerLabel = aiConfig.providerId === "openai" ? "ChatGPT (OpenAI)" : "OpenRouter";
+        onProgress?.(`Sende Anfrage an ${providerLabel}...`);
         parsedWorksheet = await aiConfig.provider.generateStructuredJson({
           prompt: promptText + "\n\nAntworte strikt im geforderten JSON-Format mit den Hauptfeldern 'exercises' und 'solutions'.",
         });
@@ -396,6 +397,8 @@ ${JSON.stringify(selectedCards.map(c => ({ englisch: c.front, deutsch: c.back })
             const errorMsg =
               err instanceof QuotaExceededError
                 ? err.message
+                : err instanceof Error && err.message
+                ? err.message
                 : "Fehler beim Erstellen des Arbeitsblatts. Bitte versuche es erneut.";
 
             safeEnqueue(
@@ -433,6 +436,10 @@ ${JSON.stringify(selectedCards.map(c => ({ englisch: c.front, deutsch: c.back })
       return NextResponse.json({ error: error.message }, { status: 429 });
     }
     console.error("Worksheet error:", error);
-    return NextResponse.json({ error: "Fehler beim Erstellen des Arbeitsblatts. Bitte versuche es erneut." }, { status: 500 });
+    const msg =
+      error instanceof Error && error.message
+        ? error.message
+        : "Fehler beim Erstellen des Arbeitsblatts. Bitte versuche es erneut.";
+    return NextResponse.json({ error: msg }, { status: 500 });
   }
 }
