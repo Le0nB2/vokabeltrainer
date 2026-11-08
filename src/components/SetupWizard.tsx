@@ -58,7 +58,6 @@ export function SetupWizard({
   const [dbLoading, setDbLoading] = useState(false)
   const [dbSuccess, setDbSuccess] = useState<string | null>(null)
   const [dbError, setDbError] = useState<string | null>(null)
-  const [copiedNeonUrl, setCopiedNeonUrl] = useState(false)
   const [showAdvancedDb, setShowAdvancedDb] = useState(false)
   const [showAdvancedMode, setShowAdvancedMode] = useState(initialShowAdvanced)
 
@@ -705,31 +704,11 @@ export function SetupWizard({
           )}
 
           {dbSuccess && (
-            <div className="mb-4 space-y-3">
+            <div className="mb-4">
               <div className="p-3 bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800 rounded-xl text-xs sm:text-sm text-emerald-800 dark:text-emerald-200 flex items-center gap-2">
                 <CheckCircle2 className="w-5 h-5 text-emerald-600 shrink-0" />
                 <span className="font-semibold">{dbSuccess}</span>
               </div>
-              {(isRender || isPublicOrRender) && (
-                <div className="p-3.5 bg-zinc-100 dark:bg-zinc-800 rounded-xl text-xs text-zinc-700 dark:text-zinc-300">
-                  <p className="font-bold mb-1">💡 Wichtiger Tipp für Render Free:</p>
-                  <p className="text-zinc-500 dark:text-zinc-400 mb-2">
-                    Trage diesen Connection String einmalig in deinem Render Dashboard unter &bdquo;Environment&ldquo; als <code className="bg-zinc-200 dark:bg-zinc-700 px-1 py-0.5 rounded">DATABASE_URL</code> ein:
-                  </p>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      navigator.clipboard.writeText(neonUrl)
-                      setCopiedNeonUrl(true)
-                      setTimeout(() => setCopiedNeonUrl(false), 2000)
-                    }}
-                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-zinc-200 dark:bg-zinc-700 text-zinc-800 dark:text-zinc-200 font-medium hover:bg-zinc-300 dark:hover:bg-zinc-600 transition-colors"
-                  >
-                    {copiedNeonUrl ? <Check className="w-3.5 h-3.5 text-emerald-500" /> : <Copy className="w-3.5 h-3.5" />}
-                    {copiedNeonUrl ? "Kopiert!" : "Connection String kopieren"}
-                  </button>
-                </div>
-              )}
             </div>
           )}
 
