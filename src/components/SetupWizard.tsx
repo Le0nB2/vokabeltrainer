@@ -1483,7 +1483,7 @@ export function SetupWizard({
                           </div>
                         </div>
                         <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">
-                          1-Klick-Verbindung oder API-Key für Gemini 3.6 Flash, GPT-4o und Claude. Erfordert OpenRouter-Guthaben (Pay-as-you-go).
+                          1-Klick-Verbindung oder API-Key. Unterstützt kostenlose Free-Modelle (0,00 €) oder Auto-Routing.
                         </p>
 
                         {aiProviderChoice === "openrouter" && (
@@ -1496,7 +1496,7 @@ export function SetupWizard({
                               <p className="text-zinc-600 dark:text-zinc-300 leading-relaxed">
                                 Du wirst zu <strong>OpenRouter</strong> weitergeleitet. Bitte melde dich dort an und klicke auf <strong>„Authorize“</strong>.
                                 <br />
-                                <em>Hinweis:</em> OpenRouter rechnet nach Verbrauch ab und erfordert Guthaben (z. B. 5 $). Für eine <strong>100% kostenlose Nutzung</strong> ohne Zahlungsdaten wähle oben <strong>Google Gemini</strong>.
+                                <em>Tipp:</em> Du kannst OpenRouter im Vokabeltrainer wahlweise <strong>vollständig kostenlos (Free Router)</strong> oder im <strong>Auto-Routing-Modus</strong> nutzen.
                               </p>
                             </div>
 

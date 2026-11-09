@@ -220,6 +220,74 @@ describe("AI Providers & Router", () => {
         provider.generateStructuredJson({ prompt: "Test" })
       ).rejects.toThrow("Dein OpenAI/ChatGPT-Guthaben ist aufgebraucht")
     })
+
+    it("respects custom default model in OpenAI requests", async () => {
+      const mockFetch = vi.fn().mockResolvedValue({
+        ok: true,
+        json: async () => ({
+          choices: [{ message: { content: "{\"result\": \"ok\"}" } }],
+        }),
+      })
+      global.fetch = mockFetch as any
+
+      const provider = new OpenAiProvider("sk-proj-test-key", "chatgpt-4o-latest")
+      await provider.generateStructuredJson({ prompt: "Test" })
+
+      const requestBody = JSON.parse(mockFetch.mock.calls[0][1].body)
+      expect(requestBody.model).toBe("chatgpt-4o-latest")
+    })
+  })
+
+  describe("OpenRouter model configuration", () => {
+    it("uses openrouter/free by default and allows openrouter/auto", async () => {
+      const mockFetch = vi.fn().mockResolvedValue({
+        ok: true,
+        json: async () => ({
+          choices: [{ message: { content: "{\"status\": \"ok\"}" } }],
+        }),
+      })
+      global.fetch = mockFetch as any
+
+      const freeProvider = new OpenRouterProvider("sk-or-key")
+      await freeProvider.generateStructuredJson({ prompt: "Hello free" })
+      let requestBody = JSON.parse(mockFetch.mock.calls[0][1].body)
+      expect(requestBody.model).toBe("openrouter/free")
+
+      const autoProvider = new OpenRouterProvider("sk-or-key", "openrouter/auto")
+      await autoProvider.generateStructuredJson({ prompt: "Hello auto" })
+      requestBody = JSON.parse(mockFetch.mock.calls[1][1].body)
+      expect(requestBody.model).toBe("openrouter/auto")
+    })
+
+    it("resolves openRouterModel and openAiModel preferences from Settings in getActiveAiProvider", async () => {
+      vi.spyOn(prisma.settings, "findUnique").mockResolvedValue({
+        id: "default",
+        activeAiProvider: "openrouter",
+        openRouterModel: "openrouter/auto",
+        openAiModel: "chatgpt-4o-latest",
+      } as any)
+
+      vi.spyOn(prisma.userAiCredential, "findFirst").mockResolvedValue({
+        id: "cred-or",
+        provider: "openrouter_key",
+        apiKey: encryptSecret("sk-or-key"),
+      } as any)
+
+      const config = await getActiveAiProvider()
+      expect(config.providerId).toBe("openrouter")
+
+      const mockFetch = vi.fn().mockResolvedValue({
+        ok: true,
+        json: async () => ({
+          choices: [{ message: { content: "{\"status\": \"ok\"}" } }],
+        }),
+      })
+      global.fetch = mockFetch as any
+
+      await config.provider.generateStructuredJson({ prompt: "Test" })
+      const requestBody = JSON.parse(mockFetch.mock.calls[0][1].body)
+      expect(requestBody.model).toBe("openrouter/auto")
+    })
   })
 
   describe("getActiveAiProvider with multiple Gemini keys", () => {

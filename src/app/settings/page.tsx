@@ -6,7 +6,7 @@ import { NotificationSettings } from "@/components/NotificationSettings"
 import { AudioSettings } from "@/components/AudioSettings"
 import { AiModelSettings } from "@/components/AiModelSettings"
 import { UserManagementSettings } from "@/components/UserManagementSettings"
-import { getSettings, getAvailableAiModelsAction } from "@/actions/settings"
+import { getSettings, getAvailableAiModelsAction, getAvailableOpenAiModelsAction } from "@/actions/settings"
 import { getUserManagementData } from "@/actions/users"
 import { getApiStats } from "@/actions/api-stats"
 import { isSettingsPasswordConfigured } from "@/actions/auth"
@@ -20,6 +20,7 @@ export default async function SettingsPage() {
   const settings = await getSettings()
   const apiStats = await getApiStats()
   const availableModels = await getAvailableAiModelsAction()
+  const availableOpenAiModels = await getAvailableOpenAiModelsAction()
   const userManagementData = await getUserManagementData()
   const isSettingsProtected = await isSettingsPasswordConfigured()
 
@@ -46,6 +47,7 @@ export default async function SettingsPage() {
         <AiModelSettings
           initialSettings={settings}
           initialModels={availableModels}
+          initialOpenAiModels={availableOpenAiModels}
           apiStats={apiStats}
         />
         <ImportExport availableUsers={userManagementData.users} />

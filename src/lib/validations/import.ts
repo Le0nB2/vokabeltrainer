@@ -103,6 +103,8 @@ export const SettingsImportSchema = z.object({
   notificationsEnabled: z.boolean().optional(),
   speechLanguage: z.string().max(20, "Sprachcode darf maximal 20 Zeichen lang sein").optional(),
   selectedModel: z.string().max(100, "Modellname darf maximal 100 Zeichen lang sein").optional(),
+  openRouterModel: z.string().max(100, "OpenRouter-Modellname darf maximal 100 Zeichen lang sein").optional(),
+  openAiModel: z.string().max(100, "OpenAI-Modellname darf maximal 100 Zeichen lang sein").optional(),
 })
 export type ValidatedSettings = z.infer<typeof SettingsImportSchema>
 

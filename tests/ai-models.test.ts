@@ -69,6 +69,7 @@ describe("ai-models service", () => {
           name: "models/gemini-3.8-flash",
           displayName: "Gemini 3.8 Flash",
           description: "Schnelles Modell",
+          provider: "gemini",
           createdAt: new Date(),
           updatedAt: new Date(),
         },
@@ -145,12 +146,14 @@ describe("ai-models service", () => {
           name: "models/gemini-3.5-flash",
           displayName: "Gemini 3.5 Flash",
           description: "Fast model",
+          provider: "gemini",
         },
         create: {
           id: "gemini-3.5-flash",
           name: "models/gemini-3.5-flash",
           displayName: "Gemini 3.5 Flash",
           description: "Fast model",
+          provider: "gemini",
         },
       });
       expect(prisma.apiUsageLog.create).toHaveBeenCalledWith({

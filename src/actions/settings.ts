@@ -239,6 +239,8 @@ export async function updateSettings(data: {
   notificationsEnabled?: boolean;
   speechLanguage?: string;
   selectedModel?: string;
+  openRouterModel?: string;
+  openAiModel?: string;
 }) {
   await requireAppAuth()
   const isAuth = await checkSettingsAuth()
@@ -259,6 +261,63 @@ export async function getAvailableAiModelsAction() {
   await requireAppAuth()
   const { getStoredAiModels } = await import("@/lib/services/ai-models")
   return await getStoredAiModels()
+}
+
+export async function getAvailableOpenAiModelsAction() {
+  await requireAppAuth()
+  const { getStoredOpenAiModels } = await import("@/lib/services/openai-models")
+  return await getStoredOpenAiModels()
+}
+
+export async function syncOpenAiModelsAction(): Promise<{
+  success: boolean;
+  count: number;
+  error?: string;
+}> {
+  await requireAppAuth()
+  const isAuth = await checkSettingsAuth()
+  if (!isAuth) {
+    return { success: false, count: 0, error: "Nicht autorisiert. Bitte melde dich mit dem Einstellungspasswort an." }
+  }
+
+  const user = await getCurrentUser()
+  const { decryptSecret } = await import("@/lib/security/crypto")
+
+  let apiKey: string | undefined
+  if (user?.id) {
+    const userCred = await prisma.userAiCredential.findFirst({
+      where: { userId: user.id, provider: "openai_key" },
+    })
+    if (userCred?.apiKey) {
+      apiKey = decryptSecret(userCred.apiKey)
+    }
+  }
+
+  if (!apiKey) {
+    const globalCred = await prisma.userAiCredential.findFirst({
+      where: { userId: null, provider: "openai_key" },
+    })
+    if (globalCred?.apiKey) {
+      apiKey = decryptSecret(globalCred.apiKey)
+    }
+  }
+
+  if (!apiKey && process.env.OPENAI_API_KEY) {
+    apiKey = process.env.OPENAI_API_KEY.trim()
+  }
+
+  if (!apiKey) {
+    return {
+      success: false,
+      count: 0,
+      error: "Kein OpenAI-Schlüssel hinterlegt. Bitte trage zuerst einen Schlüssel ein.",
+    }
+  }
+
+  const { fetchAndPersistOpenAiModels } = await import("@/lib/services/openai-models")
+  const result = await fetchAndPersistOpenAiModels(apiKey)
+  revalidatePath("/settings")
+  return result
 }
 
 export async function syncAiModelsAction(): Promise<{

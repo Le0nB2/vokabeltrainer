@@ -37,6 +37,7 @@ export async function getModelHierarchy(): Promise<string[]> {
 export async function getStoredAiModels(): Promise<FilteredAiModel[]> {
   try {
     const models = await prisma.aiModel.findMany({
+      where: { provider: "gemini" },
       orderBy: { displayName: "asc" },
     });
 
@@ -272,9 +273,12 @@ export async function fetchAndPersistGoogleModels(customAiClient?: any): Promise
   const validIds = validModels.map((m) => m.id);
 
   await prisma.$transaction(async (tx) => {
-    // Remove obsolete models
+    // Remove obsolete models for Gemini only
     await tx.aiModel.deleteMany({
-      where: { id: { notIn: validIds } },
+      where: {
+        provider: "gemini",
+        id: { notIn: validIds },
+      },
     });
 
     for (const model of validModels) {
@@ -284,12 +288,14 @@ export async function fetchAndPersistGoogleModels(customAiClient?: any): Promise
           name: model.name,
           displayName: model.displayName,
           description: model.description,
+          provider: "gemini",
         },
         create: {
           id: model.id,
           name: model.name,
           displayName: model.displayName,
           description: model.description,
+          provider: "gemini",
         },
       });
     }
