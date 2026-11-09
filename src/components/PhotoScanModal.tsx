@@ -2,7 +2,7 @@
 
 import { useState } from "react"
 import { addCardsBulk } from "@/actions/cards"
-import { UploadCloud, Loader2, Trash2, Plus } from "lucide-react"
+import { UploadCloud, Loader2, Trash2, Plus, ShieldAlert } from "lucide-react"
 
 interface PhotoScanModalProps {
   deckId: string
@@ -156,6 +156,13 @@ export function PhotoScanModal({ deckId, isOpen, onClose }: PhotoScanModalProps)
                 {file ? file.name : 'Datei auswählen...'}
               </span>
             </label>
+
+            <div className="w-full mt-4 flex items-start gap-2.5 p-3 rounded-lg bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800/50 text-amber-800 dark:text-amber-300 text-xs md:text-sm text-left">
+              <ShieldAlert className="w-4 h-4 mt-0.5 shrink-0 text-amber-600 dark:text-amber-400" />
+              <span>
+                <strong>Hinweis:</strong> Achte darauf, keine persönlichen oder sensiblen Daten mithilfe der KI zu analysieren.
+              </span>
+            </div>
 
             <div className="flex gap-2 mt-6">
               <button
