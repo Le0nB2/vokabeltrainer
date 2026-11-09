@@ -87,6 +87,8 @@ model Settings {
   notificationsEnabled  Boolean @default(false)
   speechLanguage        String  @default("en-GB")
   selectedModel         String  @default("gemini-3.6-flash")
+  openRouterModel       String  @default("openrouter/free")
+  openAiModel           String  @default("gpt-4o-mini")
   activeAiProvider      String  @default("gemini")
 }
 
@@ -111,6 +113,7 @@ model AiModel {
   name        String
   displayName String
   description String?
+  provider    String   @default("gemini")
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 }

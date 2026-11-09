@@ -17,12 +17,20 @@ export interface ResolvedAiConfig {
 export async function getActiveAiProvider(userId?: string): Promise<ResolvedAiConfig> {
   // 1. Fetch active settings
   let activeProviderPreference: string = "gemini"
+  let openRouterModelPreference: string = "openrouter/free"
+  let openAiModelPreference: string = "gpt-4o-mini"
   try {
     const settings = await prisma.settings.findUnique({
       where: { id: "default" },
     })
     if (settings?.activeAiProvider) {
       activeProviderPreference = settings.activeAiProvider
+    }
+    if (settings?.openRouterModel) {
+      openRouterModelPreference = settings.openRouterModel
+    }
+    if (settings?.openAiModel) {
+      openAiModelPreference = settings.openAiModel
     }
   } catch {
     // If settings table not available yet, default to gemini
@@ -63,7 +71,7 @@ export async function getActiveAiProvider(userId?: string): Promise<ResolvedAiCo
     if (oaKey) {
       return {
         providerId: "openai",
-        provider: new OpenAiProvider(oaKey),
+        provider: new OpenAiProvider(oaKey, openAiModelPreference),
         source: userId ? "user_credential" : "global_credential",
       }
     }
@@ -104,7 +112,7 @@ export async function getActiveAiProvider(userId?: string): Promise<ResolvedAiCo
     if (orKey) {
       return {
         providerId: "openrouter",
-        provider: new OpenRouterProvider(orKey),
+        provider: new OpenRouterProvider(orKey, openRouterModelPreference),
         source: userId ? "user_credential" : "global_credential",
       }
     }

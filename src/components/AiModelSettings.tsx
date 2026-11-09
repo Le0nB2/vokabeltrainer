@@ -32,20 +32,60 @@ type ModelItem = {
 
 type Settings = {
   selectedModel?: string
+  openRouterModel?: string
+  openAiModel?: string
   activeAiProvider?: string
 }
 
 export function AiModelSettings({
   initialSettings,
   initialModels,
+  initialOpenAiModels,
   apiStats,
 }: {
   initialSettings: Settings
   initialModels: ModelItem[]
+  initialOpenAiModels?: ModelItem[]
   apiStats?: ApiStatsResult[]
 }) {
   const [selectedModel, setSelectedModel] = useState(
     initialSettings.selectedModel ?? "gemini-3.6-flash"
+  )
+  const [openRouterModel, setOpenRouterModel] = useState<string>(
+    initialSettings.openRouterModel ?? "openrouter/free"
+  )
+  const [openAiModel, setOpenAiModel] = useState<string>(
+    initialSettings.openAiModel ?? "gpt-4o-mini"
+  )
+  const [openAiModels, setOpenAiModels] = useState<ModelItem[]>(
+    initialOpenAiModels && initialOpenAiModels.length > 0
+      ? initialOpenAiModels
+      : [
+          {
+            id: "gpt-4o-mini",
+            name: "gpt-4o-mini",
+            displayName: "GPT-4o Mini",
+            description: "Standard: Extrem schnell, kostengünstig und ideal für Vokabeln & OCR",
+          },
+          {
+            id: "chatgpt-4o-latest",
+            name: "chatgpt-4o-latest",
+            displayName: "ChatGPT-4o Latest (Dauer-Aktuell)",
+            description: "Zukunftssicher: Zeigt serverseitig immer automatisch auf die neueste Version von GPT-4o",
+          },
+          {
+            id: "gpt-4o",
+            name: "gpt-4o",
+            displayName: "GPT-4o",
+            description: "Leistungsstarkes Flagship-Modell für anspruchsvolle Aufgaben",
+          },
+          {
+            id: "o3-mini",
+            name: "o3-mini",
+            displayName: "o3-mini",
+            description: "Reasoning-Modell für tiefgründige Logik und Schritt-für-Schritt-Denken",
+          },
+        ]
   )
   const [activeProvider, setActiveProvider] = useState<"gemini" | "openrouter" | "openai">(
     initialSettings.activeAiProvider === "openrouter"
@@ -63,6 +103,7 @@ export function AiModelSettings({
   const [stats, setStats] = useState<ApiStatsResult[] | undefined>(apiStats)
   const [isSaving, setIsSaving] = useState(false)
   const [isRefreshing, setIsRefreshing] = useState(false)
+  const [isRefreshingOpenAi, setIsRefreshingOpenAi] = useState(false)
   const [feedback, setFeedback] = useState<{
     type: "success" | "error"
     message: string
@@ -267,6 +308,69 @@ export function AiModelSettings({
     }
   }
 
+  const handleOpenRouterModelChange = async (newModel: string) => {
+    setOpenRouterModel(newModel)
+    setFeedback(null)
+    try {
+      await updateSettings({ openRouterModel: newModel })
+      setFeedback({
+        type: "success",
+        message: `OpenRouter-Routing auf ${newModel === "openrouter/free" ? "Kostenlos (Free Router)" : "Auto-Routing (Bestes Modell)"} umgestellt.`,
+      })
+    } catch {
+      setFeedback({
+        type: "error",
+        message: "Fehler beim Speichern des OpenRouter-Modells.",
+      })
+    }
+  }
+
+  const handleOpenAiModelChange = async (newModel: string) => {
+    setOpenAiModel(newModel)
+    setFeedback(null)
+    try {
+      await updateSettings({ openAiModel: newModel })
+      setFeedback({
+        type: "success",
+        message: `ChatGPT-Modell auf ${newModel} umgestellt.`,
+      })
+    } catch {
+      setFeedback({
+        type: "error",
+        message: "Fehler beim Speichern des ChatGPT-Modells.",
+      })
+    }
+  }
+
+  const handleRefreshOpenAiModels = async () => {
+    setIsRefreshingOpenAi(true)
+    setFeedback(null)
+    try {
+      const { syncOpenAiModelsAction, getAvailableOpenAiModelsAction } = await import("@/actions/settings")
+      const res = await syncOpenAiModelsAction()
+      if (res.success) {
+        const updated = await getAvailableOpenAiModelsAction()
+        setOpenAiModels(updated)
+        setFeedback({
+          type: "success",
+          message: `${res.count} OpenAI-Modelle erfolgreich synchronisiert!`,
+        })
+      } else {
+        setFeedback({
+          type: "error",
+          message: res.error || "Fehler beim Abrufen der OpenAI-Modelle.",
+        })
+      }
+    } catch (err: any) {
+      setFeedback({
+        type: "error",
+        message: err?.message || "Fehler beim Synchronisieren der OpenAI-Modelle.",
+      })
+    } finally {
+      setIsRefreshingOpenAi(false)
+    }
+  }
+
   const isPaidSelected = selectedModel.toLowerCase().includes("pro")
   const flashLiteModels = models.filter((m) => m.id.includes("lite"))
   const proModels = models.filter((m) => m.id.includes("pro"))
@@ -445,6 +549,60 @@ export function AiModelSettings({
                 className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-xl text-xs font-medium disabled:opacity-50"
               >
                 {isSavingKey ? "Speichert..." : "Speichern"}
+              </button>
+            </div>
+          </div>
+
+          {/* OpenRouter Model Selection / Routing Mode */}
+          <div className="pt-3 border-t border-purple-100 dark:border-purple-900/30 space-y-2">
+            <label className="block text-xs font-semibold text-zinc-900 dark:text-zinc-100">
+              OpenRouter Routing-Modus &amp; Modell-Strategie:
+            </label>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              {/* Option 1: Kostenlos (openrouter/free) */}
+              <button
+                type="button"
+                onClick={() => handleOpenRouterModelChange("openrouter/free")}
+                className={`p-3 rounded-xl border text-left transition-all cursor-pointer ${
+                  openRouterModel === "openrouter/free"
+                    ? "border-purple-600 bg-purple-50/80 dark:bg-purple-950/40 ring-2 ring-purple-500"
+                    : "border-zinc-200 dark:border-zinc-800 hover:border-purple-300 dark:hover:border-purple-700 bg-white/60 dark:bg-zinc-900/60"
+                }`}
+              >
+                <div className="flex items-center justify-between mb-1.5">
+                  <span className="font-bold text-xs text-zinc-900 dark:text-zinc-100 flex items-center gap-1.5">
+                    <Sparkles className="w-3.5 h-3.5 text-purple-600 dark:text-purple-400" /> Kostenlos (Free Router)
+                  </span>
+                  <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300 font-bold">
+                    0,00 €
+                  </span>
+                </div>
+                <p className="text-[11px] text-zinc-600 dark:text-zinc-400 leading-snug">
+                  Nutzt OpenRouters Free-Router mit wechselnden freien Modellen. Kein Guthaben erforderlich.
+                </p>
+              </button>
+
+              {/* Option 2: Auto-Routing (openrouter/auto) */}
+              <button
+                type="button"
+                onClick={() => handleOpenRouterModelChange("openrouter/auto")}
+                className={`p-3 rounded-xl border text-left transition-all cursor-pointer ${
+                  openRouterModel === "openrouter/auto"
+                    ? "border-purple-600 bg-purple-50/80 dark:bg-purple-950/40 ring-2 ring-purple-500"
+                    : "border-zinc-200 dark:border-zinc-800 hover:border-purple-300 dark:hover:border-purple-700 bg-white/60 dark:bg-zinc-900/60"
+                }`}
+              >
+                <div className="flex items-center justify-between mb-1.5">
+                  <span className="font-bold text-xs text-zinc-900 dark:text-zinc-100 flex items-center gap-1.5">
+                    <Sparkles className="w-3.5 h-3.5 text-purple-600 dark:text-purple-400" /> Auto-Routing (Bestes Modell)
+                  </span>
+                  <span className="text-[10px] px-2 py-0.5 rounded-full bg-purple-100 text-purple-800 dark:bg-purple-950 dark:text-purple-300 font-bold">
+                    Pay-as-you-go
+                  </span>
+                </div>
+                <p className="text-[11px] text-zinc-600 dark:text-zinc-400 leading-snug">
+                  Wählt vollautomatisch das beste Modell für die jeweilige Anfrage (OCR, JSON, etc.). Erfordert Guthaben.
+                </p>
               </button>
             </div>
           </div>
@@ -672,6 +830,74 @@ export function AiModelSettings({
             </div>
           </div>
         </>
+      )}
+
+      {/* 4. ChatGPT Model Details (when OpenAI is active) */}
+      {activeProvider === "openai" && (
+        <div className="border-t border-zinc-200 dark:border-zinc-800 pt-6">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-4">
+            <h3 className="text-base font-bold text-zinc-900 dark:text-zinc-100">
+              ChatGPT Modell-Auswahl
+            </h3>
+            <button
+              type="button"
+              onClick={handleRefreshOpenAiModels}
+              disabled={isRefreshingOpenAi}
+              className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-zinc-700 text-xs font-medium transition-colors disabled:opacity-50 cursor-pointer self-start sm:self-auto"
+            >
+              <RefreshCw
+                className={`w-3.5 h-3.5 ${isRefreshingOpenAi ? "animate-spin text-emerald-600" : ""}`}
+              />
+              {isRefreshingOpenAi ? "Rufe Modelle ab..." : "Modelle jetzt abrufen"}
+            </button>
+          </div>
+
+          <div className="p-4 bg-zinc-50 dark:bg-zinc-800/50 rounded-lg">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <div>
+                <div className="font-medium text-zinc-900 dark:text-zinc-100 text-sm">
+                  Aktives ChatGPT-Modell
+                </div>
+                <div className="text-xs text-zinc-500 mt-1">
+                  Wähle das Modell für Vokabel-Scan, Beispielsätze und Arbeitsblätter.
+                </div>
+              </div>
+
+              <select
+                className="bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 rounded-md py-2 px-3 text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 w-full sm:w-80"
+                value={openAiModel}
+                onChange={(e) => handleOpenAiModelChange(e.target.value)}
+              >
+                {!openAiModels.some((m) => m.id === openAiModel) && (
+                  <option value={openAiModel}>{openAiModel}</option>
+                )}
+
+                {openAiModels.map((m) => (
+                  <option key={m.id} value={m.id}>
+                    {m.displayName}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            {openAiModel === "chatgpt-4o-latest" ? (
+              <div className="mt-3 flex items-center gap-2 p-2.5 rounded-lg bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-900/50 text-emerald-800 dark:text-emerald-300 text-xs">
+                <CheckCircle2 className="w-4 h-4 shrink-0 text-emerald-600 dark:text-emerald-400" />
+                <span><strong>Zukunftssicher:</strong> Zeigt serverseitig immer automatisch auf die neueste Version von GPT-4o.</span>
+              </div>
+            ) : openAiModel.startsWith("o") ? (
+              <div className="mt-3 flex items-center gap-2 p-2.5 rounded-lg bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-900/50 text-blue-800 dark:text-blue-300 text-xs">
+                <Sparkles className="w-4 h-4 shrink-0 text-blue-600 dark:text-blue-400" />
+                <span><strong>Reasoning-Modell:</strong> Führt vor der Antwort logische Denkschritte durch.</span>
+              </div>
+            ) : (
+              <div className="mt-3 flex items-center gap-2 p-2.5 rounded-lg bg-zinc-100 dark:bg-zinc-800/80 border border-zinc-200 dark:border-zinc-700 text-zinc-700 dark:text-zinc-300 text-xs">
+                <CheckCircle2 className="w-4 h-4 shrink-0 text-zinc-500" />
+                <span>Standard-Modell für schnelle Antworten und OCR.</span>
+              </div>
+            )}
+          </div>
+        </div>
       )}
     </div>
   )
