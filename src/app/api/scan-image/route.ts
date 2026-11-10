@@ -190,6 +190,10 @@ WICHTIGE REGELN:
       return NextResponse.json({ error: error.message }, { status: 429 });
     }
     console.error("Scan error:", error);
-    return NextResponse.json({ error: "Fehler bei der Bildanalyse. Bitte versuche es erneut." }, { status: 500 });
+    const message =
+      error instanceof Error && error.message
+        ? error.message
+        : "Fehler bei der Bildanalyse. Bitte versuche es erneut.";
+    return NextResponse.json({ error: message }, { status: 500 });
   }
 }

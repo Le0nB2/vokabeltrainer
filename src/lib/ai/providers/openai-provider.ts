@@ -52,11 +52,13 @@ export class OpenAiProvider implements IAiProvider {
       })
     }
 
+    const isWorksheet = options.prompt.includes("Arbeitsblatt")
     const payload: Record<string, any> = {
       model,
       messages,
       temperature: options.temperature ?? 0.2,
       response_format: { type: "json_object" },
+      max_tokens: isWorksheet ? 6000 : 4096,
     }
 
     const response = await fetchWithRetry(

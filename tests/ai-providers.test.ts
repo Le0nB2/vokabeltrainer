@@ -131,6 +131,24 @@ describe("AI Providers & Router", () => {
       ).rejects.toThrow("Ungültiger OpenRouter API-Schlüssel")
       expect(mockFetch).toHaveBeenCalledTimes(1)
     })
+
+    it("throws helpful error when openrouter/free fails on image vision requests", async () => {
+      const mockFetch = vi.fn().mockResolvedValue({
+        ok: false,
+        status: 404,
+        headers: new Headers(),
+        text: async () => "No models found supporting multimodal input",
+      })
+      global.fetch = mockFetch as any
+
+      const provider = new OpenRouterProvider("sk-or-test-key", "openrouter/free")
+      await expect(
+        provider.generateStructuredJson({
+          prompt: "Scanne Bild",
+          image: { data: "base64", mimeType: "image/jpeg" },
+        })
+      ).rejects.toThrow("unterstützt aktuell keine Bildanalyse (Vision)")
+    })
   })
 
   describe("getActiveAiProvider", () => {
