@@ -75,10 +75,11 @@ describe("AI Providers & Router", () => {
       )
     })
 
-    it("throws QuotaExceededError on HTTP 429", async () => {
+    it("throws QuotaExceededError on HTTP 429 after 3 attempts", async () => {
       const mockFetch = vi.fn().mockResolvedValue({
         ok: false,
         status: 429,
+        headers: new Headers(),
         text: async () => "Rate limit exceeded",
       })
       global.fetch = mockFetch as any
@@ -87,6 +88,48 @@ describe("AI Providers & Router", () => {
       await expect(
         provider.generateStructuredJson({ prompt: "Test" })
       ).rejects.toThrow("OpenRouter-Kontingent ist für diesen Zeitraum aufgebraucht")
+      expect(mockFetch).toHaveBeenCalledTimes(3)
+    })
+
+    it("retries on HTTP 429 or 503 and succeeds on subsequent attempt", async () => {
+      const mockFetch = vi
+        .fn()
+        .mockResolvedValueOnce({
+          ok: false,
+          status: 503,
+          headers: new Headers(),
+          text: async () => "Overloaded",
+        })
+        .mockResolvedValueOnce({
+          ok: true,
+          json: async () => ({
+            choices: [{ message: { content: "{\"recovered\": true}" } }],
+          }),
+        })
+      global.fetch = mockFetch as any
+
+      const provider = new OpenRouterProvider("sk-or-test-key")
+      const result = await provider.generateStructuredJson<{ recovered: boolean }>({
+        prompt: "Test",
+      })
+      expect(result.recovered).toBe(true)
+      expect(mockFetch).toHaveBeenCalledTimes(2)
+    })
+
+    it("aborts immediately without retrying on 401 Unauthorized", async () => {
+      const mockFetch = vi.fn().mockResolvedValue({
+        ok: false,
+        status: 401,
+        headers: new Headers(),
+        text: async () => "Unauthorized",
+      })
+      global.fetch = mockFetch as any
+
+      const provider = new OpenRouterProvider("sk-or-test-key")
+      await expect(
+        provider.generateStructuredJson({ prompt: "Test" })
+      ).rejects.toThrow("Ungültiger OpenRouter API-Schlüssel")
+      expect(mockFetch).toHaveBeenCalledTimes(1)
     })
   })
 
@@ -207,10 +250,11 @@ describe("AI Providers & Router", () => {
       )
     })
 
-    it("throws QuotaExceededError on HTTP 429", async () => {
+    it("throws QuotaExceededError on HTTP 429 after 3 attempts", async () => {
       const mockFetch = vi.fn().mockResolvedValue({
         ok: false,
         status: 429,
+        headers: new Headers(),
         text: async () => "Insufficient quota",
       })
       global.fetch = mockFetch as any
@@ -219,6 +263,48 @@ describe("AI Providers & Router", () => {
       await expect(
         provider.generateStructuredJson({ prompt: "Test" })
       ).rejects.toThrow("Dein OpenAI/ChatGPT-Guthaben ist aufgebraucht")
+      expect(mockFetch).toHaveBeenCalledTimes(3)
+    })
+
+    it("retries on HTTP 429 or 503 and succeeds on subsequent attempt", async () => {
+      const mockFetch = vi
+        .fn()
+        .mockResolvedValueOnce({
+          ok: false,
+          status: 429,
+          headers: new Headers(),
+          text: async () => "Rate limit",
+        })
+        .mockResolvedValueOnce({
+          ok: true,
+          json: async () => ({
+            choices: [{ message: { content: "{\"recovered\": true}" } }],
+          }),
+        })
+      global.fetch = mockFetch as any
+
+      const provider = new OpenAiProvider("sk-proj-test-key")
+      const result = await provider.generateStructuredJson<{ recovered: boolean }>({
+        prompt: "Test",
+      })
+      expect(result.recovered).toBe(true)
+      expect(mockFetch).toHaveBeenCalledTimes(2)
+    })
+
+    it("aborts immediately without retrying on 401 Unauthorized", async () => {
+      const mockFetch = vi.fn().mockResolvedValue({
+        ok: false,
+        status: 401,
+        headers: new Headers(),
+        text: async () => "Invalid API key",
+      })
+      global.fetch = mockFetch as any
+
+      const provider = new OpenAiProvider("sk-proj-test-key")
+      await expect(
+        provider.generateStructuredJson({ prompt: "Test" })
+      ).rejects.toThrow("Ungültiger OpenAI API-Schlüssel")
+      expect(mockFetch).toHaveBeenCalledTimes(1)
     })
 
     it("respects custom default model in OpenAI requests", async () => {
