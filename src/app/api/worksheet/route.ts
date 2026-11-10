@@ -192,14 +192,17 @@ ${JSON.stringify(selectedCards.map(c => ({ englisch: c.front, deutsch: c.back })
     };
 
     const generateWorksheetData = async (
-      onGeminiStatus?: (event: GeminiStatusEvent) => void | Promise<void>,
-      onProgress?: (message: string) => void
+      onAiStatus?: (event: GeminiStatusEvent) => void | Promise<void>,
+      onOptimizing?: (message: string) => void | Promise<void>
     ) => {
       let parsedWorksheet: any;
 
       if (aiConfig?.providerId === "openrouter" || aiConfig?.providerId === "openai") {
         const providerLabel = aiConfig.providerId === "openai" ? "ChatGPT (OpenAI)" : "OpenRouter";
-        onProgress?.(`Sende Anfrage an ${providerLabel}...`);
+        await onAiStatus?.({
+          type: "start",
+          message: `Sende Anfrage an ${providerLabel}...`,
+        });
         parsedWorksheet = await aiConfig.provider.generateStructuredJson({
           prompt: promptText + "\n\nAntworte strikt im geforderten JSON-Format mit den Hauptfeldern 'exercises' und 'solutions'.",
         });
@@ -221,7 +224,7 @@ ${JSON.stringify(selectedCards.map(c => ({ englisch: c.front, deutsch: c.back })
         parsedWorksheet = await callGeminiWithRetry({
           endpoint: "worksheet",
           apiKeys,
-          onStatus: onGeminiStatus,
+          onStatus: onAiStatus,
           execute: async (ai, modelToUse) => {
             const response = await ai.models.generateContent({
               model: modelToUse,
@@ -264,7 +267,13 @@ ${JSON.stringify(selectedCards.map(c => ({ englisch: c.front, deutsch: c.back })
         });
       }
 
-      onProgress?.("Aufgaben generiert! Optimiere Layout für maximal 4 Druckseiten...");
+      if (!parsedWorksheet?.exercises || !parsedWorksheet?.solutions) {
+        throw new Error(
+          "Die KI-Antwort enthielt kein vollständiges Arbeitsblatt ('exercises' oder 'solutions' fehlen). Bitte versuche es erneut."
+        );
+      }
+
+      await onOptimizing?.("Aufgaben generiert! Optimiere Layout für maximal 4 Druckseiten...");
 
       const settings = await prisma.settings.upsert({
         where: { id: "default" },

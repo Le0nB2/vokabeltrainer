@@ -52,11 +52,13 @@ export class OpenRouterProvider implements IAiProvider {
       })
     }
 
+    const isWorksheet = options.prompt.includes("Arbeitsblatt")
     const payload: Record<string, any> = {
       model,
       messages,
       temperature: options.temperature ?? 0.2,
       response_format: { type: "json_object" },
+      max_tokens: isWorksheet ? 6000 : 4096,
     }
 
     const response = await fetchWithRetry(
@@ -87,6 +89,21 @@ export class OpenRouterProvider implements IAiProvider {
       }
       if (response.status === 401) {
         throw new Error("Ungültiger OpenRouter API-Schlüssel oder abgelaufenes Token.")
+      }
+      if (response.status === 400 || response.status === 404) {
+        const lowerErr = errBody.toLowerCase()
+        if (
+          options.image &&
+          (model === "openrouter/free" ||
+            lowerErr.includes("multimodal") ||
+            lowerErr.includes("vision") ||
+            lowerErr.includes("image") ||
+            lowerErr.includes("support"))
+        ) {
+          throw new Error(
+            "Das gewählte OpenRouter-Modell (oder OpenRouter Free) unterstützt aktuell keine Bildanalyse (Vision). Bitte wechsle für Foto-Scans in den Einstellungen zu Google Gemini oder nutze OpenRouter Auto-Routing."
+          )
+        }
       }
       throw new Error(`OpenRouter API Fehler (${response.status}): ${errBody}`)
     }

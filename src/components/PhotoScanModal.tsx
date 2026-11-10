@@ -81,7 +81,8 @@ export function PhotoScanModal({ deckId, isOpen, onClose }: PhotoScanModalProps)
           setError(`${attempt}. Versuch zur Analyse (hoher Traffic) -> Erneuter Versuch in 5 Sek.`)
           await new Promise(resolve => setTimeout(resolve, retryDelay))
         } else {
-          setError("Fehler bei der Bildanalyse: " + errorMessage)
+          const prefix = errorMessage.toLowerCase().startsWith("fehler") ? "" : "Fehler bei der Bildanalyse: "
+          setError(`${prefix}${errorMessage}`)
           console.error(err)
           break // Exit loop on normal error or max retries reached
         }
