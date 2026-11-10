@@ -1,5 +1,6 @@
 import { AiGenerateOptions, IAiProvider } from "../ai-provider.interface"
 import { QuotaExceededError } from "@/lib/services/gemini-executor"
+import { fetchWithRetry, getDefaultRetryDelays } from "../fetch-with-retry"
 
 export const DEFAULT_OPENAI_MODEL = "gpt-4o-mini"
 
@@ -20,7 +21,12 @@ export class OpenAiProvider implements IAiProvider {
   id = "openai" as const
   name = "ChatGPT (OpenAI)"
 
-  constructor(private apiKey: string, private defaultModel: string = DEFAULT_OPENAI_MODEL) {}
+  constructor(
+    private apiKey: string,
+    private defaultModel: string = DEFAULT_OPENAI_MODEL,
+    private retryDelaysMs: number[] = getDefaultRetryDelays(),
+    private maxAttempts: number = 3
+  ) {}
 
   async generateStructuredJson<T>(options: AiGenerateOptions): Promise<T> {
     const model = options.model || this.defaultModel
@@ -53,14 +59,22 @@ export class OpenAiProvider implements IAiProvider {
       response_format: { type: "json_object" },
     }
 
-    const response = await fetch("https://api.openai.com/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${this.apiKey}`,
+    const response = await fetchWithRetry(
+      "https://api.openai.com/v1/chat/completions",
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${this.apiKey}`,
+        },
+        body: JSON.stringify(payload),
       },
-      body: JSON.stringify(payload),
-    })
+      {
+        maxAttempts: this.maxAttempts,
+        delaysMs: this.retryDelaysMs,
+        providerName: this.name,
+      }
+    )
 
     if (!response.ok) {
       const errBody = await response.text().catch(() => "")
