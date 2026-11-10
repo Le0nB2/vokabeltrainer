@@ -2,13 +2,29 @@
 
 import prisma from "@/lib/prisma"
 import { revalidatePath } from "next/cache"
-import { requireAppAuth, getCurrentUser, UnauthorizedError } from "@/lib/auth-guard"
+import { requireAppAuth, getCurrentUser, UnauthorizedError, requireAdminUser } from "@/lib/auth-guard"
 import { MAX_IMPORT_SIZE_BYTES, validateBackupData } from "@/lib/validations/import"
 import { checkSettingsAuthenticated } from "@/actions/auth"
 import { hashPassword, validateUsername, validatePasswordPolicy } from "@/lib/auth-utils"
 import { MAX_SRS_INTERVAL_DAYS } from "@/lib/constants"
+import { z } from "zod"
 
 const checkSettingsAuth = checkSettingsAuthenticated
+
+const UpdateSettingsSchema = z.object({
+  minigamesEnabled: z.boolean().optional(),
+  minigameIntervalMin: z.number().int().min(1).max(1000).optional(),
+  minigameIntervalMax: z.number().int().min(1).max(1000).optional(),
+  speedMatchEnabled: z.boolean().optional(),
+  balloonPopEnabled: z.boolean().optional(),
+  reactionTesterEnabled: z.boolean().optional(),
+  wordDropEnabled: z.boolean().optional(),
+  notificationsEnabled: z.boolean().optional(),
+  speechLanguage: z.string().max(20).optional(),
+  selectedModel: z.string().max(100).optional(),
+  openRouterModel: z.string().max(100).optional(),
+  openAiModel: z.string().max(100).optional(),
+}).strict()
 
 export interface UserImportMapping {
   action: "create" | "assign"
@@ -22,8 +38,7 @@ export async function importData(
   userMappings?: Record<string, UserImportMapping>
 ) {
   try {
-    await requireAppAuth()
-    const user = await getCurrentUser()
+    const user = await requireAdminUser()
     const isAuth = await checkSettingsAuth()
     if (!isAuth) {
       return { success: false, error: "Nicht autorisiert. Bitte melde dich mit dem Einstellungspasswort an." }
@@ -162,7 +177,39 @@ export async function importData(
 
         if (deck.cards && deck.cards.length > 0) {
           const maxDueTime = Date.now() + MAX_SRS_INTERVAL_DAYS * 24 * 60 * 60 * 1000
-          for (const card of deck.cards) {
+
+          const cardsWithoutLogs = deck.cards.filter((c) => !c.reviewLogs || c.reviewLogs.length === 0)
+          const cardsWithLogs = deck.cards.filter((c) => c.reviewLogs && c.reviewLogs.length > 0)
+
+          if (cardsWithoutLogs.length > 0) {
+            await tx.card.createMany({
+              data: cardsWithoutLogs.map((card) => {
+                const clampedBox = Math.min(MAX_SRS_INTERVAL_DAYS, card.box)
+                const clampedDueDate = card.dueDate
+                  ? new Date(Math.min(card.dueDate.getTime(), maxDueTime))
+                  : undefined
+                return {
+                  deckId: createdDeck.id,
+                  front: card.front,
+                  back: card.back,
+                  notes: card.notes ?? null,
+                  mnemonic: card.mnemonic ?? null,
+                  contextSentence: card.contextSentence ?? null,
+                  easeFactor: card.easeFactor,
+                  lapses: card.lapses,
+                  box: clampedBox,
+                  consecutiveCorrect: card.consecutiveCorrect,
+                  dueDate: clampedDueDate,
+                  lastReviewed: card.lastReviewed ?? null,
+                  createdAt: card.createdAt ?? undefined,
+                  updatedAt: card.updatedAt ?? undefined,
+                  gapText: card.gapText ?? null,
+                }
+              }),
+            })
+          }
+
+          for (const card of cardsWithLogs) {
             const clampedBox = Math.min(MAX_SRS_INTERVAL_DAYS, card.box)
             const clampedDueDate = card.dueDate
               ? new Date(Math.min(card.dueDate.getTime(), maxDueTime))
@@ -201,7 +248,7 @@ export async function importData(
           }
         }
       }
-    })
+    }, { maxWait: 10000, timeout: 60000 })
 
     revalidatePath("/")
     revalidatePath("/settings")
@@ -217,44 +264,35 @@ export async function importData(
 
 export async function getSettings() {
   await requireAppAuth()
-  const settings = await prisma.settings.findUnique({
+  let settings = await prisma.settings.findUnique({
     where: { id: "default" }
   })
   if (!settings) {
-    return await prisma.settings.create({
+    settings = await prisma.settings.create({
       data: { id: "default" }
     })
   }
-  return settings
+  const { settingsPasswordHash: _omitted, ...safeSettings } = settings as any
+  return safeSettings
 }
 
-export async function updateSettings(data: {
-  minigamesEnabled?: boolean;
-  minigameIntervalMin?: number;
-  minigameIntervalMax?: number;
-  speedMatchEnabled?: boolean;
-  balloonPopEnabled?: boolean;
-  reactionTesterEnabled?: boolean;
-  wordDropEnabled?: boolean;
-  notificationsEnabled?: boolean;
-  speechLanguage?: string;
-  selectedModel?: string;
-  openRouterModel?: string;
-  openAiModel?: string;
-}) {
-  await requireAppAuth()
+export async function updateSettings(rawInput: unknown) {
+  await requireAdminUser()
   const isAuth = await checkSettingsAuth()
   if (!isAuth) {
     throw new Error("Nicht autorisiert. Bitte melde dich mit dem Einstellungspasswort an.")
   }
 
+  const validatedData = UpdateSettingsSchema.parse(rawInput)
+
   const updatedSettings = await prisma.settings.update({
     where: { id: "default" },
-    data
+    data: validatedData,
   })
   revalidatePath("/settings")
   revalidatePath("/decks/[id]/study", "page")
-  return updatedSettings
+  const { settingsPasswordHash: _omitted, ...safeSettings } = updatedSettings as any
+  return safeSettings
 }
 
 export async function getAvailableAiModelsAction() {

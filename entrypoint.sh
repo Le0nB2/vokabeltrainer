@@ -14,6 +14,16 @@ if [ -d "/app/prisma_static" ]; then
   fi
 fi
 
+# Ensure persistent secret generation across container restarts if AUTH_SECRET is not explicitly set:
+if [ -z "$AUTH_SECRET" ] && [ -d "/app/prisma" ]; then
+  if [ ! -f "/app/prisma/.auth_secret" ]; then
+    node -e "process.stdout.write(require('crypto').randomBytes(32).toString('hex'))" > /app/prisma/.auth_secret 2>/dev/null || true
+  fi
+  if [ -f "/app/prisma/.auth_secret" ]; then
+    export AUTH_SECRET=$(cat /app/prisma/.auth_secret)
+  fi
+fi
+
 # 0. Prüfe, ob eine zur Laufzeit gespeicherte Datenbank-Konfiguration vorliegt
 if [ -f "/app/prisma/runtime-db.json" ]; then
   RUNTIME_DB_URL=$(node -e "try { const c = JSON.parse(require('fs').readFileSync('/app/prisma/runtime-db.json')); if (c.databaseUrl) console.log(c.databaseUrl); } catch(e){}" 2>/dev/null || true)

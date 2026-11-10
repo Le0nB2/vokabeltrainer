@@ -1,3 +1,5 @@
+import fs from "fs"
+import path from "path"
 import { createCipheriv, createDecipheriv, createHash, randomBytes } from "crypto"
 import { getAppSecret } from "@/lib/auth-utils"
 
@@ -5,8 +7,30 @@ const ALGORITHM = "aes-256-gcm"
 const IV_LENGTH = 12
 const PREFIX = "enc_v1:"
 
+let cachedPersistentSecret: string | null = null
+
 function getEncryptionKey(): Buffer {
-  const secret = process.env.ENCRYPTION_SECRET || getAppSecret()
+  let secret = process.env.ENCRYPTION_SECRET || process.env.AUTH_SECRET || process.env.SESSION_SECRET
+  if (!secret) {
+    if (!cachedPersistentSecret) {
+      const keyFile = path.join(process.cwd(), "prisma", ".encryption_key")
+      try {
+        if (fs.existsSync(keyFile)) {
+          cachedPersistentSecret = fs.readFileSync(keyFile, "utf8").trim()
+        } else {
+          cachedPersistentSecret = randomBytes(32).toString("hex")
+          const dir = path.dirname(keyFile)
+          if (!fs.existsSync(dir)) {
+            fs.mkdirSync(dir, { recursive: true })
+          }
+          fs.writeFileSync(keyFile, cachedPersistentSecret, { encoding: "utf8", mode: 0o600 })
+        }
+      } catch {
+        cachedPersistentSecret = getAppSecret()
+      }
+    }
+    secret = cachedPersistentSecret
+  }
   return createHash("sha256").update(secret).digest()
 }
 
@@ -32,12 +56,12 @@ export function encryptSecret(plainText: string): string {
 
 /**
  * Decrypts a string encrypted with encryptSecret.
- * If the input doesn't start with the encryption prefix, it returns the input as-is (graceful fallback).
+ * Rejects unencrypted input or inputs without the valid prefix to prevent cryptographic bypasses.
  */
 export function decryptSecret(cipherText: string): string {
-  if (!cipherText || typeof cipherText !== "string") return cipherText
+  if (!cipherText || typeof cipherText !== "string") return ""
   if (!cipherText.startsWith(PREFIX)) {
-    return cipherText
+    throw new Error("Unencrypted or invalid secret format rejected")
   }
 
   const payload = cipherText.slice(PREFIX.length)

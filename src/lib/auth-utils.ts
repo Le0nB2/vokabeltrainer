@@ -150,14 +150,24 @@ export function getAppAuthCredentials() {
  * Secret used for HMAC session token signing.
  */
 export function getAppSecret(password?: string): string {
-  return (
-    process.env.AUTH_SECRET ||
-    process.env.SESSION_SECRET ||
-    (process.env.RENDER_SERVICE_ID ? `render-sec-${process.env.RENDER_SERVICE_ID}` : undefined) ||
-    (password ? deriveSecretFromPassword(password) : undefined) ||
-    (process.env.SETTINGS_PASSWORD ? deriveSecretFromPassword(process.env.SETTINGS_PASSWORD) : undefined) ||
-    getFallbackSecret()
-  )
+  const envSecret = process.env.AUTH_SECRET || process.env.SESSION_SECRET
+
+  if (envSecret) {
+    if (password) {
+      return createHmac("sha256", envSecret).update(password).digest("hex")
+    }
+    return envSecret
+  }
+
+  if (password) {
+    return deriveSecretFromPassword(password)
+  }
+
+  if (process.env.SETTINGS_PASSWORD) {
+    return deriveSecretFromPassword(process.env.SETTINGS_PASSWORD)
+  }
+
+  return getFallbackSecret()
 }
 
 export const SCRYPT_PARAMS = { N: 32768, r: 8, p: 1, maxmem: 64 * 1024 * 1024 };

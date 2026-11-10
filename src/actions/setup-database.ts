@@ -2,15 +2,18 @@
 
 import fs from "fs"
 import path from "path"
-import { exec } from "child_process"
+import { execFile } from "child_process"
 import { promisify } from "util"
 import { cookies, headers } from "next/headers"
 import { PrismaClient } from "@prisma/client"
 import { reloadPrismaClient } from "@/lib/prisma"
 import { encryptSecret } from "@/lib/security/crypto"
 import { isSecureRequest } from "@/lib/auth-utils"
+import { getSetupState } from "@/actions/setup"
+import { getCurrentUser } from "@/lib/auth-guard"
+import { checkSettingsAuthenticated } from "@/actions/auth"
 
-const execAsync = promisify(exec)
+const execFileAsync = promisify(execFile)
 
 export interface DatabaseSetupResult {
   success: boolean
@@ -20,7 +23,24 @@ export interface DatabaseSetupResult {
 
 const CONFIG_PATH = path.join(process.cwd(), "prisma", "runtime-db.json")
 
+async function assertDatabaseSetupAllowed(): Promise<void> {
+  const setupState = await getSetupState()
+  if (setupState.needsSetup) return
+
+  const user = await getCurrentUser()
+  const isSettingsAuth = await checkSettingsAuthenticated()
+  if (!user || user.role !== "ADMIN" || !isSettingsAuth) {
+    throw new Error("Nicht autorisiert: Datenbank-Konfiguration ist gesperrt.")
+  }
+}
+
 export async function testAndMigrateDatabase(connectionString: string): Promise<DatabaseSetupResult> {
+  try {
+    await assertDatabaseSetupAllowed()
+  } catch (authErr: any) {
+    return { success: false, error: authErr.message }
+  }
+
   const cleanUrl = connectionString?.trim()
   if (!cleanUrl) {
     return { success: false, error: "Bitte gib einen gültigen Neon Connection String ein." }
@@ -57,14 +77,14 @@ export async function testAndMigrateDatabase(connectionString: string): Promise<
       DIRECT_URL: directUrl,
     }
 
-    await execAsync(`npx prisma migrate deploy --schema=${schemaFile}`, {
+    await execFileAsync("npx", ["prisma", "migrate", "deploy", `--schema=${schemaFile}`], {
       env: execEnv,
       timeout: 60000,
     })
 
     if (schemaFile.includes("postgres")) {
       try {
-        await execAsync(`npx prisma generate --schema=${schemaFile}`, {
+        await execFileAsync("npx", ["prisma", "generate", `--schema=${schemaFile}`], {
           env: execEnv,
           timeout: 60000,
         })
@@ -73,10 +93,10 @@ export async function testAndMigrateDatabase(connectionString: string): Promise<
       }
     }
   } catch (err: any) {
-    const errorMsg = err?.stderr || err?.message || "Fehler beim Schema-Update"
+    console.error("Database migration error:", err)
     return {
       success: false,
-      error: `Verbindung zur Neon-Datenbank oder Migration fehlgeschlagen: ${errorMsg}`,
+      error: "Verbindung zur Neon-Datenbank oder Migration fehlgeschlagen. Bitte prüfe die Verbindungsdaten.",
     }
   }
 
@@ -130,6 +150,12 @@ export async function testAndMigrateDatabase(connectionString: string): Promise<
 
 export async function useLocalDatabase(): Promise<DatabaseSetupResult> {
   try {
+    await assertDatabaseSetupAllowed()
+  } catch (authErr: any) {
+    return { success: false, error: authErr.message }
+  }
+
+  try {
     const configDir = path.dirname(CONFIG_PATH)
     if (!fs.existsSync(configDir)) {
       fs.mkdirSync(configDir, { recursive: true })
@@ -150,6 +176,7 @@ export async function useLocalDatabase(): Promise<DatabaseSetupResult> {
     reloadPrismaClient()
     return { success: true, message: "Lokale SQLite-Datenbank aktiviert." }
   } catch (err: any) {
-    return { success: false, error: err?.message || "Fehler beim Aktivieren der lokalen Datenbank." }
+    console.error("Local database activation error:", err)
+    return { success: false, error: "Fehler beim Aktivieren der lokalen Datenbank." }
   }
 }

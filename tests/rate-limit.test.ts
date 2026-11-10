@@ -131,13 +131,24 @@ describe('RateLimiter utility', () => {
   })
 
   describe('getClientIpFromHeaders', () => {
-    it('prioritizes cf-connecting-ip over x-forwarded-for and x-real-ip to prevent spoofing', () => {
+    it('prioritizes cf-connecting-ip when TRUST_CLOUDFLARE_HEADERS is enabled', () => {
+      process.env.TRUST_CLOUDFLARE_HEADERS = 'true'
       const headers = new Headers({
         'cf-connecting-ip': '192.0.2.1',
         'x-real-ip': '198.51.100.1',
         'x-forwarded-for': '203.0.113.195, 70.41.3.18',
       })
       expect(getClientIpFromHeaders(headers)).toBe('192.0.2.1')
+      delete process.env.TRUST_CLOUDFLARE_HEADERS
+    })
+
+    it('ignores cf-connecting-ip when TRUST_CLOUDFLARE_HEADERS is not enabled to prevent spoofing (HIGH-02)', () => {
+      delete process.env.TRUST_CLOUDFLARE_HEADERS
+      const headers = new Headers({
+        'cf-connecting-ip': '1.2.3.4',
+        'x-real-ip': '198.51.100.1',
+      })
+      expect(getClientIpFromHeaders(headers)).toBe('198.51.100.1')
     })
 
     it('prioritizes x-real-ip over x-forwarded-for when cf-connecting-ip is missing', () => {
@@ -148,9 +159,9 @@ describe('RateLimiter utility', () => {
       expect(getClientIpFromHeaders(headers)).toBe('198.51.100.1')
     })
 
-    it('extracts IP from x-forwarded-for first entry when trusted headers are missing', () => {
+    it('extracts IP from x-forwarded-for last entry (proxy appended) to prevent client spoofing (HIGH-02)', () => {
       const headers = new Headers({ 'x-forwarded-for': '203.0.113.195, 70.41.3.18' })
-      expect(getClientIpFromHeaders(headers)).toBe('203.0.113.195')
+      expect(getClientIpFromHeaders(headers)).toBe('70.41.3.18')
     })
 
     it('sanitizes IP address with port', () => {

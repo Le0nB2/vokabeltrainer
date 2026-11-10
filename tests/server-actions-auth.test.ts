@@ -44,6 +44,7 @@ const { mockCookies, mockPrisma } = vi.hoisted(() => {
       createMany: vi.fn().mockResolvedValue({ count: 2 }),
       delete: vi.fn().mockResolvedValue({ id: 'card-1' }),
       update: vi.fn().mockImplementation(({ data }) => Promise.resolve({ id: 'card-1', ...data })),
+      updateMany: vi.fn().mockResolvedValue({ count: 1 }),
     },
     reviewLog: {
       create: vi.fn().mockResolvedValue({ id: 'log-1' }),
@@ -68,7 +69,7 @@ const { mockCookies, mockPrisma } = vi.hoisted(() => {
       deleteMany: vi.fn().mockResolvedValue({ count: 0 }),
       upsert: vi.fn().mockResolvedValue({ id: 'dummy' }),
     },
-    $transaction: vi.fn().mockImplementation((cb) => cb(prismaMock)),
+    $transaction: vi.fn().mockImplementation((cb) => typeof cb === 'function' ? cb(prismaMock) : Promise.all(cb)),
   }
   return { mockCookies: cookies, mockPrisma: prismaMock }
 })
@@ -302,7 +303,7 @@ describe('SEC-02: Server Actions Authentication Protection', () => {
     it('allows updateCardsEnrichmentBulk when authenticated', async () => {
       setValidSessionCookie()
       await updateCardsEnrichmentBulk('deck-1', [{ id: 'card-1', gapText: '...' }])
-      expect(mockPrisma.card.update).toHaveBeenCalled()
+      expect(mockPrisma.card.updateMany).toHaveBeenCalled()
     })
   })
 
@@ -426,14 +427,11 @@ describe('SEC-02: Server Actions Authentication Protection', () => {
       }
       const res = await importData(JSON.stringify(payload))
       expect(res.success).toBe(true)
-      expect(mockPrisma.card.create).toHaveBeenCalledWith(
-        expect.objectContaining({
-          data: expect.objectContaining({
-            front: 'word',
-            box: 365,
-          }),
-        })
-      )
+      const createCall = mockPrisma.card.createMany.mock.calls[0] || mockPrisma.card.create.mock.calls[0]
+      expect(createCall).toBeDefined()
+      const insertedData = Array.isArray(createCall[0].data) ? createCall[0].data[0] : createCall[0].data
+      expect(insertedData.front).toBe('word')
+      expect(insertedData.box).toBe(365)
     })
 
     it('blocks getApiStats when unauthenticated', async () => {

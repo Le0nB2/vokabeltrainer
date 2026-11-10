@@ -228,10 +228,12 @@ export function getClientIpFromHeaders(headersObj?: { get(name: string): string 
   try {
     if (!headersObj) return "127.0.0.1"
 
-    // 1. Prioritize trusted reverse proxy headers that cannot be arbitrarily forged by client
-    const cfConnectingIp = headersObj.get("cf-connecting-ip")?.trim()
-    if (cfConnectingIp) {
-      return sanitizeIp(cfConnectingIp)
+    // 1. Only trust cf-connecting-ip if explicitly configured behind Cloudflare
+    if (process.env.TRUST_CLOUDFLARE_HEADERS === "true") {
+      const cfConnectingIp = headersObj.get("cf-connecting-ip")?.trim()
+      if (cfConnectingIp) {
+        return sanitizeIp(cfConnectingIp)
+      }
     }
 
     const realIp = headersObj.get("x-real-ip")?.trim()
@@ -239,11 +241,13 @@ export function getClientIpFromHeaders(headersObj?: { get(name: string): string 
       return sanitizeIp(realIp)
     }
 
-    // 2. Fall back to X-Forwarded-For
+    // 2. Behind a reverse proxy (Render, Docker, Nginx), the last entry in X-Forwarded-For
+    // is the client IP appended by the trusted reverse proxy, mitigating client header spoofing.
     const forwardedFor = headersObj.get("x-forwarded-for")
     if (forwardedFor) {
-      const first = forwardedFor.split(",")[0].trim()
-      if (first) return sanitizeIp(first)
+      const parts = forwardedFor.split(",").map((p) => p.trim()).filter(Boolean)
+      const trustedIp = parts[parts.length - 1]
+      if (trustedIp) return sanitizeIp(trustedIp)
     }
   } catch {
     // fallback

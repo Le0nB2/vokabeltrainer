@@ -3,7 +3,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { Type, Schema } from "@google/genai";
 import prisma from "@/lib/prisma";
 import { z } from "zod";
-import { requireAppAuth, UnauthorizedError } from "@/lib/auth-guard";
+import { requireAppAuth, getCurrentUser, UnauthorizedError } from "@/lib/auth-guard";
 import { consumeRateLimit, formatRetryDuration, getClientIpFromHeaders } from "@/lib/rate-limit";
 import { callGeminiWithRetry, QuotaExceededError, GeminiStatusEvent } from "@/lib/services/gemini-executor";
 import { formatSseEvent } from "@/lib/services/ai-status";
@@ -16,13 +16,9 @@ const requestSchema = z.object({
 
 export async function POST(req: NextRequest) {
   try {
-    try {
-      await requireAppAuth();
-    } catch (error) {
-      if (error instanceof UnauthorizedError) {
-        return NextResponse.json({ error: "Nicht autorisiert. Bitte melde dich an." }, { status: 401 });
-      }
-      throw error;
+    const user = await getCurrentUser();
+    if (!user) {
+      return NextResponse.json({ error: "Nicht autorisiert. Bitte melde dich an." }, { status: 401 });
     }
 
     const clientIp = getClientIpFromHeaders(req.headers);
@@ -61,6 +57,13 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Deck not found" }, { status: 404 });
     }
 
+    if (user.id !== "default" && user.id !== "admin") {
+      const isOwner = deck.userId === user.id || (user.role === "ADMIN" && !deck.userId);
+      if (!isOwner) {
+        return NextResponse.json({ error: "Keine Berechtigung für dieses Deck" }, { status: 403 });
+      }
+    }
+
     if (deck.cards.length < 5) {
        return NextResponse.json({ error: "Deck needs at least 5 cards for a worksheet" }, { status: 400 });
     }
@@ -78,7 +81,7 @@ export async function POST(req: NextRequest) {
 
     let aiConfig: any = null;
     try {
-      aiConfig = await getActiveAiProvider();
+      aiConfig = await getActiveAiProvider(user.id);
     } catch {
       // ignore
     }
@@ -445,10 +448,9 @@ ${JSON.stringify(selectedCards.map(c => ({ englisch: c.front, deutsch: c.back })
       return NextResponse.json({ error: error.message }, { status: 429 });
     }
     console.error("Worksheet error:", error);
-    const msg =
-      error instanceof Error && error.message
-        ? error.message
-        : "Fehler beim Erstellen des Arbeitsblatts. Bitte versuche es erneut.";
-    return NextResponse.json({ error: msg }, { status: 500 });
+    return NextResponse.json(
+      { error: "Fehler beim Erstellen des Arbeitsblatts. Bitte versuche es erneut." },
+      { status: 500 }
+    );
   }
 }

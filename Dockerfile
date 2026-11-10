@@ -60,10 +60,10 @@ RUN adduser --system --uid 1001 nextjs
 COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
 COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
 
-# Install prisma CLI for running migrations at startup and grant permissions to nextjs user
+# Install prisma CLI for running migrations at startup and grant cache permissions to nextjs user
 RUN mkdir -p /tmp/prisma-engines && \
     npm install -g prisma@6.19.3 && \
-    chown -R nextjs:nodejs /usr/local/lib/node_modules /usr/local/bin /tmp/prisma-engines
+    chown -R nextjs:nodejs /tmp/prisma-engines
 
 # Copy Prisma schema, migrations and generated client
 COPY --from=builder --chown=nextjs:nodejs /app/node_modules/@prisma ./node_modules/@prisma
