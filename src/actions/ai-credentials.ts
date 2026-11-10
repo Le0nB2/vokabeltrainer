@@ -2,8 +2,25 @@
 
 import prisma from "@/lib/prisma"
 import { encryptSecret } from "@/lib/security/crypto"
-import { getCurrentUser } from "@/lib/auth-guard"
+import { requireAppAuth, getCurrentUser } from "@/lib/auth-guard"
+import { checkSettingsAuthenticated } from "@/actions/auth"
+import { getSetupState } from "@/actions/setup"
 import { revalidatePath } from "next/cache"
+
+async function requireAdminOrSetupAuth(): Promise<void> {
+  const setupState = await getSetupState()
+  if (setupState.needsSetup) return
+
+  await requireAppAuth()
+  const user = await getCurrentUser()
+  if (!user || user.role !== "ADMIN") {
+    throw new Error("Nur Administratoren dürfen KI-Zugangsdaten verwalten.")
+  }
+  const isSettingsAuth = await checkSettingsAuthenticated()
+  if (!isSettingsAuth) {
+    throw new Error("Bitte entsperre zuerst die Einstellungen mit deiner PIN.")
+  }
+}
 
 export interface AiConfigStatus {
   activeProvider: "gemini" | "openrouter" | "openai"
@@ -78,6 +95,12 @@ export async function saveAiKeyAction(
   rawKey: string,
   isGlobal = true
 ): Promise<{ success: boolean; error?: string }> {
+  try {
+    await requireAdminOrSetupAuth()
+  } catch (authErr: any) {
+    return { success: false, error: authErr.message }
+  }
+
   let cleanKey = rawKey?.trim()
   if (!cleanKey) {
     return { success: false, error: "Der API-Schlüssel darf nicht leer sein." }
@@ -135,13 +158,20 @@ export async function saveAiKeyAction(
     revalidatePath("/setup")
     return { success: true }
   } catch (err: any) {
-    return { success: false, error: err?.message || "Fehler beim Speichern des Schlüssels." }
+    console.error("saveAiKeyAction error:", err)
+    return { success: false, error: "Fehler beim Speichern des Schlüssels." }
   }
 }
 
 export async function setActiveAiProviderAction(
   provider: "gemini" | "openrouter" | "openai"
 ): Promise<{ success: boolean; error?: string }> {
+  try {
+    await requireAdminOrSetupAuth()
+  } catch (authErr: any) {
+    return { success: false, error: authErr.message }
+  }
+
   try {
     await prisma.settings.upsert({
       where: { id: "default" },
@@ -151,13 +181,20 @@ export async function setActiveAiProviderAction(
     revalidatePath("/settings")
     return { success: true }
   } catch (err: any) {
-    return { success: false, error: err?.message || "Fehler beim Wechseln des KI-Dienstes." }
+    console.error("setActiveAiProviderAction error:", err)
+    return { success: false, error: "Fehler beim Wechseln des KI-Dienstes." }
   }
 }
 
 export async function disconnectAiProviderAction(
   provider: "gemini" | "openrouter" | "openai"
 ): Promise<{ success: boolean; error?: string }> {
+  try {
+    await requireAdminOrSetupAuth()
+  } catch (authErr: any) {
+    return { success: false, error: authErr.message }
+  }
+
   const user = await getCurrentUser()
   const userId = user?.id
 
@@ -183,6 +220,7 @@ export async function disconnectAiProviderAction(
     revalidatePath("/setup")
     return { success: true }
   } catch (err: any) {
-    return { success: false, error: err?.message || "Fehler beim Trennen der Verbindung." }
+    console.error("disconnectAiProviderAction error:", err)
+    return { success: false, error: "Fehler beim Trennen der Verbindung." }
   }
 }

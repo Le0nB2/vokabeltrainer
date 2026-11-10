@@ -28,6 +28,8 @@ import {
 import { cookies, headers } from "next/headers"
 import { revalidatePath } from "next/cache"
 
+const DUMMY_HASH = hashPassword("dummy-timing-mitigation-password!")
+
 async function getClientIp(): Promise<string> {
   try {
     const headersList = await headers()
@@ -38,7 +40,7 @@ async function getClientIp(): Promise<string> {
   return "127.0.0.1"
 }
 
-export async function getSettingsProtection(): Promise<{
+async function getSettingsProtection(): Promise<{
   isProtected: boolean
   dbHash: string | null
   envPassword: string | null
@@ -96,12 +98,17 @@ export async function checkPassword(password: string) {
   }
 
   const clientIp = await getClientIp()
-  const rateLimitKey = `settings:${clientIp}`
-  const rateLimit = checkRateLimit(rateLimitKey)
-  if (rateLimit.isBlocked) {
+  const ipKey = `settings:${clientIp}`
+  const globalKey = "settings:global"
+
+  const ipLimit = checkRateLimit(ipKey, { maxAttempts: 5, windowMs: 15 * 60 * 1000, blockDurationMs: 15 * 60 * 1000 })
+  const globalLimit = checkRateLimit(globalKey, { maxAttempts: 15, windowMs: 15 * 60 * 1000, blockDurationMs: 15 * 60 * 1000 })
+
+  if (ipLimit.isBlocked || globalLimit.isBlocked) {
+    const retry = Math.max(ipLimit.retryAfterSeconds, globalLimit.retryAfterSeconds)
     return {
       success: false,
-      error: `Zu viele Fehlversuche. Bitte versuche es in ${formatRetryDuration(rateLimit.retryAfterSeconds)} erneut.`,
+      error: `Zu viele Fehlversuche. Bitte versuche es in ${formatRetryDuration(retry)} erneut.`,
     }
   }
 
@@ -149,7 +156,8 @@ export async function checkPassword(password: string) {
   }
 
   if (isMatch) {
-    resetRateLimit(rateLimitKey)
+    resetRateLimit(ipKey)
+    resetRateLimit(globalKey)
     const headersList = await headers()
     const isSecure = isSecureRequest(headersList)
     const cookieStore = await cookies()
@@ -165,7 +173,8 @@ export async function checkPassword(password: string) {
     return { success: true }
   }
 
-  recordRateLimitFailure(rateLimitKey)
+  recordRateLimitFailure(ipKey, { maxAttempts: 5, windowMs: 15 * 60 * 1000, blockDurationMs: 15 * 60 * 1000 })
+  recordRateLimitFailure(globalKey, { maxAttempts: 15, windowMs: 15 * 60 * 1000, blockDurationMs: 15 * 60 * 1000 })
 
   // Add slight delay to mitigate high-speed brute-force attacks
   await new Promise((resolve) => setTimeout(resolve, 500))
@@ -176,6 +185,10 @@ export async function updateSettingsPasswordAction(params: {
   action: "change" | "disable"
   newPassword?: string
 }): Promise<{ success: boolean; error?: string }> {
+  const user = await getCurrentUser()
+  if (!user || user.role !== "ADMIN") {
+    return { success: false, error: "Nur Eltern/Administratoren dürfen die Einstellungs-PIN ändern." }
+  }
   const isAuth = await checkSettingsAuthenticated()
   if (!isAuth) {
     return { success: false, error: "Nicht autorisiert. Bitte melde dich mit dem Einstellungspasswort an." }
@@ -297,7 +310,7 @@ export async function loginApp(credentials: { username?: string; password?: stri
   if (resetEnvPassword && password && secureCompare(password, resetEnvPassword)) {
     try {
       const adminUser = await prisma.user.findFirst({
-        where: username ? { username } : { role: "ADMIN" },
+        where: username ? { username: username.toLowerCase(), role: "ADMIN" } : { role: "ADMIN" },
       })
       if (adminUser) {
         // Automatically synchronize DB hash to match this new admin password
@@ -354,6 +367,9 @@ export async function loginApp(credentials: { username?: string; password?: stri
             })
             .catch(() => {})
         }
+      } else if (process.env.NODE_ENV !== "test") {
+        // Mitigation for user enumeration timing side-channel (MED-02)
+        verifyPassword(password, DUMMY_HASH)
       }
     } catch {
       // ignore db errors in rate limiting context

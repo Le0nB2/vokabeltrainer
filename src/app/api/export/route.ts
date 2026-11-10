@@ -1,12 +1,12 @@
 import { NextResponse } from 'next/server'
 import prisma from '@/lib/prisma'
-import { requireAppAuth, UnauthorizedError } from '@/lib/auth-guard'
+import { requireAdminUser, UnauthorizedError } from '@/lib/auth-guard'
 import { checkSettingsAuthenticated } from '@/actions/auth'
 
 async function handleExport() {
   try {
-    // 1. Enforce App Auth (bypassed if not configured in environment)
-    await requireAppAuth()
+    // 1. Enforce Admin User
+    await requireAdminUser()
 
     // 2. Enforce Settings Auth if configured
     const isAuth = await checkSettingsAuthenticated()
@@ -17,6 +17,9 @@ async function handleExport() {
     const settings = await prisma.settings.findUnique({
       where: { id: "default" }
     })
+    const safeSettings = settings
+      ? (({ settingsPasswordHash: _omitted, ...rest }) => rest)(settings as any)
+      : null
 
     const decks = await prisma.deck.findMany({
       include: {
@@ -37,7 +40,7 @@ async function handleExport() {
 
     const payloadData = {
       version: 2,
-      settings: settings,
+      settings: safeSettings,
       decks: decks.map((deck) => {
         const { user, ...deckRest } = deck
         return {

@@ -43,12 +43,14 @@ describe('Security Audit: DoS, Memory Flooding & IP Spoofing Protections', () =>
   })
 
   describe('IP Extraction & Spoofing Resilience (getClientIpFromHeaders)', () => {
-    it('prioritizes trusted cf-connecting-ip over x-forwarded-for', () => {
+    it('prioritizes trusted cf-connecting-ip when TRUST_CLOUDFLARE_HEADERS is enabled', () => {
+      process.env.TRUST_CLOUDFLARE_HEADERS = 'true'
       const headers = new Headers({
         'cf-connecting-ip': '198.51.100.5',
         'x-forwarded-for': '203.0.113.195, 10.0.0.1',
       })
       expect(getClientIpFromHeaders(headers)).toBe('198.51.100.5')
+      delete process.env.TRUST_CLOUDFLARE_HEADERS
     })
 
     it('prioritizes x-real-ip over x-forwarded-for when cf-connecting-ip is absent', () => {
@@ -79,11 +81,11 @@ describe('Security Audit: DoS, Memory Flooding & IP Spoofing Protections', () =>
       })
     })
 
-    it('returns first IP from comma-separated x-forwarded-for chain', () => {
+    it('returns last IP (proxy appended) from comma-separated x-forwarded-for chain', () => {
       const headers = new Headers({
         'x-forwarded-for': '198.51.100.15, 10.0.0.1, 172.16.0.1',
       })
-      expect(getClientIpFromHeaders(headers)).toBe('198.51.100.15')
+      expect(getClientIpFromHeaders(headers)).toBe('172.16.0.1')
     })
   })
 

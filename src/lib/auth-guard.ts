@@ -127,6 +127,18 @@ export async function requireAppAuth(): Promise<void> {
 }
 
 /**
+ * Ensures the user has a valid authenticated session with role ADMIN.
+ * Throws UnauthorizedError if not authenticated or role is not ADMIN.
+ */
+export async function requireAdminUser(): Promise<AuthUser> {
+  const user = await getCurrentUser()
+  if (!user || user.role !== "ADMIN") {
+    throw new UnauthorizedError("Forbidden: Administrator privileges required")
+  }
+  return user
+}
+
+/**
  * Returns true if the user is authenticated or if auth is not configured.
  */
 export async function isAppAuthenticated(): Promise<boolean> {

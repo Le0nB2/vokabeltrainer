@@ -23,9 +23,9 @@ describe("crypto encryption & decryption", () => {
     expect(decryptSecret(enc2)).toBe(text)
   })
 
-  it("gracefully returns unencrypted text if no prefix is present", () => {
+  it("strictly rejects unencrypted text if no prefix is present (CRIT-01)", () => {
     const plain = "unencrypted_legacy_key"
-    expect(decryptSecret(plain)).toBe(plain)
+    expect(() => decryptSecret(plain)).toThrow("Unencrypted or invalid secret format rejected")
   })
 
   it("handles empty or falsy strings cleanly", () => {

@@ -50,6 +50,8 @@ next-env.d.ts
 # SQLite databases
 prisma/*.db
 prisma/*.db-journal
+prisma/.encryption_key
+prisma/.auth_secret
 /backups/
 
 # Generated bundles

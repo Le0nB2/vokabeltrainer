@@ -16,8 +16,8 @@ docker compose up -d app
 echo "Waiting for app to be ready..."
 sleep 15
 
-if curl -s http://localhost:3000 > /dev/null; then
-    echo "App is responding on port 3000! Docker test successful."
+if curl -s http://localhost:3001 > /dev/null || curl -s http://localhost:3000 > /dev/null; then
+    echo "App is responding! Docker test successful."
 else
     echo "App failed to respond."
     docker compose logs app

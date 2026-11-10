@@ -58,7 +58,7 @@ export async function getSetupState(): Promise<{
     try {
       const cookieStore = await cookies()
       const encryptedCookie = cookieStore.get("runtime_db_url")?.value
-      if (encryptedCookie) {
+      if (encryptedCookie && encryptedCookie.startsWith("enc_v1:")) {
         const decrypted = decryptSecret(encryptedCookie)
         if (
           decrypted &&

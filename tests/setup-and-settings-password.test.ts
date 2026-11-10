@@ -6,7 +6,6 @@ import {
 } from '../src/actions/setup'
 import {
   checkPassword,
-  getSettingsProtection,
   isSettingsPasswordConfigured,
   updateSettingsPasswordAction,
   loginApp,

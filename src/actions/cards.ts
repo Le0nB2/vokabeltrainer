@@ -286,23 +286,22 @@ export async function updateCardsEnrichmentBulk(
   if (!Array.isArray(updates) || updates.length === 0) return;
   const limitedUpdates = updates.slice(0, 500);
 
-  for (const update of limitedUpdates) {
-    if (!update.id || typeof update.id !== "string") continue;
-    if (typeof prisma?.card?.findFirst === 'function') {
-      const card = await prisma.card.findFirst({
-        where: { id: update.id, deckId: deckId },
-        select: { id: true },
-      });
-      if (!card) continue;
-    }
-    await prisma.card.update({
-      where: { id: update.id },
-      data: {
-        ...(update.gapText !== undefined && { gapText: sanitizeField(update.gapText, 2000) }),
-        ...(update.mnemonic !== undefined && { mnemonic: sanitizeField(update.mnemonic, 1000) }),
-        ...(update.contextSentence !== undefined && { contextSentence: sanitizeField(update.contextSentence, 2000) }),
-      },
-    });
+  const validUpdates = limitedUpdates.filter((u) => u.id && typeof u.id === "string");
+  if (validUpdates.length === 0) return;
+
+  if (typeof prisma.$transaction === "function") {
+    await prisma.$transaction(
+      validUpdates.map((update) =>
+        prisma.card.updateMany({
+          where: { id: update.id, deckId },
+          data: {
+            ...(update.gapText !== undefined && { gapText: sanitizeField(update.gapText, 2000) }),
+            ...(update.mnemonic !== undefined && { mnemonic: sanitizeField(update.mnemonic, 1000) }),
+            ...(update.contextSentence !== undefined && { contextSentence: sanitizeField(update.contextSentence, 2000) }),
+          },
+        })
+      )
+    );
   }
   revalidatePath(`/decks/${deckId}`);
 }
