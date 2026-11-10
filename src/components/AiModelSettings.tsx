@@ -578,7 +578,7 @@ export function AiModelSettings({
                   </span>
                 </div>
                 <p className="text-[11px] text-zinc-600 dark:text-zinc-400 leading-snug">
-                  Nutzt OpenRouters Free-Router mit wechselnden freien Modellen. Kein Guthaben erforderlich.
+                  Nutzt OpenRouters Free-Router mit wechselnden freien Modellen. Je nach aktueller Verfügbarkeit an freien Modellen funktioniert dieser KI-Anbieter oder nicht.
                 </p>
               </button>
 
