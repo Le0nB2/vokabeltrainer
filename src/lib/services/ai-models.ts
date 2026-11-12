@@ -111,13 +111,24 @@ export function isSuitableModel(id: string): boolean {
 }
 
 /**
+ * Known paid-only models in Google AI Studio that have no Free Tier quota (quota limit: 0)
+ * or require a pay-as-you-go billing account.
+ */
+const KNOWN_PAID_MODELS = ["gemini-4-carbon", "gemini-4-argon", "deep-research"];
+
+/**
  * Determines whether a model is accessible on the Google AI Studio Free Tier
  * or requires a paid pay-as-you-go billing account.
- * In Google's official naming hierarchy, all Pro flagship models require paid billing,
- * while Flash and Flash-Lite models have free tier quotas.
+ * - Traditional naming: models containing "pro" require paid billing.
+ * - New Generation: models like "gemini-4-carbon", "gemini-4-argon", and "deep-research" are Paid-only.
+ * - Free Tier models: "gemini-4-hydrogen", Flash, and Flash-Lite models.
  */
 export function getModelTier(id: string): "free" | "paid" {
-  if (id.toLowerCase().includes("pro")) {
+  const lower = id.toLowerCase();
+  if (lower.includes("pro")) {
+    return "paid";
+  }
+  if (KNOWN_PAID_MODELS.some((m) => lower.includes(m))) {
     return "paid";
   }
   return "free";

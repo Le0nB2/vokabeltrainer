@@ -371,10 +371,15 @@ export function AiModelSettings({
     }
   }
 
-  const isPaidSelected = selectedModel.toLowerCase().includes("pro")
-  const flashLiteModels = models.filter((m) => m.id.includes("lite"))
-  const proModels = models.filter((m) => m.id.includes("pro"))
-  const flashModels = models.filter((m) => !m.id.includes("lite") && !m.id.includes("pro"))
+  // Known paid-only models in Google AI Studio (e.g. Pro, Carbon, Argon, Deep Research)
+  const isPaidModel = (modelId: string) => {
+    const lower = modelId.toLowerCase();
+    return lower.includes("pro") || lower.includes("carbon") || lower.includes("argon") || lower.includes("deep-research");
+  };
+
+  const isPaidSelected = isPaidModel(selectedModel);
+  const freeModels = models.filter((m) => !isPaidModel(m.id));
+  const paidModels = models.filter((m) => isPaidModel(m.id));
 
   return (
     <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl p-6 shadow-sm mt-8 space-y-6">
@@ -782,9 +787,9 @@ export function AiModelSettings({
                     <option value={selectedModel}>{selectedModel}</option>
                   )}
 
-                  {flashLiteModels.length > 0 && (
-                    <optgroup label="Flash-Lite (Kostenlos / Free Tier)">
-                      {flashLiteModels.map((m) => (
+                  {freeModels.length > 0 && (
+                    <optgroup label="Kostenlos / Free Tier (z. B. Hydrogen & Flash)">
+                      {freeModels.map((m) => (
                         <option key={m.id} value={m.id}>
                           {m.displayName} [Free Tier]
                         </option>
@@ -792,19 +797,9 @@ export function AiModelSettings({
                     </optgroup>
                   )}
 
-                  {flashModels.length > 0 && (
-                    <optgroup label="Flash (Kostenlos / Free Tier)">
-                      {flashModels.map((m) => (
-                        <option key={m.id} value={m.id}>
-                          {m.displayName} [Free Tier]
-                        </option>
-                      ))}
-                    </optgroup>
-                  )}
-
-                  {proModels.length > 0 && (
-                    <optgroup label="Pro (Kostenpflichtig / Paid API)">
-                      {proModels.map((m) => (
+                  {paidModels.length > 0 && (
+                    <optgroup label="Kostenpflichtig / Paid API (z. B. Carbon & Pro)">
+                      {paidModels.map((m) => (
                         <option key={m.id} value={m.id}>
                           {m.displayName} [Paid API]
                         </option>
@@ -818,7 +813,7 @@ export function AiModelSettings({
                 <div className="mt-3 flex items-start gap-2 p-3 rounded-lg bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-900/50 text-amber-800 dark:text-amber-300 text-xs">
                   <CreditCard className="w-4 h-4 shrink-0 mt-0.5 text-amber-600 dark:text-amber-400" />
                   <div>
-                    <span className="font-semibold">Paid API erforderlich:</span> Pro-Modelle setzen ein Google AI Studio Abrechnungskonto voraus.
+                    <span className="font-semibold">Paid API erforderlich:</span> Für dieses Modell (z. B. Carbon / Pro) ist ein Google AI Studio Abrechnungskonto (Billing) erforderlich, da es im reinen Free Tier kein Kontingent besitzt.
                   </div>
                 </div>
               ) : (

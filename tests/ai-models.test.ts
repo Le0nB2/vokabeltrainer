@@ -216,13 +216,16 @@ describe("ai-models service", () => {
   });
 
   describe("getModelTier", () => {
-    it("classifies Pro models as paid", () => {
+    it("classifies Pro, Carbon, and Argon models as paid", () => {
       expect(getModelTier("gemini-3.1-pro-preview")).toBe("paid");
       expect(getModelTier("gemini-pro-latest")).toBe("paid");
       expect(getModelTier("gemini-4-pro")).toBe("paid");
+      expect(getModelTier("gemini-4-carbon")).toBe("paid");
+      expect(getModelTier("gemini-4-argon")).toBe("paid");
     });
 
-    it("classifies Flash and Flash-Lite models as free tier", () => {
+    it("classifies Hydrogen, Flash, and Flash-Lite models as free tier", () => {
+      expect(getModelTier("gemini-4-hydrogen")).toBe("free");
       expect(getModelTier("gemini-3.5-flash-lite")).toBe("free");
       expect(getModelTier("gemini-3.1-flash-lite")).toBe("free");
       expect(getModelTier("gemini-3.8-flash")).toBe("free");
