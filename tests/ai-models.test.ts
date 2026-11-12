@@ -46,7 +46,7 @@ describe("ai-models service", () => {
 
       const models = await getModelHierarchy();
       expect(models).toEqual([
-        "gemini-3.6-flash",
+        "gemini-4-hydrogen",
         "gemini-flash-lite-latest",
       ]);
     });
@@ -58,7 +58,7 @@ describe("ai-models service", () => {
 
       const models = await getStoredAiModels();
       expect(models.length).toBeGreaterThanOrEqual(1);
-      expect(models[0].id).toBe("gemini-3.6-flash");
+      expect(models[0].id).toBe("gemini-4-hydrogen");
       expect(models[1].id).toBe("gemini-flash-lite-latest");
     });
 

@@ -85,7 +85,7 @@ model Settings {
   worksheetCount        Int     @default(0)
   notificationsEnabled  Boolean @default(false)
   speechLanguage        String  @default("en-GB")
-  selectedModel         String  @default("gemini-3.6-flash")
+  selectedModel         String  @default("gemini-4-hydrogen")
   openRouterModel       String  @default("openrouter/free")
   openAiModel           String  @default("gpt-4o-mini")
   activeAiProvider      String  @default("gemini")

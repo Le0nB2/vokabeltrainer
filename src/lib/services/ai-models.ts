@@ -8,7 +8,7 @@ export interface FilteredAiModel {
   description: string | null;
 }
 
-export const DEFAULT_AI_MODEL = "gemini-3.6-flash";
+export const DEFAULT_AI_MODEL = "gemini-4-hydrogen";
 export const FALLBACK_AI_MODEL = "gemini-flash-lite-latest";
 
 /**
@@ -46,7 +46,7 @@ export async function getStoredAiModels(): Promise<FilteredAiModel[]> {
         {
           id: DEFAULT_AI_MODEL,
           name: `models/${DEFAULT_AI_MODEL}`,
-          displayName: "Gemini 3.6 Flash",
+          displayName: "Gemini 4 Hydrogen",
           description: "Standardmodell",
         },
         {
@@ -70,7 +70,7 @@ export async function getStoredAiModels(): Promise<FilteredAiModel[]> {
       {
         id: DEFAULT_AI_MODEL,
         name: `models/${DEFAULT_AI_MODEL}`,
-        displayName: "Gemini 3.6 Flash",
+        displayName: "Gemini 4 Hydrogen",
         description: "Standardmodell",
       },
       {

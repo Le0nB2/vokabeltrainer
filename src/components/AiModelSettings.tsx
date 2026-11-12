@@ -49,7 +49,7 @@ export function AiModelSettings({
   apiStats?: ApiStatsResult[]
 }) {
   const [selectedModel, setSelectedModel] = useState(
-    initialSettings.selectedModel ?? "gemini-3.6-flash"
+    initialSettings.selectedModel ?? "gemini-4-hydrogen"
   )
   const [openRouterModel, setOpenRouterModel] = useState<string>(
     initialSettings.openRouterModel ?? "openrouter/free"
