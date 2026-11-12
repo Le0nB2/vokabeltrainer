@@ -2,7 +2,7 @@ import { notFound, redirect } from "next/navigation"
 import { getCurrentUser } from "@/lib/auth-guard"
 import { getSetupState } from "@/actions/setup"
 import { getDeckById } from "@/actions/decks"
-import WorksheetClientView from "./WorksheetClientView"
+import WorksheetContainer from "./WorksheetContainer"
 
 export const dynamic = "force-dynamic"
 
@@ -23,5 +23,5 @@ export default async function WorksheetPage({ params }: { params: Promise<{ id: 
     return notFound()
   }
 
-  return <WorksheetClientView deckId={id} initialDeckName={deck.title} />
+  return <WorksheetContainer deckId={id} initialDeckName={deck.title} />
 }
