@@ -8,7 +8,8 @@ const cspHeader = `
   style-src 'self' 'unsafe-inline';
   img-src 'self' blob: data:;
   font-src 'self' data: https://cdn.jsdelivr.net;
-  connect-src 'self' https://cdn.jsdelivr.net;
+  connect-src 'self' blob: https://cdn.jsdelivr.net;
+  worker-src 'self' blob:;
   object-src 'none';
   base-uri 'self';
   form-action 'self';

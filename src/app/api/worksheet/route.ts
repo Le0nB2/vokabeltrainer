@@ -308,11 +308,15 @@ ${JSON.stringify(selectedCards.map(c => ({ englisch: c.front, deutsch: c.back })
       parsedWorksheet.exercises = optimized.finalExercises;
       parsedWorksheet.solutions = optimized.finalSolutions;
 
+      // Base64-kodiertes PDF mitsenden (falls Puffer vorhanden, z.B. in Tests optional)
+      const pdfBase64 = optimized.buffer ? Buffer.from(optimized.buffer).toString("base64") : undefined;
+
       return {
         worksheet: parsedWorksheet,
         worksheetId,
         dateStr,
         deckName: deck.title,
+        pdfBase64,
       };
     };
 

@@ -1,10 +1,8 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { ArrowLeft, Printer, Download } from "lucide-react";
-import { usePDF, Document, Page } from "@react-pdf/renderer";
-import WorksheetPDF from "./WorksheetPDF";
 import { AiProgressCard } from "@/components/AiProgressCard";
 import { AiActivityLog } from "@/components/AiActivityLog";
 import { readAiStatusStream, AiStatusMessage } from "@/lib/services/ai-status";
@@ -46,6 +44,7 @@ interface WorksheetResponse {
   worksheetId: string;
   dateStr: string;
   deckName?: string;
+  pdfUrl?: string;
 }
 
 interface ApiWorksheetPayload {
@@ -56,6 +55,7 @@ interface ApiWorksheetPayload {
   worksheetId: string;
   dateStr: string;
   deckName?: string;
+  pdfBase64?: string;
 }
 
 export default function WorksheetClientView({
@@ -72,36 +72,15 @@ export default function WorksheetClientView({
   const [worksheetData, setWorksheetData] = useState<WorksheetResponse | null>(null);
   const [currentStatus, setCurrentStatus] = useState<AiStatusMessage | null>(null);
   const [statusHistory, setStatusHistory] = useState<AiStatusMessage[]>([]);
-
-  const [pdfInstance, updatePdf] = usePDF({
-    document: worksheetData ? (
-      <WorksheetPDF
-        exercises={worksheetData.exercises}
-        solutions={worksheetData.solutions}
-        worksheetId={worksheetData.worksheetId}
-        dateStr={worksheetData.dateStr}
-        deckName={worksheetData.deckName}
-      />
-    ) : (
-      <Document>
-        <Page></Page>
-      </Document>
-    ),
-  });
+  const pdfBlobUrlRef = useRef<string | null>(null);
 
   useEffect(() => {
-    if (worksheetData) {
-      updatePdf(
-        <WorksheetPDF
-          exercises={worksheetData.exercises}
-          solutions={worksheetData.solutions}
-          worksheetId={worksheetData.worksheetId}
-          dateStr={worksheetData.dateStr}
-          deckName={worksheetData.deckName}
-        />
-      );
-    }
-  }, [worksheetData, updatePdf]);
+    return () => {
+      if (pdfBlobUrlRef.current) {
+        URL.revokeObjectURL(pdfBlobUrlRef.current);
+      }
+    };
+  }, []);
 
   useEffect(() => {
     async function fetchWorksheet() {
@@ -125,12 +104,26 @@ export default function WorksheetClientView({
           setStatusHistory((prev) => [...prev, statusUpdate]);
         });
 
+        let pdfUrl: string | undefined = undefined;
+        if (data.pdfBase64) {
+          const byteCharacters = atob(data.pdfBase64);
+          const byteNumbers = new Array(byteCharacters.length);
+          for (let i = 0; i < byteCharacters.length; i++) {
+            byteNumbers[i] = byteCharacters.charCodeAt(i);
+          }
+          const byteArray = new Uint8Array(byteNumbers);
+          const blob = new Blob([byteArray], { type: "application/pdf" });
+          pdfUrl = URL.createObjectURL(blob);
+          pdfBlobUrlRef.current = pdfUrl;
+        }
+
         setWorksheetData({
           exercises: data.worksheet.exercises,
           solutions: data.worksheet.solutions,
           worksheetId: data.worksheetId,
           dateStr: data.dateStr,
           deckName: data.deckName || initialDeckName,
+          pdfUrl,
         });
       } catch (err: unknown) {
         setError((err as Error).message);
@@ -155,16 +148,16 @@ export default function WorksheetClientView({
   };
 
   const handlePrint = () => {
-    if (!worksheetData || !pdfInstance.url) return;
+    if (!worksheetData?.pdfUrl) return;
     try {
       const fileName = getPdfFileName();
       const oldTitle = document.title;
       document.title = fileName;
-      const newWindow = window.open(pdfInstance.url, "_blank");
+      const newWindow = window.open(worksheetData.pdfUrl, "_blank");
 
       if (!newWindow) {
         const a = document.createElement("a");
-        a.href = pdfInstance.url;
+        a.href = worksheetData.pdfUrl;
         a.target = "_blank";
         document.body.appendChild(a);
         a.click();
@@ -184,12 +177,12 @@ export default function WorksheetClientView({
   };
 
   const handleDownload = () => {
-    if (!worksheetData || !pdfInstance.url) return;
+    if (!worksheetData?.pdfUrl) return;
     try {
       const fileName = getPdfFileName();
 
       const a = document.createElement("a");
-      a.href = pdfInstance.url;
+      a.href = worksheetData.pdfUrl;
       a.download = fileName;
       document.body.appendChild(a);
       a.click();
@@ -235,6 +228,8 @@ export default function WorksheetClientView({
 
   if (!worksheetData) return null;
 
+  const isPdfReady = Boolean(worksheetData.pdfUrl);
+
   return (
     <div className="min-h-screen bg-zinc-100 dark:bg-zinc-950 flex flex-col items-center justify-center p-4">
       <div className="bg-white dark:bg-zinc-900 p-8 rounded-2xl shadow-sm border border-zinc-200 dark:border-zinc-800 max-w-md w-full text-center">
@@ -253,9 +248,9 @@ export default function WorksheetClientView({
         <div className="space-y-4">
           <button
             onClick={handlePrint}
-            disabled={pdfInstance.loading || !pdfInstance.url}
+            disabled={!isPdfReady}
             className={`w-full flex items-center justify-center gap-2 px-6 py-4 rounded-xl font-medium transition-colors shadow-sm ${
-              pdfInstance.loading || !pdfInstance.url
+              !isPdfReady
                 ? "bg-blue-400 cursor-not-allowed text-white"
                 : "bg-blue-600 hover:bg-blue-700 text-white"
             }`}
@@ -266,9 +261,9 @@ export default function WorksheetClientView({
 
           <button
             onClick={handleDownload}
-            disabled={pdfInstance.loading || !pdfInstance.url}
+            disabled={!isPdfReady}
             className={`w-full flex items-center justify-center gap-2 px-6 py-4 rounded-xl font-medium transition-colors ${
-              pdfInstance.loading || !pdfInstance.url
+              !isPdfReady
                 ? "bg-zinc-50 dark:bg-zinc-800/40 cursor-not-allowed text-zinc-400"
                 : "bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700 text-zinc-900 dark:text-zinc-100"
             }`}
