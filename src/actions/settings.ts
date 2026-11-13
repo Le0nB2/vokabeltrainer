@@ -2,7 +2,7 @@
 
 import prisma from "@/lib/prisma"
 import { revalidatePath } from "next/cache"
-import { requireAppAuth, getCurrentUser, UnauthorizedError, requireAdminUser } from "@/lib/auth-guard"
+import { requireAppAuth, getCurrentUser, UnauthorizedError } from "@/lib/auth-guard"
 import { MAX_IMPORT_SIZE_BYTES, validateBackupData } from "@/lib/validations/import"
 import { checkSettingsAuthenticated } from "@/actions/auth"
 import { hashPassword, validateUsername, validatePasswordPolicy } from "@/lib/auth-utils"
@@ -38,7 +38,8 @@ export async function importData(
   userMappings?: Record<string, UserImportMapping>
 ) {
   try {
-    const user = await requireAdminUser()
+    await requireAppAuth()
+    const user = await getCurrentUser()
     const isAuth = await checkSettingsAuth()
     if (!isAuth) {
       return { success: false, error: "Nicht autorisiert. Bitte melde dich mit dem Einstellungspasswort an." }
@@ -277,7 +278,7 @@ export async function getSettings() {
 }
 
 export async function updateSettings(rawInput: unknown) {
-  await requireAdminUser()
+  await requireAppAuth()
   const isAuth = await checkSettingsAuth()
   if (!isAuth) {
     throw new Error("Nicht autorisiert. Bitte melde dich mit dem Einstellungspasswort an.")

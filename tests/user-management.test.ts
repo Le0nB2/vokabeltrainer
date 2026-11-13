@@ -337,4 +337,44 @@ describe('User Management Actions', () => {
     expect(resetRes.success).toBe(false)
     expect(resetRes.error).toContain('mindestens ein Sonderzeichen')
   })
+
+  it('allows child/non-admin account to access getUserManagementData when settings PIN is verified', async () => {
+    // Simulate active child account session (role: USER)
+    const appSecret = getAppSecret('password123')
+    const childToken = createAppSessionToken('leon', appSecret, 3600, {
+      id: 'child-123',
+      role: 'USER',
+    })
+    mockCookies.set(AUTH_COOKIE_NAME, { value: childToken })
+
+    vi.spyOn(prisma.user, 'findUnique').mockResolvedValue({
+      id: 'child-123',
+      username: 'leon',
+      role: 'USER',
+      isActive: true,
+      passwordHash: 'hash',
+    } as any)
+
+    vi.spyOn(prisma.deck, 'count').mockResolvedValue(1)
+    vi.spyOn(prisma.user, 'findMany').mockResolvedValue([
+      {
+        id: 'child-123',
+        username: 'leon',
+        displayName: 'Leon',
+        role: 'USER',
+        isActive: true,
+        createdAt: new Date(),
+        _count: { decks: 1 },
+      } as any,
+    ])
+
+    // 1. With valid settings PIN session: access is allowed
+    const data = await getUserManagementData()
+    expect(data).toBeDefined()
+    expect(data.users.length).toBeGreaterThan(0)
+
+    // 2. Without settings PIN session: access is blocked
+    mockCookies.delete(SETTINGS_COOKIE_NAME)
+    await expect(getUserManagementData()).rejects.toThrow('Nicht autorisiert')
+  })
 })
