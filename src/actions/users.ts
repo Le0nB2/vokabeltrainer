@@ -16,7 +16,7 @@ import {
   isSecureRequest,
   hashPassword,
 } from "@/lib/auth-utils"
-import { requireAppAuth, getCurrentUser, requireAdminUser } from "@/lib/auth-guard"
+import { requireAppAuth, getCurrentUser } from "@/lib/auth-guard"
 import { checkSettingsAuthenticated } from "@/actions/auth"
 
 const checkSettingsAuth = checkSettingsAuthenticated
@@ -43,7 +43,7 @@ export interface UserManagementData {
 }
 
 export async function getUserManagementData(): Promise<UserManagementData> {
-  await requireAdminUser()
+  await requireAppAuth()
   const isAuth = await checkSettingsAuth()
   if (!isAuth) {
     throw new Error("Nicht autorisiert. Bitte melde dich mit dem Einstellungspasswort an.")
@@ -563,7 +563,7 @@ export async function createUser(data: {
   password: string
   displayName?: string
 }) {
-  await requireAdminUser()
+  await requireAppAuth()
   const isAuth = await checkSettingsAuth()
   if (!isAuth) {
     return { success: false, error: "Nicht autorisiert. Bitte melde dich mit dem Einstellungspasswort an." }
@@ -627,7 +627,7 @@ export async function createUser(data: {
 }
 
 export async function deleteUser(userId: string) {
-  await requireAdminUser()
+  await requireAppAuth()
   const isAuth = await checkSettingsAuth()
   if (!isAuth) {
     return { success: false, error: "Nicht autorisiert. Bitte melde dich mit dem Einstellungspasswort an." }
@@ -658,7 +658,7 @@ export async function deleteUser(userId: string) {
 }
 
 export async function resetUserPassword(userId: string, newPassword: string) {
-  await requireAdminUser()
+  await requireAppAuth()
   const isAuth = await checkSettingsAuth()
   if (!isAuth) {
     return { success: false, error: "Nicht autorisiert. Bitte melde dich mit dem Einstellungspasswort an." }
@@ -689,7 +689,7 @@ export async function resetUserPassword(userId: string, newPassword: string) {
 }
 
 export async function toggleUserActive(userId: string) {
-  await requireAdminUser()
+  await requireAppAuth()
   const isAuth = await checkSettingsAuth()
   if (!isAuth) {
     return { success: false, error: "Nicht autorisiert. Bitte melde dich mit dem Einstellungspasswort an." }

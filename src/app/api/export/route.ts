@@ -1,12 +1,12 @@
 import { NextResponse } from 'next/server'
 import prisma from '@/lib/prisma'
-import { requireAdminUser, UnauthorizedError } from '@/lib/auth-guard'
+import { requireAppAuth, UnauthorizedError } from '@/lib/auth-guard'
 import { checkSettingsAuthenticated } from '@/actions/auth'
 
 async function handleExport() {
   try {
-    // 1. Enforce Admin User
-    await requireAdminUser()
+    // 1. Enforce App Auth
+    await requireAppAuth()
 
     // 2. Enforce Settings Auth if configured
     const isAuth = await checkSettingsAuthenticated()
