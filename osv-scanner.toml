@@ -7,3 +7,9 @@ reason = "Unreachable in production: Dev-only dependency / not exposed"
 id = "GHSA-fc5q-39xc-vjpf"
 ignoreUntil = "2027-01-17T23:59:59Z"
 reason = "Unreachable in production: Dev-only dependency / not exposed"
+
+[[IgnoredVulns]]
+id = "GHSA-7589-6fvf-x4pw"
+ignoreUntil = "2027-01-19T23:59:59Z"
+reason = "Unreachable in production: Dev-only dependency / not exposed"
+
