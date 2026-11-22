@@ -6,7 +6,7 @@ import { updateCardProgress } from "@/actions/cards"
 import { saveDeckResult } from "@/actions/decks"
 import Link from "next/link"
 import { ArrowLeft, Check, X, RotateCcw, Volume2, Brain, Zap, Keyboard, Type } from "lucide-react"
-import { evaluateAnswer } from "@/lib/utils/string"
+import { evaluateAnswer, maskSpoiler } from "@/lib/utils/string"
 import { MinigameOverlay } from "./games/MinigameOverlay"
 
 export function StudySession({ deck, dueCards, settings }: { deck: { id: string, lastResultCorrect?: number | null, lastResultIncorrect?: number | null, cards: { id: string, deckId?: string, front: string, back: string, notes?: string | null, box: number, gapText?: string | null, lapses: number, mnemonic?: string | null }[] }, dueCards: { id: string, deckId?: string, front: string, back: string, notes?: string | null, box: number, gapText?: string | null, lapses: number, mnemonic?: string | null }[], settings: {minigamesEnabled: boolean, minigameIntervalMin: number, minigameIntervalMax: number, speedMatchEnabled: boolean, balloonPopEnabled: boolean, reactionTesterEnabled: boolean, wordDropEnabled: boolean, speechLanguage: string} }) {
@@ -22,6 +22,8 @@ export function StudySession({ deck, dueCards, settings }: { deck: { id: string,
   const [studyMode, setStudyMode] = useState<'smart' | 'classic'>('smart')
   const [typingInput, setTypingInput] = useState('')
   const [typingFeedback, setTypingFeedback] = useState<{ status: string, message: string, input?: string, rating: 'again' | 'hard' | 'good' | 'easy' } | null>(null)
+  const [showHintButton, setShowHintButton] = useState(false)
+  const [isHintRevealed, setIsHintRevealed] = useState(false)
   const [backCardCache, setBackCardCache] = useState<{
     card: any
     isEnglishQuestion: boolean
@@ -94,6 +96,23 @@ export function StudySession({ deck, dueCards, settings }: { deck: { id: string,
     return () => clearTimeout(timeoutId)
   }, [currentIndex, cards.length, cards])
 
+  useEffect(() => {
+    setShowHintButton(false);
+    setIsHintRevealed(false);
+
+    const card = cards[currentIndex];
+    if (!card || !card.mnemonic || isFlipped || sessionCompleted || showMinigame) return;
+
+    const isProblemCard = (card.lapses ?? 0) >= 3;
+    const delayMs = isProblemCard ? 5000 : 10000;
+
+    const timer = setTimeout(() => {
+      setShowHintButton(true);
+    }, delayMs);
+
+    return () => clearTimeout(timer);
+  }, [currentIndex, isFlipped, sessionCompleted, showMinigame, cards])
+
   const handleAnswer = (rating: 'again' | 'hard' | 'good' | 'easy') => {
     if (isTransitioning) return;
     setIsTransitioning(true);
@@ -130,6 +149,8 @@ export function StudySession({ deck, dueCards, settings }: { deck: { id: string,
       flushSync(() => {
         setAnimateFlip(false)
         setIsFlipped(false)
+        setShowHintButton(false)
+        setIsHintRevealed(false)
         setTypingInput('')
         if (!isCompleted) {
           setCurrentIndex(nextIndex)
@@ -138,6 +159,8 @@ export function StudySession({ deck, dueCards, settings }: { deck: { id: string,
     } catch {
       setAnimateFlip(false)
       setIsFlipped(false)
+      setShowHintButton(false)
+      setIsHintRevealed(false)
       setTypingInput('')
       if (!isCompleted) {
         setCurrentIndex(nextIndex)
@@ -170,6 +193,8 @@ export function StudySession({ deck, dueCards, settings }: { deck: { id: string,
       setBackCardCache(null);
       setTypingFeedback(null);
       setTypingInput('');
+      setShowHintButton(false);
+      setIsHintRevealed(false);
     }, 300)
   }
 
@@ -292,6 +317,8 @@ export function StudySession({ deck, dueCards, settings }: { deck: { id: string,
                     setSessionCompleted(deck.cards.length === 0)
                     setBackCardCache(null)
                     setTypingFeedback(null)
+                    setShowHintButton(false)
+                    setIsHintRevealed(false)
                     setTypingInput('')
                     setAnimateFlip(false)
                     setIsFlipped(false)
@@ -303,6 +330,8 @@ export function StudySession({ deck, dueCards, settings }: { deck: { id: string,
                   setSessionCompleted(deck.cards.length === 0)
                   setBackCardCache(null)
                   setTypingFeedback(null)
+                  setShowHintButton(false)
+                  setIsHintRevealed(false)
                   setTypingInput('')
                   setAnimateFlip(false)
                   setIsFlipped(false)
@@ -468,12 +497,42 @@ export function StudySession({ deck, dueCards, settings }: { deck: { id: string,
               </button>
             )}
 
-            {/* Leech-Management: Mnemonic hint for problem cards */}
-            {currentCard.lapses >= 3 && currentCard.mnemonic && (
-              <div className="absolute top-4 right-4 sm:top-6 sm:right-6">
-                <span className="inline-block bg-orange-100 dark:bg-orange-900/30 text-orange-600 dark:text-orange-400 px-2.5 py-1 sm:px-3 sm:py-1.5 rounded-xl text-xs sm:text-sm font-medium border border-orange-200 dark:border-orange-800/50 shadow-sm">
-                  💡 {currentCard.mnemonic}
-                </span>
+            {/* Mnemonic hint with timed reveal and spoiler protection */}
+            {showHintButton && currentCard?.mnemonic && (
+              <div
+                className="absolute top-4 right-4 sm:top-6 sm:right-6 z-10"
+                onClick={(e) => e.stopPropagation()}
+              >
+                {!isHintRevealed ? (
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setIsHintRevealed(true);
+                      if (isTypingMode) {
+                        focusTypingInput();
+                      }
+                    }}
+                    className="inline-flex items-center gap-1.5 bg-orange-100 hover:bg-orange-200 dark:bg-orange-900/30 dark:hover:bg-orange-900/50 text-orange-700 dark:text-orange-300 px-3 py-1.5 rounded-xl text-xs sm:text-sm font-medium border border-orange-200 dark:border-orange-800/50 shadow-sm transition-colors cursor-pointer"
+                  >
+                    <span>💡</span> Tipp anzeigen
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setIsHintRevealed(false);
+                      if (isTypingMode) {
+                        focusTypingInput();
+                      }
+                    }}
+                    className="inline-block bg-orange-100 hover:bg-orange-200/80 dark:bg-orange-900/30 dark:hover:bg-orange-900/50 text-orange-700 dark:text-orange-300 px-3 py-1.5 rounded-xl text-xs sm:text-sm font-medium border border-orange-200 dark:border-orange-800/50 shadow-sm max-w-xs text-left cursor-pointer transition-colors"
+                    title="Klicken zum Ausblenden"
+                  >
+                    💡 {maskSpoiler(currentCard.mnemonic, correctAnswer)}
+                  </button>
+                )}
               </div>
             )}
 
@@ -538,6 +597,13 @@ export function StudySession({ deck, dueCards, settings }: { deck: { id: string,
             {backCard.notes && (
               <div className="text-md sm:text-lg md:text-xl text-zinc-600 dark:text-zinc-400 bg-zinc-50 dark:bg-zinc-800/50 p-3 sm:p-4 rounded-xl [overflow-wrap:anywhere] w-full">
                 {backCard.notes}
+              </div>
+            )}
+
+            {/* Leech-Management: Mnemonic reinforcement only for problem cards (lapses >= 3) */}
+            {(backCard.lapses ?? 0) >= 3 && backCard.mnemonic && (
+              <div className="text-sm sm:text-base text-amber-800 dark:text-amber-200 bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800/50 p-3 sm:p-4 rounded-xl [overflow-wrap:anywhere] w-full text-center shadow-sm">
+                <span className="font-semibold">💡 Eselsbrücke: </span>{backCard.mnemonic}
               </div>
             )}
 

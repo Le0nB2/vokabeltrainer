@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { damerauLevenshtein, evaluateAnswer, extractAnswerVariants } from '../src/lib/utils/string'
+import { damerauLevenshtein, evaluateAnswer, extractAnswerVariants, maskSpoiler } from '../src/lib/utils/string'
 
 describe('damerauLevenshtein', () => {
   it('should return 0 for identical strings', () => {
@@ -139,6 +139,23 @@ describe('evaluateAnswer', () => {
       expect(evaluateAnswer('Entschuldigung', 'Verzeihung. / Entschuldigung.').status).toBe('CORRECT')
       expect(evaluateAnswer('Yes, I am', 'Yes, I am.').status).toBe('CORRECT')
       expect(evaluateAnswer('Yes I am', 'Yes, I am.').status).toBe('CORRECT')
+    })
+  })
+
+  describe('maskSpoiler', () => {
+    it('masks target solution words inside mnemonic', () => {
+      expect(maskSpoiler('Art ist englisch für Kunst.', 'art')).toBe('[...] ist englisch für Kunst.')
+      expect(maskSpoiler('Art ist englisch für Kunst.', 'die Kunst')).toBe('Art ist englisch für [...].')
+    })
+
+    it('ignores common stop words like articles and prepositions when determining words to mask', () => {
+      expect(maskSpoiler('Das Haus ist groß.', 'das Haus')).toBe('Das [...] ist groß.')
+      expect(maskSpoiler('To come to school.', 'to come')).toBe('To [...] to school.')
+    })
+
+    it('returns original mnemonic if targetAnswer or mnemonic is empty', () => {
+      expect(maskSpoiler('Keine Lösung hier', '')).toBe('Keine Lösung hier')
+      expect(maskSpoiler('', 'art')).toBe('')
     })
   })
 })
