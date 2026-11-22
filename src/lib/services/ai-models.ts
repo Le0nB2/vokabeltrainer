@@ -1,15 +1,35 @@
 import { GoogleGenAI } from "@google/genai";
 import prisma from "@/lib/prisma";
+import {
+  getModelTier,
+  getHeuristicModelTier,
+  isPaidModel,
+  isFreeModel,
+  KNOWN_PAID_KEYWORDS,
+  KNOWN_FREE_KEYWORDS,
+  ModelTier,
+} from "@/lib/ai-model-tiers";
 
 export interface FilteredAiModel {
   id: string;
   name: string;
   displayName: string;
   description: string | null;
+  tier: "free" | "paid";
 }
 
 export const DEFAULT_AI_MODEL = "gemini-4-hydrogen";
 export const FALLBACK_AI_MODEL = "gemini-flash-lite-latest";
+
+export {
+  getModelTier,
+  getHeuristicModelTier,
+  isPaidModel,
+  isFreeModel,
+  KNOWN_PAID_KEYWORDS,
+  KNOWN_FREE_KEYWORDS,
+};
+export const KNOWN_PAID_MODELS = KNOWN_PAID_KEYWORDS;
 
 /**
  * Returns the models configured to be used for LLM requests.
@@ -48,12 +68,14 @@ export async function getStoredAiModels(): Promise<FilteredAiModel[]> {
           name: `models/${DEFAULT_AI_MODEL}`,
           displayName: "Gemini 4 Hydrogen",
           description: "Standardmodell",
+          tier: "free",
         },
         {
           id: FALLBACK_AI_MODEL,
           name: `models/${FALLBACK_AI_MODEL}`,
           displayName: "Gemini Flash-Lite Latest",
           description: "Fallback-Modell",
+          tier: "free",
         },
       ];
     }
@@ -63,6 +85,9 @@ export async function getStoredAiModels(): Promise<FilteredAiModel[]> {
       name: m.name,
       displayName: m.displayName,
       description: m.description,
+      tier: (m.tier === "free" || m.tier === "paid")
+        ? (m.tier as "free" | "paid")
+        : getModelTier(m.id, m.displayName),
     }));
   } catch (error) {
     console.error("Fehler beim Laden der gespeicherten KI-Modelle:", error);
@@ -72,12 +97,14 @@ export async function getStoredAiModels(): Promise<FilteredAiModel[]> {
         name: `models/${DEFAULT_AI_MODEL}`,
         displayName: "Gemini 4 Hydrogen",
         description: "Standardmodell",
+        tier: "free",
       },
       {
         id: FALLBACK_AI_MODEL,
         name: `models/${FALLBACK_AI_MODEL}`,
         displayName: "Gemini Flash-Lite Latest",
         description: "Fallback-Modell",
+        tier: "free",
       },
     ];
   }
@@ -111,27 +138,28 @@ export function isSuitableModel(id: string): boolean {
 }
 
 /**
- * Known paid-only models in Google AI Studio that have no Free Tier quota (quota limit: 0)
- * or require a pay-as-you-go billing account.
- */
-const KNOWN_PAID_MODELS = ["gemini-4-carbon", "gemini-4-argon", "deep-research"];
-
-/**
- * Determines whether a model is accessible on the Google AI Studio Free Tier
+ * Probes a model with a minimal 1-token prompt to verify if it works on the Free Tier
  * or requires a paid pay-as-you-go billing account.
- * - Traditional naming: models containing "pro" require paid billing.
- * - New Generation: models like "gemini-4-carbon", "gemini-4-argon", and "deep-research" are Paid-only.
- * - Free Tier models: "gemini-4-hydrogen", Flash, and Flash-Lite models.
  */
-export function getModelTier(id: string): "free" | "paid" {
-  const lower = id.toLowerCase();
-  if (lower.includes("pro")) {
+export async function probeModelTier(
+  aiClient: any,
+  modelId: string
+): Promise<"free" | "paid"> {
+  try {
+    if (aiClient?.models?.generateContent) {
+      await aiClient.models.generateContent({
+        model: modelId,
+        contents: "ping",
+        config: { maxOutputTokens: 1 },
+      });
+      return "free";
+    }
+    return "paid";
+  } catch (err: any) {
+    const msg = (err?.message || "").toLowerCase();
+    console.info(`[ModelProbe] Modell ${modelId} nicht im Free Tier verfügbar (${msg.slice(0, 100)}) -> paid`);
     return "paid";
   }
-  if (KNOWN_PAID_MODELS.some((m) => lower.includes(m))) {
-    return "paid";
-  }
-  return "free";
 }
 
 /**
@@ -145,6 +173,7 @@ export async function fetchAndPersistGoogleModels(customAiClient?: any): Promise
   error?: string;
 }> {
   const validModels: FilteredAiModel[] = [];
+  let activeAiClient: any = customAiClient;
 
   if (customAiClient) {
     try {
@@ -157,7 +186,8 @@ export async function fetchAndPersistGoogleModels(customAiClient?: any): Promise
           id,
           name: m.name || `models/${id}`,
           displayName: m.displayName || id,
-        description: m.description || null,
+          description: m.description || null,
+          tier: "free",
         });
       }
 
@@ -239,10 +269,12 @@ export async function fetchAndPersistGoogleModels(customAiClient?: any): Promise
             name: m.name || `models/${id}`,
             displayName: m.displayName || id,
             description: m.description || null,
+            tier: "free",
           });
         }
 
         // Successfully fetched from Google API
+        activeAiClient = ai;
         await prisma.apiUsageLog.create({
           data: {
             apiKeyIndex: i + 1,
@@ -280,6 +312,37 @@ export async function fetchAndPersistGoogleModels(customAiClient?: any): Promise
     }
   }
 
+  // Retrieve existing models from database to reuse previously probed/stored tiers
+  const existingDbModels = await prisma.aiModel.findMany({
+    where: { provider: "gemini" },
+    select: { id: true, tier: true },
+  }).catch(() => []);
+  const existingTierMap = new Map(existingDbModels.map((m) => [m.id, m.tier]));
+
+  // Resolve tier for each model
+  await Promise.all(
+    validModels.map(async (model) => {
+      const existingTier = existingTierMap.get(model.id);
+      if (existingTier === "free" || existingTier === "paid") {
+        model.tier = existingTier;
+        return;
+      }
+
+      const heuristic = getHeuristicModelTier(model.id, model.displayName);
+      if (heuristic === "paid" || heuristic === "free") {
+        model.tier = heuristic;
+        return;
+      }
+
+      // Model is unclassified/new: run lightweight 1-token probe test
+      if (activeAiClient) {
+        model.tier = await probeModelTier(activeAiClient, model.id);
+      } else {
+        model.tier = getModelTier(model.id, model.displayName);
+      }
+    })
+  );
+
   // Store in database
   const validIds = validModels.map((m) => m.id);
 
@@ -300,6 +363,7 @@ export async function fetchAndPersistGoogleModels(customAiClient?: any): Promise
           displayName: model.displayName,
           description: model.description,
           provider: "gemini",
+          tier: model.tier,
         },
         create: {
           id: model.id,
@@ -307,6 +371,7 @@ export async function fetchAndPersistGoogleModels(customAiClient?: any): Promise
           displayName: model.displayName,
           description: model.description,
           provider: "gemini",
+          tier: model.tier,
         },
       });
     }

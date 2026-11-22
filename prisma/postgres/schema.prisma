@@ -114,6 +114,7 @@ model AiModel {
   displayName String
   description String?
   provider    String   @default("gemini")
+  tier        String?
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 }

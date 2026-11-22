@@ -6,6 +6,10 @@ import {
   fetchAndPersistGoogleModels,
   isSuitableModel,
   getModelTier,
+  getHeuristicModelTier,
+  isPaidModel,
+  isFreeModel,
+  probeModelTier,
 } from "@/lib/services/ai-models";
 
 describe("ai-models service", () => {
@@ -59,7 +63,9 @@ describe("ai-models service", () => {
       const models = await getStoredAiModels();
       expect(models.length).toBeGreaterThanOrEqual(1);
       expect(models[0].id).toBe("gemini-4-hydrogen");
+      expect(models[0].tier).toBe("free");
       expect(models[1].id).toBe("gemini-flash-lite-latest");
+      expect(models[1].tier).toBe("free");
     });
 
     it("returns stored models when available in DB", async () => {
@@ -70,6 +76,7 @@ describe("ai-models service", () => {
           displayName: "Gemini 3.8 Flash",
           description: "Schnelles Modell",
           provider: "gemini",
+          tier: "free",
           createdAt: new Date(),
           updatedAt: new Date(),
         },
@@ -82,6 +89,7 @@ describe("ai-models service", () => {
           name: "models/gemini-3.8-flash",
           displayName: "Gemini 3.8 Flash",
           description: "Schnelles Modell",
+          tier: "free",
         },
       ]);
     });
@@ -147,6 +155,7 @@ describe("ai-models service", () => {
           displayName: "Gemini 3.5 Flash",
           description: "Fast model",
           provider: "gemini",
+          tier: "free",
         },
         create: {
           id: "gemini-3.5-flash",
@@ -154,6 +163,7 @@ describe("ai-models service", () => {
           displayName: "Gemini 3.5 Flash",
           description: "Fast model",
           provider: "gemini",
+          tier: "free",
         },
       });
       expect(prisma.apiUsageLog.create).toHaveBeenCalledWith({
@@ -215,13 +225,18 @@ describe("ai-models service", () => {
     });
   });
 
-  describe("getModelTier", () => {
-    it("classifies Pro, Carbon, and Argon models as paid", () => {
+  describe("getModelTier and Tier Classification", () => {
+    it("classifies Neon, Carbon, Argon, Pro, and Deep Research models as paid", () => {
+      expect(getModelTier("gemini-4-neon")).toBe("paid");
+      expect(getModelTier("gemini-neon-preview")).toBe("paid");
       expect(getModelTier("gemini-3.1-pro-preview")).toBe("paid");
       expect(getModelTier("gemini-pro-latest")).toBe("paid");
       expect(getModelTier("gemini-4-pro")).toBe("paid");
       expect(getModelTier("gemini-4-carbon")).toBe("paid");
       expect(getModelTier("gemini-4-argon")).toBe("paid");
+      expect(getModelTier("deep-research")).toBe("paid");
+      expect(isPaidModel("gemini-4-neon")).toBe(true);
+      expect(isFreeModel("gemini-4-neon")).toBe(false);
     });
 
     it("classifies Hydrogen, Flash, and Flash-Lite models as free tier", () => {
@@ -230,6 +245,33 @@ describe("ai-models service", () => {
       expect(getModelTier("gemini-3.1-flash-lite")).toBe("free");
       expect(getModelTier("gemini-3.8-flash")).toBe("free");
       expect(getModelTier("gemini-flash-latest")).toBe("free");
+      expect(isFreeModel("gemini-4-hydrogen")).toBe(true);
+      expect(isPaidModel("gemini-4-hydrogen")).toBe(false);
+    });
+
+    it("defaults unknown models to paid as safe fallback to protect against quota exhaustion", () => {
+      expect(getHeuristicModelTier("gemini-4-xenon")).toBe("unknown");
+      expect(getModelTier("gemini-4-xenon")).toBe("paid");
+      expect(getModelTier("gemini-5-frontier")).toBe("paid");
+    });
+
+    it("probeModelTier probes with 1-token request and identifies free vs paid", async () => {
+      const mockSuccessClient = {
+        models: {
+          generateContent: vi.fn().mockResolvedValue({ text: "ok" }),
+        },
+      };
+      const mockFailClient = {
+        models: {
+          generateContent: vi.fn().mockRejectedValue(new Error("Quota limit: 0 for this model")),
+        },
+      };
+
+      const resSuccess = await probeModelTier(mockSuccessClient, "gemini-4-test");
+      expect(resSuccess).toBe("free");
+
+      const resFail = await probeModelTier(mockFailClient, "gemini-4-test");
+      expect(resFail).toBe("paid");
     });
   });
 });

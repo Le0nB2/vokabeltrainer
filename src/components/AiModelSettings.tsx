@@ -22,12 +22,14 @@ import {
 } from "lucide-react"
 import { ApiUsageChart } from "@/components/ApiUsageChart"
 import type { ApiStatsResult } from "@/actions/api-stats"
+import { isPaidModel, getModelTier } from "@/lib/ai-model-tiers"
 
 type ModelItem = {
   id: string
   name: string
   displayName: string
   description: string | null
+  tier?: string | null
 }
 
 type Settings = {
@@ -371,15 +373,17 @@ export function AiModelSettings({
     }
   }
 
-  // Known paid-only models in Google AI Studio (e.g. Pro, Carbon, Argon, Deep Research)
-  const isPaidModel = (modelId: string) => {
-    const lower = modelId.toLowerCase();
-    return lower.includes("pro") || lower.includes("carbon") || lower.includes("argon") || lower.includes("deep-research");
+  // Check whether a model requires Paid API billing (Pro, Carbon, Neon, Argon, etc.)
+  const isPaidModelCheck = (modelId: string, modelDisplayName?: string) => {
+    const found = models.find((m) => m.id === modelId);
+    if (found?.tier === "paid") return true;
+    if (found?.tier === "free") return false;
+    return isPaidModel(modelId, modelDisplayName || found?.displayName);
   };
 
-  const isPaidSelected = isPaidModel(selectedModel);
-  const freeModels = models.filter((m) => !isPaidModel(m.id));
-  const paidModels = models.filter((m) => isPaidModel(m.id));
+  const isPaidSelected = isPaidModelCheck(selectedModel);
+  const freeModels = models.filter((m) => !isPaidModelCheck(m.id, m.displayName));
+  const paidModels = models.filter((m) => isPaidModelCheck(m.id, m.displayName));
 
   return (
     <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl p-6 shadow-sm mt-8 space-y-6">
@@ -798,7 +802,7 @@ export function AiModelSettings({
                   )}
 
                   {paidModels.length > 0 && (
-                    <optgroup label="Kostenpflichtig / Paid API (z. B. Carbon & Pro)">
+                    <optgroup label="Kostenpflichtig / Paid API (z. B. Carbon, Neon & Pro)">
                       {paidModels.map((m) => (
                         <option key={m.id} value={m.id}>
                           {m.displayName} [Paid API]
@@ -813,7 +817,7 @@ export function AiModelSettings({
                 <div className="mt-3 flex items-start gap-2 p-3 rounded-lg bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-900/50 text-amber-800 dark:text-amber-300 text-xs">
                   <CreditCard className="w-4 h-4 shrink-0 mt-0.5 text-amber-600 dark:text-amber-400" />
                   <div>
-                    <span className="font-semibold">Paid API erforderlich:</span> Für dieses Modell (z. B. Carbon / Pro) ist ein Google AI Studio Abrechnungskonto (Billing) erforderlich, da es im reinen Free Tier kein Kontingent besitzt.
+                    <span className="font-semibold">Paid API erforderlich:</span> Für dieses Modell (z. B. Carbon, Neon / Pro) ist ein Google AI Studio Abrechnungskonto (Billing) erforderlich, da es im reinen Free Tier kein Kontingent besitzt.
                   </div>
                 </div>
               ) : (
