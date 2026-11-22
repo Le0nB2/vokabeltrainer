@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, screen, fireEvent, act } from '@testing-library/react'
 import { StudySession } from '../src/components/StudySession'
 
@@ -363,5 +363,203 @@ describe('StudySession card flip & typing transition', () => {
     render(<StudySession deck={mockDeck} dueCards={dueCards} settings={mockSettings} />)
 
     expect(window.scrollTo).toHaveBeenCalledWith(0, 0)
+  })
+})
+
+describe('StudySession hint timing and Leech-Management', () => {
+  const mockDeck = {
+    id: 'deck-1',
+    cards: [],
+  }
+
+  const mockSettings = {
+    minigamesEnabled: false,
+    minigameIntervalMin: 5,
+    minigameIntervalMax: 10,
+    speedMatchEnabled: false,
+    balloonPopEnabled: false,
+    reactionTesterEnabled: false,
+    wordDropEnabled: false,
+    speechLanguage: 'en-GB',
+  }
+
+  beforeEach(() => {
+    vi.useFakeTimers()
+    vi.clearAllMocks()
+    window.scrollTo = vi.fn()
+  })
+
+  afterEach(() => {
+    vi.useRealTimers()
+  })
+
+  it('shows "Tipp anzeigen" after 5 seconds for problem cards (lapses >= 3)', () => {
+    const dueCards = [
+      {
+        id: 'card-1',
+        deckId: 'deck-1',
+        front: 'art',
+        back: 'die Kunst',
+        box: 1,
+        gapText: null,
+        lapses: 3,
+        mnemonic: 'Art ist englisch für Kunst.',
+      },
+    ]
+
+    render(<StudySession deck={mockDeck} dueCards={dueCards} settings={mockSettings} />)
+
+    // Initially at 0s, button is NOT visible
+    expect(screen.queryByRole('button', { name: /tipp anzeigen/i })).toBeNull()
+
+    // Fast-forward 4 seconds: still not visible
+    act(() => {
+      vi.advanceTimersByTime(4000)
+    })
+    expect(screen.queryByRole('button', { name: /tipp anzeigen/i })).toBeNull()
+
+    // Fast-forward another 1 second (total 5s): button appears
+    act(() => {
+      vi.advanceTimersByTime(1000)
+    })
+    expect(screen.getByRole('button', { name: /tipp anzeigen/i })).toBeDefined()
+  })
+
+  it('shows "Tipp anzeigen" only after 10 seconds for normal cards (lapses < 3)', () => {
+    const dueCards = [
+      {
+        id: 'card-2',
+        deckId: 'deck-1',
+        front: 'beach',
+        back: 'der Strand',
+        box: 1,
+        gapText: null,
+        lapses: 0,
+        mnemonic: 'Am Beach gibt es Sand.',
+      },
+    ]
+
+    render(<StudySession deck={mockDeck} dueCards={dueCards} settings={mockSettings} />)
+
+    // At 5 seconds: problem cards would show, but normal cards must NOT
+    act(() => {
+      vi.advanceTimersByTime(5000)
+    })
+    expect(screen.queryByRole('button', { name: /tipp anzeigen/i })).toBeNull()
+
+    // At 9.9 seconds: still not visible
+    act(() => {
+      vi.advanceTimersByTime(4900)
+    })
+    expect(screen.queryByRole('button', { name: /tipp anzeigen/i })).toBeNull()
+
+    // At 10 seconds: button appears
+    act(() => {
+      vi.advanceTimersByTime(100)
+    })
+    expect(screen.getByRole('button', { name: /tipp anzeigen/i })).toBeDefined()
+  })
+
+  it('clicking "Tipp anzeigen" reveals masked hint without flipping card and allows toggling', () => {
+    const dueCards = [
+      {
+        id: 'card-1',
+        deckId: 'deck-1',
+        front: 'art',
+        back: 'die Kunst',
+        box: 1,
+        gapText: null,
+        lapses: 3,
+        mnemonic: 'Art ist englisch für Kunst.',
+      },
+    ]
+
+    const { container } = render(<StudySession deck={mockDeck} dueCards={dueCards} settings={mockSettings} />)
+
+    // Advance 5 seconds to show hint button
+    act(() => {
+      vi.advanceTimersByTime(5000)
+    })
+
+    const tippBtn = screen.getByRole('button', { name: /tipp anzeigen/i })
+    expect(tippBtn).toBeDefined()
+
+    // Click the hint button
+    act(() => {
+      fireEvent.click(tippBtn)
+    })
+
+    // The card must NOT have flipped (outer transform-style-3d container does not have rotate-x-180)
+    expect(container.querySelector('.transform-style-3d.rotate-x-180')).toBeNull()
+
+    // The revealed hint text is rendered and masks the target answer
+    const revealedHint = screen.getByTitle('Klicken zum Ausblenden')
+    expect(revealedHint).toBeDefined()
+    expect(revealedHint.textContent).toContain('[...]')
+
+    // Click again to toggle hide
+    act(() => {
+      fireEvent.click(revealedHint)
+    })
+    expect(screen.queryByTitle('Klicken zum Ausblenden')).toBeNull()
+    expect(screen.getByRole('button', { name: /tipp anzeigen/i })).toBeDefined()
+  })
+
+  it('displays mnemonic on the back side ONLY for problem cards (lapses >= 3)', () => {
+    const dueCards = [
+      {
+        id: 'card-problem',
+        deckId: 'deck-1',
+        front: 'art',
+        back: 'die Kunst',
+        box: 1,
+        gapText: null,
+        lapses: 3,
+        mnemonic: 'Art ist englisch für Kunst.',
+      },
+      {
+        id: 'card-normal',
+        deckId: 'deck-1',
+        front: 'sun',
+        back: 'die Sonne',
+        box: 1,
+        gapText: null,
+        lapses: 0,
+        mnemonic: 'Sonne scheint am Sonntag.',
+      },
+    ]
+
+    const { container } = render(<StudySession deck={mockDeck} dueCards={dueCards} settings={mockSettings} />)
+
+    // Flip Problem Card by clicking the flip prompt
+    const flipPrompt = screen.getByText(/Klicken oder Leertaste zum Umdrehen/i)
+    act(() => {
+      fireEvent.click(flipPrompt)
+    })
+
+    // Card is now flipped
+    expect(container.querySelector('.transform-style-3d.rotate-x-180')).not.toBeNull()
+
+    // On the back, mnemonic should be displayed for the problem card
+    expect(screen.getByText(/Eselsbrücke:/i)).toBeDefined()
+    expect(screen.getByText(/Art ist englisch für Kunst/i)).toBeDefined()
+
+    // Rate problem card "good" (Gut) to advance to normal card
+    const gutBtn = screen.getByText(/Gut \(3\)/i)
+    act(() => {
+      fireEvent.click(gutBtn)
+      vi.advanceTimersByTime(350)
+    })
+
+    // We are now on normal card (card-normal, lapses = 0)
+    // Flip normal card
+    const flipPromptNormal = screen.getByText(/Klicken oder Leertaste zum Umdrehen/i)
+    act(() => {
+      fireEvent.click(flipPromptNormal)
+    })
+
+    // On the back of the normal card, NO mnemonic should be shown to keep surface clean
+    expect(screen.queryByText(/Eselsbrücke:/i)).toBeNull()
+    expect(screen.queryByText(/Sonne scheint am Sonntag/i)).toBeNull()
   })
 })

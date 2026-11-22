@@ -180,3 +180,43 @@ export function evaluateAnswer(input: string, correct: string) {
     message: `Falsch. Richtige Antwort: "${correct}".`,
   };
 }
+
+// Maskiert das gesuchte Zielwort in einer Eselsbrücke (Spoiler-Schutz auf der Vorderseite)
+export function maskSpoiler(mnemonic: string, targetAnswer?: string | null): string {
+  if (!mnemonic || !targetAnswer) return mnemonic || "";
+  const stopWords = new Set([
+    "der", "die", "das", "ein", "eine", "einer", "eines", "einem", "einen",
+    "the", "a", "an", "to"
+  ]);
+
+  // Klammerzusätze (z.B. Erklärungen wie "(im Haus)" oder "[sth]") vor der Wortextraktion entfernen,
+  // optionale Wortteile wie "(Mobil-)Telefon" jedoch erhalten
+  const sanitizedTarget = targetAnswer
+    .replace(/\(([a-zA-ZäöüÄÖÜß]+)-\)/g, "$1")
+    .replace(/\([^()]*\)/g, " ")
+    .replace(/\[[^\[\]]*\]/g, " ");
+
+  const rawWords = sanitizedTarget
+    .toLowerCase()
+    .replace(/[^a-zA-Z0-9äöüÄÖÜß]/g, " ")
+    .split(/\s+/)
+    .filter(w => w.length >= 2 && !stopWords.has(w));
+
+  // Auch Varianten mit ss/ß-Äquivalenz berücksichtigen (z.B. Fluß vs Fluss, Straße vs Strasse)
+  const wordsToMask = new Set<string>();
+  for (const w of rawWords) {
+    wordsToMask.add(w);
+    if (w.includes('ß')) wordsToMask.add(w.replace(/ß/g, 'ss'));
+    if (w.includes('ss')) wordsToMask.add(w.replace(/ss/g, 'ß'));
+  }
+
+  let masked = mnemonic;
+  for (const word of wordsToMask) {
+    const escaped = word.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    const regex = new RegExp("(^|[^a-zA-Z0-9äöüÄÖÜß])" + escaped + "([^a-zA-Z0-9äöüÄÖÜß]|$)", "gi");
+    masked = masked.replace(regex, "$1[...]$2");
+    masked = masked.replace(regex, "$1[...]$2");
+  }
+  return masked;
+}
+
