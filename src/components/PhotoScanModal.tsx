@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect, useRef } from "react"
-import { addCardsBulk } from "@/actions/cards"
+import { addCardsBulk, saveOrUpdateScannedCards } from "@/actions/cards"
 import {
   UploadCloud,
   Loader2,
@@ -12,6 +12,7 @@ import {
   Clock,
   RefreshCw,
   XCircle,
+  CheckCircle2,
 } from "lucide-react"
 
 interface PhotoScanModalProps {
@@ -105,6 +106,7 @@ export function PhotoScanModal({ deckId, isOpen, onClose }: PhotoScanModalProps)
   const [retryInfo, setRetryInfo] = useState<{ attempt: number; maxRetries: number; countdown: number } | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [error, setError] = useState("")
+  const [infoMessage, setInfoMessage] = useState("")
   const [extractedCards, setExtractedCards] = useState<ExtractedCard[]>([])
   const [step, setStep] = useState<"upload" | "preview">("upload")
 
@@ -209,6 +211,7 @@ export function PhotoScanModal({ deckId, isOpen, onClose }: PhotoScanModalProps)
         const uploadFile = await prepareImageForUpload(file)
         const formData = new FormData()
         formData.append("image", uploadFile)
+        formData.append("deckId", deckId)
 
         const res = await fetch("/api/scan-image", {
           method: "POST",
@@ -225,6 +228,21 @@ export function PhotoScanModal({ deckId, isOpen, onClose }: PhotoScanModalProps)
         }
 
         const data = await res.json()
+        if (data.backgroundEnrichment) {
+          // Kontingent aller Schlüssel erschöpft -> Im Hintergrund angelegt
+          setIsScanning(false)
+          setInfoMessage(
+            data.message ||
+              `Kontingent aller Schlüssel erschöpft. Die restlichen ${data.pendingCount || 0} Karten werden im Hintergrund vervollständigt.`
+          )
+          setTimeout(() => {
+            onClose()
+            setFile(null)
+            setInfoMessage("")
+          }, 2500)
+          break
+        }
+
         if (data.cards && Array.isArray(data.cards)) {
           setExtractedCards(data.cards)
           setStep("preview")
@@ -281,7 +299,7 @@ export function PhotoScanModal({ deckId, isOpen, onClose }: PhotoScanModalProps)
 
     setIsSubmitting(true)
     try {
-      await addCardsBulk(deckId, validCards)
+      await saveOrUpdateScannedCards(deckId, validCards)
       onClose()
       setFile(null)
       setExtractedCards([])
@@ -321,6 +339,12 @@ export function PhotoScanModal({ deckId, isOpen, onClose }: PhotoScanModalProps)
         </h2>
 
         {error && <p className="text-red-500 text-sm mb-4">{error}</p>}
+        {infoMessage && (
+          <div className="mb-4 p-4 rounded-xl bg-blue-50 dark:bg-blue-950/40 border border-blue-200 dark:border-blue-800 text-blue-900 dark:text-blue-200 flex items-center gap-3 text-sm">
+            <CheckCircle2 className="w-5 h-5 text-blue-600 shrink-0" />
+            <span>{infoMessage}</span>
+          </div>
+        )}
 
         {step === "upload" && (
           <div className="flex-1 flex flex-col items-center justify-center p-4 md:p-8 text-center">

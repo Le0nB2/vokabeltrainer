@@ -98,6 +98,7 @@ export async function addCardsBulk(
     mnemonic?: string;
     contextSentence?: string | null;
     phonetic?: string | null;
+    enrichmentStatus?: string;
   }[]
 ) {
   await requireAppAuth();
@@ -126,6 +127,7 @@ export async function addCardsBulk(
           gapText: sanitizeField(c.gapText, 2000),
           mnemonic: sanitizeField(c.mnemonic, 1000),
           contextSentence: sanitizeField(c.contextSentence, 2000),
+          enrichmentStatus: c.enrichmentStatus || (c.gapText && c.mnemonic ? "DONE" : "idle"),
           box: 1,
           dueDate: new Date(),
           language: "en",
@@ -279,6 +281,7 @@ export async function updateCardsEnrichmentBulk(
     gapText?: string | null;
     mnemonic?: string | null;
     contextSentence?: string | null;
+    enrichmentStatus?: string;
   }[]
 ) {
   await requireAppAuth();
@@ -298,10 +301,64 @@ export async function updateCardsEnrichmentBulk(
             ...(update.gapText !== undefined && { gapText: sanitizeField(update.gapText, 2000) }),
             ...(update.mnemonic !== undefined && { mnemonic: sanitizeField(update.mnemonic, 1000) }),
             ...(update.contextSentence !== undefined && { contextSentence: sanitizeField(update.contextSentence, 2000) }),
+            ...(update.enrichmentStatus !== undefined && { enrichmentStatus: update.enrichmentStatus }),
           },
         })
       )
     );
   }
+  revalidatePath(`/decks/${deckId}`);
+}
+
+export async function saveOrUpdateScannedCards(
+  deckId: string,
+  cards: {
+    id?: string;
+    front: string;
+    back: string;
+    notes?: string | null;
+    gapText?: string | null;
+    mnemonic?: string | null;
+    contextSentence?: string | null;
+    phonetic?: string | null;
+    enrichmentStatus?: string;
+  }[]
+) {
+  await requireAppAuth();
+  await verifyDeckAccess(deckId);
+  if (!deckId || typeof deckId !== "string" || deckId.length > 100) {
+    throw new Error("Ungültige Deck-ID");
+  }
+  if (!Array.isArray(cards) || cards.length === 0) {
+    throw new Error("Mindestens eine Karte erforderlich");
+  }
+
+  const existingWithId = cards.filter((c) => c.id && !c.id.startsWith("temp_"));
+  const newCards = cards.filter((c) => !c.id || c.id.startsWith("temp_"));
+
+  if (existingWithId.length > 0 && typeof prisma.$transaction === "function") {
+    await prisma.$transaction(
+      existingWithId.map((c) => {
+        const rawNotes = c.phonetic ? (c.notes ? `${c.phonetic}\n${c.notes}` : c.phonetic) : c.notes;
+        return prisma.card.update({
+          where: { id: c.id },
+          data: {
+            front: (c.front || "").trim().slice(0, 2000),
+            back: (c.back || "").trim().slice(0, 2000),
+            notes: sanitizeField(rawNotes, 2000),
+            gapText: sanitizeField(c.gapText, 2000),
+            mnemonic: sanitizeField(c.mnemonic, 1000),
+            contextSentence: sanitizeField(c.contextSentence, 2000),
+            enrichmentStatus: c.enrichmentStatus || (c.gapText && c.mnemonic ? "DONE" : "idle"),
+          },
+        });
+      })
+    );
+  }
+
+  if (newCards.length > 0) {
+    await addCardsBulk(deckId, newCards as any);
+  }
+
   revalidatePath(`/decks/${deckId}`);
 }

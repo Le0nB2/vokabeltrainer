@@ -70,6 +70,27 @@ export function EnrichCardsModal({ deckId, cards, isOpen, onClose }: EnrichCards
 
         if (!res.ok) {
           const data = await res.json().catch(() => ({}));
+          if (res.status === 429 || data.quotaExhausted || data.backgroundEnrichment) {
+            // Speichere ggf. bereits angereicherte Batches
+            if (enrichedResults.length > 0) {
+              const previousUpdates = enrichedResults.map((e: any) => ({
+                id: e.id,
+                gapText: e.gapText,
+                mnemonic: e.mnemonic,
+                contextSentence: e.contextSentence,
+                enrichmentStatus: "DONE",
+              }));
+              await updateCardsEnrichmentBulk(deckId, previousUpdates);
+            }
+            setProgress(100);
+            setProgressText(
+              data.error ||
+                `Kontingent aller Schlüssel erschöpft. Die restlichen Karten werden im Hintergrund vervollständigt.`
+            );
+            await new Promise((r) => setTimeout(r, 2000));
+            onClose();
+            return;
+          }
           throw new Error(data.error || "Fehler bei der KI-Generierung");
         }
 

@@ -3,6 +3,8 @@ import { z } from "zod";
 import { enrichCards, QuotaExceededError } from "@/lib/services/ai-enrichment";
 import { requireAppAuth, UnauthorizedError } from "@/lib/auth-guard";
 import { consumeRateLimit, formatRetryDuration, getClientIpFromHeaders } from "@/lib/rate-limit";
+import { triggerBackgroundEnrichment } from "@/lib/services/background-enricher";
+import prisma from "@/lib/prisma";
 
 export const MAX_CARDS_PER_ENRICH_REQUEST = 50;
 export const MAX_TEXT_LENGTH_PER_CARD = 500;
@@ -87,8 +89,33 @@ export async function POST(req: NextRequest) {
 
   } catch (error: unknown) {
     if (error instanceof QuotaExceededError) {
+      try {
+        const body = await req.clone().json().catch(() => null);
+        const cardIds = Array.isArray(body?.cards) ? body.cards.map((c: any) => c.id).filter(Boolean) : [];
+        if (cardIds.length > 0) {
+          const existingCards = await prisma.card.findMany({
+            where: { id: { in: cardIds } },
+            select: { id: true },
+          });
+
+          if (existingCards.length > 0) {
+            await prisma.card.updateMany({
+              where: { id: { in: existingCards.map((c) => c.id) } },
+              data: { enrichmentStatus: "PENDING" },
+            });
+            triggerBackgroundEnrichment({ waitInitial: true });
+          }
+        }
+      } catch (dbErr) {
+        console.error("DB error updating cards to PENDING:", dbErr);
+      }
+
       return NextResponse.json(
-        { error: error.message },
+        {
+          error: "Kontingent aller Schlüssel erschöpft. Die restlichen Karten werden im Hintergrund vervollständigt.",
+          quotaExceeded: true,
+          backgroundEnrichment: true,
+        },
         { status: 429 }
       );
     }

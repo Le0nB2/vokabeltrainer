@@ -1,7 +1,7 @@
 import { getDecks, createDeck } from "@/actions/decks"
 import Link from "next/link"
 import { redirect } from "next/navigation"
-import { Plus, BookOpen, Settings, Brain } from "lucide-react"
+import { Plus, BookOpen, Settings, Brain, Sparkles } from "lucide-react"
 import { AppLogo } from "@/components/AppLogo"
 import { DeckMenu } from "@/components/DeckMenu"
 import { DeckPieChart } from "@/components/DeckPieChart"
@@ -11,6 +11,7 @@ import { getAppAuthCredentials, AUTH_COOKIE_NAME } from "@/lib/auth-utils"
 import { getCurrentUser } from "@/lib/auth-guard"
 import { getSetupState } from "@/actions/setup"
 import prisma from "@/lib/prisma"
+import { triggerBackgroundEnrichment } from "@/lib/services/background-enricher"
 import { subDays, format } from "date-fns"
 import { cookies } from "next/headers"
 
@@ -35,6 +36,17 @@ export default async function Dashboard() {
   const isSetupMode = user.id === "default"
   const decks = await getDecks()
   const now = new Date()
+
+  // Startseiten-Trigger: Automatische Prüfung auf offene Karten zur Anreicherung
+  const pendingEnrichmentCount = await prisma.card.count({
+    where: {
+      enrichmentStatus: { in: ["PENDING", "DAILY_QUOTA_REACHED"] },
+    },
+  })
+
+  if (pendingEnrichmentCount > 0) {
+    triggerBackgroundEnrichment({ waitInitial: false, includeDailyQuotaReached: true })
+  }
 
   const { isConfigured: isAuthEnabled } = getAppAuthCredentials()
   const totalDueCount = decks.reduce((acc, deck) => acc + deck.cards.filter(c => c.dueDate <= now).length, 0)
@@ -153,6 +165,17 @@ export default async function Dashboard() {
             </div>
           </div>
         </header>
+
+        {pendingEnrichmentCount > 0 && (
+          <div className="mb-8 p-4 rounded-xl bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800 text-blue-900 dark:text-blue-200 flex items-center justify-between text-sm shadow-sm">
+            <div className="flex items-center gap-2.5">
+              <Sparkles className="w-5 h-5 text-blue-600 animate-pulse" />
+              <span>
+                <strong>Hintergrund-Verarbeitung aktiv:</strong> {pendingEnrichmentCount} Karte(n) werden im Hintergrund mit KI-Eselsbrücken und Lückentexten vervollständigt.
+              </span>
+            </div>
+          </div>
+        )}
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {decks.map(deck => {

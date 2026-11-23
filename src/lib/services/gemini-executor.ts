@@ -186,7 +186,7 @@ export async function callGeminiWithRetry<T>({
                 keyIndex: keyIndex + 2,
               });
             }
-            if (keyIndex === apiKeys.length - 1 && modelIndex === models.length - 1) {
+            if (keyIndex === apiKeys.length - 1) {
               throw new QuotaExceededError();
             }
             break; // Stop retrying this model, break to switch API key
