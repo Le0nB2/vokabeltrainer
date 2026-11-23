@@ -58,6 +58,7 @@ model Card {
   createdAt          DateTime    @default(now())
   updatedAt          DateTime    @updatedAt
   gapText            String?
+  enrichmentStatus   String?     @default("idle")
   reviewLogs         ReviewLog[]
 }
 

@@ -88,6 +88,43 @@ export function CsvImportModal({ deckId, isOpen, onClose }: CsvImportModalProps)
 
               if (!res.ok) {
                 const data = await res.json().catch(() => ({}));
+                if (res.status === 429 || data.quotaExhausted || data.backgroundEnrichment) {
+                  // Kontingent aller Schlüssel erschöpft:
+                  // Karten direkt mit enrichmentStatus = 'PENDING' speichern!
+                  const remainingEnriched = new Map(enrichedResults.map((e: any) => [e.id, e]));
+                  const cardsToSave = cards.map(c => {
+                    const enrichment = remainingEnriched.get(c.id);
+                    if (enrichment) {
+                      return {
+                        front: c.front,
+                        back: c.back,
+                        notes: c.notes,
+                        gapText: c.gapText || enrichment.gapText,
+                        mnemonic: c.mnemonic || enrichment.mnemonic,
+                        contextSentence: c.contextSentence || enrichment.contextSentence,
+                        enrichmentStatus: "DONE",
+                      };
+                    }
+                    return {
+                      front: c.front,
+                      back: c.back,
+                      notes: c.notes,
+                      gapText: c.gapText || null,
+                      mnemonic: c.mnemonic || null,
+                      contextSentence: c.contextSentence || null,
+                      enrichmentStatus: "PENDING",
+                    };
+                  });
+
+                  await addCardsBulk(deckId, cardsToSave as any);
+                  const pendingCount = cardsToSave.filter(c => c.enrichmentStatus === "PENDING").length;
+                  setProgress(100);
+                  setProgressText(`Kontingent aller Schlüssel erschöpft. Die restlichen ${pendingCount} Karten werden im Hintergrund vervollständigt.`);
+                  await new Promise(r => setTimeout(r, 2000));
+                  setFile(null);
+                  onClose();
+                  return;
+                }
                 throw new Error(data.error || "Fehler bei der KI-Generierung");
               }
 
