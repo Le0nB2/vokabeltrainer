@@ -156,53 +156,56 @@ const styles = StyleSheet.create({
     marginLeft: 2,
   },
   solutionPage: {
-    padding: 25,
+    padding: 20,
     fontFamily: 'Open Sans',
-    fontSize: 8.5,
-    lineHeight: 1.35,
+    fontSize: 8,
+    lineHeight: 1.25,
   },
   solutionHeader: {
-    fontSize: 15,
+    fontSize: 13,
     fontWeight: 'bold',
     borderBottomWidth: 2,
     borderBottomColor: '#000',
-    paddingBottom: 4,
-    marginBottom: 10,
+    paddingBottom: 3,
+    marginBottom: 6,
   },
-  columnsContainer: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-  },
-  leftCol: {
-    width: '48%',
-  },
-  rightCol: {
-    width: '49%',
+  solutionSection: {
+    marginBottom: 4,
   },
   solutionSectionTitle: {
-    fontSize: 11,
+    fontSize: 10,
     fontWeight: 'bold',
-    marginBottom: 5,
-    marginTop: 8,
+    marginBottom: 3,
+    marginTop: 4,
     borderBottomWidth: 1,
     borderBottomColor: '#ddd',
-    paddingBottom: 2,
+    paddingBottom: 1.5,
+  },
+  threeColList: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'space-between',
+    marginBottom: 2,
+  },
+  threeColItem: {
+    width: '32%',
+    marginBottom: 2,
   },
   twoColList: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     justifyContent: 'space-between',
-    marginBottom: 6,
+    marginBottom: 2,
   },
   twoColItem: {
-    width: '48%',
-    marginBottom: 4,
+    width: '48.5%',
+    marginBottom: 2.5,
   },
   singleColList: {
     flexDirection: 'column',
   },
   singleColItem: {
-    marginBottom: 5,
+    marginBottom: 1.5,
   },
 });
 
@@ -345,59 +348,55 @@ const WorksheetPDF: React.FC<WorksheetPDFProps> = ({ exercises, solutions, works
         <Text style={styles.pageIdDate} fixed>{headerInfo}</Text>
         <Text style={styles.solutionHeader}>Solution Key (Teacher&apos;s Copy)</Text>
 
-        <View style={styles.columnsContainer}>
-          {/* Left Column: 1. MC, 2. Words in a box, 4. Fill in the blanks */}
-          <View style={styles.leftCol}>
-            <View>
-              <Text style={styles.solutionSectionTitle}>1. Multiple Choice</Text>
-              <View style={styles.twoColList}>
-                {exercises.multipleChoice?.map((task, i: number) => {
-                  const letter = ['A', 'B', 'C'][task.correctIndex] || '?';
-                  const answer = task.options[task.correctIndex] || '';
-                  return (
-                    <Text key={i} style={styles.twoColItem}>
-                      <Text style={styles.index}>{i + 1}.</Text> {letter}) {answer}
-                    </Text>
-                  );
-                })}
-              </View>
-            </View>
-
-            <View>
-              <Text style={styles.solutionSectionTitle}>2. Words in a box</Text>
-              <View style={styles.twoColList}>
-                {solutions.wordBoxSolutions?.map((sol: string, i: number) => (
-                  <Text key={i} style={styles.twoColItem}>
-                    <Text style={styles.index}>{i + 1}.</Text> {sol}
-                  </Text>
-                ))}
-              </View>
-            </View>
-
-            <View>
-              <Text style={styles.solutionSectionTitle}>4. Fill in the blanks</Text>
-              <View style={styles.twoColList}>
-                {solutions.fillInTheBlankSolutions?.map((sol: string, i: number) => (
-                  <Text key={i} style={styles.twoColItem}>
-                    <Text style={styles.index}>{i + 1}.</Text> {sol}
-                  </Text>
-                ))}
-              </View>
-            </View>
+        {/* 1. Multiple Choice */}
+        <View style={styles.solutionSection}>
+          <Text style={styles.solutionSectionTitle}>1. Multiple Choice</Text>
+          <View style={styles.threeColList}>
+            {exercises.multipleChoice?.map((task, i: number) => {
+              const letter = ['A', 'B', 'C'][task.correctIndex] || '?';
+              const answer = task.options[task.correctIndex] || '';
+              return (
+                <Text key={i} style={styles.threeColItem}>
+                  <Text style={styles.index}>{i + 1}.</Text> {letter}) {answer}
+                </Text>
+              );
+            })}
           </View>
+        </View>
 
-          {/* Right Column: 3. Translation challenge */}
-          <View style={styles.rightCol}>
-            <View>
-              <Text style={styles.solutionSectionTitle}>3. Translation challenge</Text>
-              <View style={styles.singleColList}>
-                {solutions.translateSolutions?.map((sol: string, i: number) => (
-                  <Text key={i} style={styles.singleColItem}>
-                    <Text style={styles.index}>{i + 1}.</Text> {sol}
-                  </Text>
-                ))}
-              </View>
-            </View>
+        {/* 2. Words in a box (einzeilig) */}
+        <View style={styles.solutionSection}>
+          <Text style={styles.solutionSectionTitle}>2. Words in a box</Text>
+          <View style={styles.singleColList}>
+            {solutions.wordBoxSolutions?.map((sol: string, i: number) => (
+              <Text key={i} style={styles.singleColItem}>
+                <Text style={styles.index}>{i + 1}.</Text> {sol}
+              </Text>
+            ))}
+          </View>
+        </View>
+
+        {/* 3. Translation challenge (zweispaltig) */}
+        <View style={styles.solutionSection}>
+          <Text style={styles.solutionSectionTitle}>3. Translation challenge</Text>
+          <View style={styles.twoColList}>
+            {solutions.translateSolutions?.map((sol: string, i: number) => (
+              <Text key={i} style={styles.twoColItem}>
+                <Text style={styles.index}>{i + 1}.</Text> {sol}
+              </Text>
+            ))}
+          </View>
+        </View>
+
+        {/* 4. Fill in the blanks (einzeilig) */}
+        <View style={styles.solutionSection}>
+          <Text style={styles.solutionSectionTitle}>4. Fill in the blanks</Text>
+          <View style={styles.singleColList}>
+            {solutions.fillInTheBlankSolutions?.map((sol: string, i: number) => (
+              <Text key={i} style={styles.singleColItem}>
+                <Text style={styles.index}>{i + 1}.</Text> {sol}
+              </Text>
+            ))}
           </View>
         </View>
       </Page>
