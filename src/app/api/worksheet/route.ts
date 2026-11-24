@@ -1,4 +1,5 @@
 import { generateOptimizedPdf } from '@/lib/utils/pdf-helper';
+import { selectWorksheetCards } from '@/lib/utils/worksheet-cards';
 import { NextRequest, NextResponse } from "next/server";
 import { Type, Schema } from "@google/genai";
 import prisma from "@/lib/prisma";
@@ -49,7 +50,15 @@ export async function POST(req: NextRequest) {
     const deck = await prisma.deck.findUnique({
       where: { id: deckId },
       include: {
-        cards: true,
+        cards: {
+          include: {
+            reviewLogs: {
+              orderBy: { createdAt: "desc" },
+              take: 1,
+              select: { isCorrect: true },
+            },
+          },
+        },
       },
     });
 
@@ -68,16 +77,9 @@ export async function POST(req: NextRequest) {
        return NextResponse.json({ error: "Deck needs at least 5 cards for a worksheet" }, { status: 400 });
     }
 
-    // Select up to 20 cards (prioritizing due cards, then filling up randomly)
-    const now = new Date();
-    const dueCards = deck.cards.filter(c => c.dueDate <= now);
-    const notDueCards = deck.cards.filter(c => c.dueDate > now);
-
-    // Shuffle both arrays
-    dueCards.sort(() => 0.5 - Math.random());
-    notDueCards.sort(() => 0.5 - Math.random());
-
-    const selectedCards = [...dueCards, ...notDueCards].slice(0, 60);
+    // Select up to 60 cards: up to 1/4 from recently incorrect or often-repeated cards,
+    // then fill remaining slots with due cards first and non-due cards.
+    const selectedCards = selectWorksheetCards(deck.cards, 60);
 
     let aiConfig: any = null;
     try {

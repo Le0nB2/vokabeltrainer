@@ -24,7 +24,15 @@ export async function getDecks() {
         select: { cards: true }
       },
       cards: {
-        select: { box: true, dueDate: true }
+        select: {
+          box: true,
+          dueDate: true,
+          reviewLogs: {
+            orderBy: { createdAt: "desc" },
+            take: 1,
+            select: { isCorrect: true },
+          },
+        }
       }
     },
     orderBy: { createdAt: "desc" }
