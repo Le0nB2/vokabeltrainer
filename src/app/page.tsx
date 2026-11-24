@@ -180,6 +180,7 @@ export default async function Dashboard() {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {decks.map(deck => {
             const dueCount = deck.cards.filter(c => c.dueDate <= now).length
+            const lastIncorrectCount = deck.cards.filter(c => c.reviewLogs[0]?.isCorrect === false).length
 
             // Calculate Box distribution (clamp box >= 7 to Stufe 7)
             const boxes = [0, 0, 0, 0, 0, 0, 0] // 7 boxes
@@ -196,9 +197,16 @@ export default async function Dashboard() {
                 {/* If there are no cards, go to the detail page to add some. Otherwise, go to study. */}
                 <Link href={deck.cards.length === 0 ? `/decks/${deck.id}` : `/decks/${deck.id}/study`} className="block">
                   <h2 className="text-xl font-semibold mb-2">{deck.title}</h2>
-                  <div className="flex gap-4 text-sm text-zinc-500 mb-6">
-                    <span>{deck._count.cards} Karten</span>
-                    {dueCount > 0 && <span className="text-amber-600 font-medium">{dueCount} heute fällig</span>}
+                  <div className="flex flex-col gap-1 text-sm text-zinc-500 mb-6">
+                    <div className="flex gap-4">
+                      <span>{deck._count.cards} Karten</span>
+                      {dueCount > 0 && <span className="text-amber-600 font-medium">{dueCount} heute fällig</span>}
+                    </div>
+                    {lastIncorrectCount > 0 && (
+                      <span className="text-red-600 dark:text-red-400 font-medium">
+                        {lastIncorrectCount} zuletzt nicht gewusst
+                      </span>
+                    )}
                   </div>
 
                   {/* Progress / Box Distribution */}
