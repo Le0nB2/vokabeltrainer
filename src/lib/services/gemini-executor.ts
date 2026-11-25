@@ -11,6 +11,31 @@ export class QuotaExceededError extends Error {
   }
 }
 
+export class RequestTimeoutError extends Error {
+  constructor(
+    message: string = "Zeitüberschreitung bei der KI-Anfrage. Bitte versuche es erneut."
+  ) {
+    super(message);
+    this.name = "RequestTimeoutError";
+  }
+}
+
+/**
+ * Checks if an error represents a request timeout.
+ */
+export function isTimeoutError(error: unknown): boolean {
+  if (!error) return false;
+  if (error instanceof RequestTimeoutError) return true;
+  const message = error instanceof Error ? error.message : String(error);
+  const name = error instanceof Error ? error.name : "";
+  return (
+    name === "TimeoutError" ||
+    name === "AbortError" ||
+    message.toLowerCase().includes("zeitüberschreitung") ||
+    message.toLowerCase().includes("timed out")
+  );
+}
+
 /**
  * Checks if an error represents a temporary overload / high demand (HTTP 503 or similar).
  */
@@ -86,8 +111,32 @@ export interface CallGeminiOptions<T> {
   retryDelaysMs?: number[];
   maxAttemptsPrimaryModel?: number;
   maxAttemptsFallbackModel?: number;
+  timeoutMs?: number;
   execute: (ai: GoogleGenAI, model: string) => Promise<T>;
   onStatus?: (event: GeminiStatusEvent) => void | Promise<void>;
+}
+
+export const DEFAULT_REQUEST_TIMEOUT_MS = 45000;
+
+async function executeWithTimeout<T>(fn: () => Promise<T>, timeoutMs: number): Promise<T> {
+  if (!timeoutMs || timeoutMs <= 0) {
+    return fn();
+  }
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  try {
+    return await Promise.race([
+      fn(),
+      new Promise<T>((_, reject) => {
+        timer = setTimeout(() => {
+          reject(new RequestTimeoutError(`Zeitüberschreitung bei KI-Anfrage nach ${Math.round(timeoutMs / 1000)}s`));
+        }, timeoutMs);
+      }),
+    ]);
+  } finally {
+    if (timer !== undefined) {
+      clearTimeout(timer);
+    }
+  }
 }
 
 /**
@@ -105,6 +154,7 @@ export async function callGeminiWithRetry<T>({
   retryDelaysMs,
   maxAttemptsPrimaryModel = 3,
   maxAttemptsFallbackModel = 1,
+  timeoutMs = DEFAULT_REQUEST_TIMEOUT_MS,
   execute,
   onStatus,
 }: CallGeminiOptions<T>): Promise<T> {
@@ -145,7 +195,7 @@ export async function callGeminiWithRetry<T>({
             keyIndex: keyIndex + 1,
           });
 
-          const result = await execute(ai, modelToUse);
+          const result = await executeWithTimeout(() => execute(ai, modelToUse), timeoutMs);
 
           // Log success to DB
           await prisma.apiUsageLog.create({
@@ -162,7 +212,8 @@ export async function callGeminiWithRetry<T>({
 
           const isOverloaded = isOverloadedError(error);
           const isQuota = isQuotaError(error);
-          const errorReason = isOverloaded ? "overloaded" : isQuota ? "quota" : "other";
+          const isTimeout = isTimeoutError(error);
+          const errorReason = isOverloaded ? "overloaded" : isQuota ? "quota" : isTimeout ? "timeout" : "other";
 
           // Log failed attempt to DB
           await prisma.apiUsageLog.create({
@@ -190,6 +241,24 @@ export async function callGeminiWithRetry<T>({
               throw new QuotaExceededError();
             }
             break; // Stop retrying this model, break to switch API key
+          }
+
+          if (isTimeout) {
+            const nextModel = models[modelIndex + 1];
+            console.warn(
+              `Zeitüberschreitung bei Modell ${modelToUse} (Key ${keyIndex + 1}). Wechsle zu Fallback-Modell/Key.`
+            );
+            if (nextModel) {
+              await safeNotify({
+                type: "fallback",
+                message: `Modell ${modelToUse} antwortet nicht rechtzeitig. Wechsle zum Fallback-Modell ${nextModel}...`,
+                model: nextModel,
+              });
+            }
+            if (modelIndex === models.length - 1 && keyIndex === apiKeys.length - 1) {
+              throw error;
+            }
+            break; // Proceed to next model immediately
           }
 
           if (isOverloaded) {

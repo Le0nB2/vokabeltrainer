@@ -1,7 +1,13 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import { updateCardsEnrichmentBulk } from "@/actions/cards"
+import {
+  buildAnalysisBlocks,
+  runBlockEnrichment,
+  type AnalysisBlock,
+} from "@/lib/enrich-blocks"
+import { AnalysisBlocksPanel } from "./AnalysisBlocksPanel"
 import { Loader2 } from "lucide-react"
 
 type CardType = {
@@ -23,17 +29,19 @@ interface EnrichCardsModalProps {
 export function EnrichCardsModal({ deckId, cards, isOpen, onClose }: EnrichCardsModalProps) {
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [error, setError] = useState("")
-  const [progress, setProgress] = useState(0)
-  const [progressText, setProgressText] = useState("")
+  const [statusText, setStatusText] = useState("")
+  const [analysisBlocks, setAnalysisBlocks] = useState<AnalysisBlock<CardType>[]>([])
+  const abortRef = useRef<AbortController | null>(null)
 
-  const cardsToEnrich = cards.filter(c => !c.gapText || !c.mnemonic || !c.contextSentence)
+  const cardsToEnrich = cards.filter((c) => !c.gapText || !c.mnemonic || !c.contextSentence)
 
   useEffect(() => {
     if (!isOpen) {
+      abortRef.current?.abort()
       setIsSubmitting(false)
       setError("")
-      setProgress(0)
-      setProgressText("")
+      setStatusText("")
+      setAnalysisBlocks([])
     }
   }, [isOpen])
 
@@ -43,97 +51,92 @@ export function EnrichCardsModal({ deckId, cards, isOpen, onClose }: EnrichCards
     if (cardsToEnrich.length === 0) return
     setIsSubmitting(true)
     setError("")
-    setProgress(0)
-    setProgressText(`Generiere KI-Felder für ${cardsToEnrich.length} Karte(n)...`)
+
+    const blocks = buildAnalysisBlocks(cardsToEnrich)
+    setAnalysisBlocks(blocks)
+    setStatusText(`Generiere KI-Felder in ${blocks.length} Block/Blöcken...`)
+
+    const controller = new AbortController()
+    abortRef.current = controller
+    const cardLookup = new Map(cardsToEnrich.map((c) => [c.id, c]))
 
     try {
-      const batchSize = 20;
-      const enrichedResults: any[] = [];
-      const totalBatches = Math.ceil(cardsToEnrich.length / batchSize);
+      let hadBackgroundFallback = false
 
-      for (let i = 0; i < cardsToEnrich.length; i += batchSize) {
-        const batch = cardsToEnrich.slice(i, i + batchSize);
-        const currentBatch = Math.floor(i / batchSize) + 1;
-
-        setProgress(Math.round(((i) / cardsToEnrich.length) * 100))
-        setProgressText(`Generiere KI-Felder (Batch ${currentBatch}/${totalBatches})...`)
-
-        const reqBody = {
-          cards: batch.map(c => ({ id: c.id, front: c.front, back: c.back }))
-        };
-
-        const res = await fetch("/api/enrich-csv", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(reqBody)
-        });
-
-        if (!res.ok) {
-          const data = await res.json().catch(() => ({}));
-          if (res.status === 429 || data.quotaExhausted || data.backgroundEnrichment) {
-            // Speichere ggf. bereits angereicherte Batches
-            if (enrichedResults.length > 0) {
-              const previousUpdates = enrichedResults.map((e: any) => ({
-                id: e.id,
-                gapText: e.gapText,
-                mnemonic: e.mnemonic,
-                contextSentence: e.contextSentence,
+      const outcome = await runBlockEnrichment(blocks, {
+        signal: controller.signal,
+        onBlockStart: (bIdx) => {
+          setAnalysisBlocks((prev) =>
+            prev.map((b, idx) => (idx === bIdx ? { ...b, status: "analyzing" } : b))
+          )
+        },
+        onBlockSuccess: async (bIdx, enrichedList) => {
+          const updates = enrichedList
+            .map((e) => {
+              const orig = cardLookup.get(e.id)
+              if (!orig) return null
+              return {
+                id: orig.id,
+                gapText: orig.gapText || e.gapText,
+                mnemonic: orig.mnemonic || e.mnemonic,
+                contextSentence: orig.contextSentence || e.contextSentence,
                 enrichmentStatus: "DONE",
-              }));
-              await updateCardsEnrichmentBulk(deckId, previousUpdates);
-            }
-            setProgress(100);
-            setProgressText(
-              data.error ||
-                `Kontingent aller Schlüssel erschöpft. Die restlichen Karten werden im Hintergrund vervollständigt.`
-            );
-            await new Promise((r) => setTimeout(r, 2000));
-            onClose();
-            return;
+              }
+            })
+            .filter((u): u is NonNullable<typeof u> => u !== null)
+
+          if (updates.length > 0) {
+            await updateCardsEnrichmentBulk(deckId, updates)
           }
-          throw new Error(data.error || "Fehler bei der KI-Generierung");
-        }
 
-        const data = await res.json();
-        enrichedResults.push(...data.cards);
+          setAnalysisBlocks((prev) =>
+            prev.map((b, idx) => (idx === bIdx ? { ...b, status: "done" } : b))
+          )
+        },
+        onRemainingToBackground: async (startBlockIdx, info) => {
+          hadBackgroundFallback = true
+          setStatusText(info.message)
+          setAnalysisBlocks((prev) =>
+            prev.map((b, idx) =>
+              idx >= startBlockIdx && b.status !== "done" ? { ...b, status: "background" } : b
+            )
+          )
+
+          const remainingUpdates = blocks
+            .slice(startBlockIdx)
+            .flatMap((b) => b.cards)
+            .map((c) => ({
+              id: c.id,
+              enrichmentStatus: "PENDING",
+            }))
+
+          if (remainingUpdates.length > 0) {
+            await updateCardsEnrichmentBulk(deckId, remainingUpdates, { waitInitial: info.isQuota })
+          }
+        },
+      })
+
+      if (outcome.aborted) {
+        return
       }
 
-      setProgress(100)
-      setProgressText("Speichere Karten...")
-
-      // Prepare updates
-      const updates = cardsToEnrich.map(c => {
-         const enrichment = enrichedResults.find((e: any) => e.id === c.id);
-         if (enrichment) {
-           return {
-             id: c.id,
-             gapText: c.gapText || enrichment.gapText,
-             mnemonic: c.mnemonic || enrichment.mnemonic,
-             contextSentence: c.contextSentence || enrichment.contextSentence
-           }
-         }
-         return { id: c.id };
-      }).filter(u => Object.keys(u).length > 1);
-
-      if (updates.length > 0) {
-        await updateCardsEnrichmentBulk(deckId, updates);
+      if (hadBackgroundFallback) {
+        await new Promise((r) => setTimeout(r, 2000))
       }
+
       onClose()
     } catch (err: any) {
       setError(err.message || "Fehler beim Speichern der Karten.")
       console.error(err)
     } finally {
+      abortRef.current = null
       setIsSubmitting(false)
-      if (error) {
-        setProgress(0)
-        setProgressText("")
-      }
     }
   }
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-      <div className="bg-white dark:bg-zinc-900 rounded-xl p-6 w-full max-w-md shadow-xl">
+      <div className="bg-white dark:bg-zinc-900 rounded-xl p-6 w-full max-w-lg shadow-xl">
         <h2 className="text-xl font-bold mb-4">Lückentext generieren</h2>
         <div className="space-y-4">
           {cardsToEnrich.length > 0 ? (
@@ -146,28 +149,19 @@ export function EnrichCardsModal({ deckId, cards, isOpen, onClose }: EnrichCards
             </p>
           )}
 
-          {isSubmitting && (
-            <div className="space-y-2">
-              <div className="flex justify-between text-xs text-zinc-500">
-                <span>{progressText}</span>
-                <span>{progress}%</span>
-              </div>
-              <div className="h-2 w-full bg-zinc-200 dark:bg-zinc-800 rounded-full overflow-hidden">
-                <div
-                  className="h-full bg-blue-500 transition-all duration-300"
-                  style={{ width: `${progress}%` }}
-                />
-              </div>
-            </div>
+          {isSubmitting && analysisBlocks.length > 0 && (
+            <AnalysisBlocksPanel blocks={analysisBlocks} statusText={statusText || undefined} />
           )}
 
           {error && <p className="text-red-500 text-sm">{error}</p>}
           <div className="flex justify-end gap-2 mt-6">
             <button
               type="button"
-              onClick={onClose}
-              disabled={isSubmitting}
-              className="px-4 py-2 border rounded-lg hover:bg-zinc-100 dark:hover:bg-zinc-800 disabled:opacity-50"
+              onClick={() => {
+                abortRef.current?.abort()
+                onClose()
+              }}
+              className="px-4 py-2 border rounded-lg hover:bg-zinc-100 dark:hover:bg-zinc-800"
             >
               Abbrechen
             </button>

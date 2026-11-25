@@ -43,6 +43,9 @@ export async function runBackgroundEnrichment(options?: {
     const batchSize = 20;
 
     while (true) {
+      if (typeof prisma?.card?.findMany !== "function") {
+        break;
+      }
       const pendingCards = await prisma.card.findMany({
         where: {
           enrichmentStatus: { in: targetStatuses },

@@ -4,6 +4,14 @@ import prisma from "@/lib/prisma"
 import { revalidatePath } from "next/cache"
 import { requireAppAuth, getCurrentUser, UnauthorizedError } from "@/lib/auth-guard"
 import { MAX_SRS_INTERVAL_DAYS } from "@/lib/constants"
+import { triggerBackgroundEnrichment } from "@/lib/services/background-enricher"
+
+function maybeTriggerBackgroundEnrichment(hasPending: boolean, waitInitial = false) {
+  if (!hasPending || process.env.NODE_ENV === "test") return;
+  if (typeof prisma?.card?.findMany === "function") {
+    triggerBackgroundEnrichment({ waitInitial });
+  }
+}
 
 async function verifyDeckAccess(deckId: string) {
   const user = await getCurrentUser();
@@ -99,7 +107,8 @@ export async function addCardsBulk(
     contextSentence?: string | null;
     phonetic?: string | null;
     enrichmentStatus?: string;
-  }[]
+  }[],
+  options?: { waitInitial?: boolean }
 ) {
   await requireAppAuth();
   await verifyDeckAccess(deckId);
@@ -113,28 +122,34 @@ export async function addCardsBulk(
   const maxBulkCards = 500;
   const limitedCards = cards.slice(0, maxBulkCards);
 
+  const preparedData = limitedCards
+    .map(c => {
+      const cleanFront = (c.front || "").trim().slice(0, 2000);
+      const cleanBack = (c.back || "").trim().slice(0, 2000);
+      const rawNotes = c.phonetic ? (c.notes ? `${c.phonetic}\n${c.notes}` : c.phonetic) : c.notes;
+      return {
+        deckId,
+        front: cleanFront,
+        back: cleanBack,
+        notes: sanitizeField(rawNotes, 2000),
+        gapText: sanitizeField(c.gapText, 2000),
+        mnemonic: sanitizeField(c.mnemonic, 1000),
+        contextSentence: sanitizeField(c.contextSentence, 2000),
+        enrichmentStatus: c.enrichmentStatus || (c.gapText && c.mnemonic ? "DONE" : "idle"),
+        box: 1,
+        dueDate: new Date(),
+        language: "en",
+      };
+    })
+    .filter(c => c.front && c.back);
+
   const created = await prisma.card.createMany({
-    data: limitedCards
-      .map(c => {
-        const cleanFront = (c.front || "").trim().slice(0, 2000);
-        const cleanBack = (c.back || "").trim().slice(0, 2000);
-        const rawNotes = c.phonetic ? (c.notes ? `${c.phonetic}\n${c.notes}` : c.phonetic) : c.notes;
-        return {
-          deckId,
-          front: cleanFront,
-          back: cleanBack,
-          notes: sanitizeField(rawNotes, 2000),
-          gapText: sanitizeField(c.gapText, 2000),
-          mnemonic: sanitizeField(c.mnemonic, 1000),
-          contextSentence: sanitizeField(c.contextSentence, 2000),
-          enrichmentStatus: c.enrichmentStatus || (c.gapText && c.mnemonic ? "DONE" : "idle"),
-          box: 1,
-          dueDate: new Date(),
-          language: "en",
-        };
-      })
-      .filter(c => c.front && c.back)
+    data: preparedData,
   });
+
+  const hasPending = preparedData.some(c => c.enrichmentStatus === "PENDING");
+  maybeTriggerBackgroundEnrichment(hasPending, options?.waitInitial ?? false);
+
   revalidatePath(`/decks/${deckId}`);
   return created;
 }
@@ -282,7 +297,8 @@ export async function updateCardsEnrichmentBulk(
     mnemonic?: string | null;
     contextSentence?: string | null;
     enrichmentStatus?: string;
-  }[]
+  }[],
+  options?: { waitInitial?: boolean }
 ) {
   await requireAppAuth();
   await verifyDeckAccess(deckId);
@@ -307,6 +323,10 @@ export async function updateCardsEnrichmentBulk(
       )
     );
   }
+
+  const hasPending = validUpdates.some((u) => u.enrichmentStatus === "PENDING");
+  maybeTriggerBackgroundEnrichment(hasPending, options?.waitInitial ?? false);
+
   revalidatePath(`/decks/${deckId}`);
 }
 
@@ -322,7 +342,8 @@ export async function saveOrUpdateScannedCards(
     contextSentence?: string | null;
     phonetic?: string | null;
     enrichmentStatus?: string;
-  }[]
+  }[],
+  options?: { waitInitial?: boolean }
 ) {
   await requireAppAuth();
   await verifyDeckAccess(deckId);
@@ -333,8 +354,9 @@ export async function saveOrUpdateScannedCards(
     throw new Error("Mindestens eine Karte erforderlich");
   }
 
-  const existingWithId = cards.filter((c) => c.id && !c.id.startsWith("temp_"));
-  const newCards = cards.filter((c) => !c.id || c.id.startsWith("temp_"));
+  const isTempId = (id?: string) => !id || id.startsWith("temp_") || id.startsWith("scan_");
+  const existingWithId = cards.filter((c) => !isTempId(c.id));
+  const newCards = cards.filter((c) => isTempId(c.id));
 
   if (existingWithId.length > 0 && typeof prisma.$transaction === "function") {
     await prisma.$transaction(
@@ -357,8 +379,11 @@ export async function saveOrUpdateScannedCards(
   }
 
   if (newCards.length > 0) {
-    await addCardsBulk(deckId, newCards as any);
+    await addCardsBulk(deckId, newCards as any, options);
   }
+
+  const hasPendingExisting = existingWithId.some((c) => c.enrichmentStatus === "PENDING");
+  maybeTriggerBackgroundEnrichment(hasPendingExisting, options?.waitInitial ?? false);
 
   revalidatePath(`/decks/${deckId}`);
 }

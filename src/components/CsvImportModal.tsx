@@ -1,7 +1,13 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useRef, useEffect } from "react"
 import { addCardsBulk } from "@/actions/cards"
+import {
+  buildAnalysisBlocks,
+  runBlockEnrichment,
+  type AnalysisBlock,
+} from "@/lib/enrich-blocks"
+import { AnalysisBlocksPanel } from "./AnalysisBlocksPanel"
 import Papa from "papaparse"
 import { Loader2 } from "lucide-react"
 
@@ -24,8 +30,19 @@ export function CsvImportModal({ deckId, isOpen, onClose }: CsvImportModalProps)
   const [file, setFile] = useState<File | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [error, setError] = useState("")
-  const [progress, setProgress] = useState(0)
-  const [progressText, setProgressText] = useState("")
+  const [statusText, setStatusText] = useState("")
+  const [analysisBlocks, setAnalysisBlocks] = useState<AnalysisBlock<any>[]>([])
+  const abortRef = useRef<AbortController | null>(null)
+
+  useEffect(() => {
+    if (!isOpen) {
+      abortRef.current?.abort()
+      setIsSubmitting(false)
+      setError("")
+      setStatusText("")
+      setAnalysisBlocks([])
+    }
+  }, [isOpen])
 
   if (!isOpen) return null
 
@@ -33,152 +50,136 @@ export function CsvImportModal({ deckId, isOpen, onClose }: CsvImportModalProps)
     if (!file) return
     setIsSubmitting(true)
     setError("")
-    setProgress(0)
-    setProgressText("Parse CSV...")
+    setStatusText("Parse CSV...")
+    setAnalysisBlocks([])
 
     Papa.parse<Record<string, string>>(file, {
       header: true,
       skipEmptyLines: true,
       complete: async (results) => {
         try {
-          let cards = results.data.map((row, index: number) => {
-            // Support standard fields with fallbacks
-            const keys = Object.keys(row)
-            const front = sanitizeCsvField(row.front || row[keys[0]] || "") || ""
-            const back = sanitizeCsvField(row.back || row[keys[1]] || "") || ""
-            const notes = sanitizeCsvField(row.notes || row[keys[2]])
-            const gapText = sanitizeCsvField(row.gapText || row.gap_text || row.lückentext)
-            const mnemonic = sanitizeCsvField(row.mnemonic || row.eselsbrücke)
-            const contextSentence = sanitizeCsvField(row.contextSentence || row.context_sentence || row.beispielsatz)
-            return { id: `card_${index}`, front, back, notes, gapText, mnemonic, contextSentence }
-          }).filter(c => c.front && c.back)
+          let cards = results.data
+            .map((row, index: number) => {
+              const keys = Object.keys(row)
+              const front = sanitizeCsvField(row.front || row[keys[0]] || "") || ""
+              const back = sanitizeCsvField(row.back || row[keys[1]] || "") || ""
+              const notes = sanitizeCsvField(row.notes || row[keys[2]])
+              const gapText = sanitizeCsvField(row.gapText || row.gap_text || row.lückentext)
+              const mnemonic = sanitizeCsvField(row.mnemonic || row.eselsbrücke)
+              const contextSentence = sanitizeCsvField(
+                row.contextSentence || row.context_sentence || row.beispielsatz
+              )
+              return { id: `card_${index}`, front, back, notes, gapText, mnemonic, contextSentence }
+            })
+            .filter((c) => c.front && c.back)
 
           if (cards.length === 0) {
-            setError("Keine gültigen Vokabeln gefunden. Stelle sicher, dass die CSV 'front' und 'back' Spalten hat.")
+            setError(
+              "Keine gültigen Vokabeln gefunden. Stelle sicher, dass die CSV 'front' und 'back' Spalten hat."
+            )
             setIsSubmitting(false)
             return
           }
 
-          const cardsToEnrich = cards.filter(c => !c.gapText || !c.mnemonic || !c.contextSentence)
+          const cardsToEnrich = cards.filter(
+            (c) => !c.gapText || !c.mnemonic || !c.contextSentence
+          )
+
+          let hadBackgroundFallback = false
+          let hadQuota = false
+          const enrichedResults = new Map<string, any>()
 
           if (cardsToEnrich.length > 0) {
-            setProgressText(`Generiere KI-Felder für ${cardsToEnrich.length} Karte(n)...`)
+            const blocks = buildAnalysisBlocks(cardsToEnrich)
+            setAnalysisBlocks(blocks)
+            setStatusText(`Starte KI-Analyse in ${blocks.length} Block/Blöcken...`)
 
-            // Process in batches to avoid huge payloads and long timeouts
-            const batchSize = 20;
-            const enrichedResults: any[] = [];
-            const totalBatches = Math.ceil(cardsToEnrich.length / batchSize);
+            const controller = new AbortController()
+            abortRef.current = controller
 
-            for (let i = 0; i < cardsToEnrich.length; i += batchSize) {
-              const batch = cardsToEnrich.slice(i, i + batchSize);
-              const currentBatch = Math.floor(i / batchSize) + 1;
-
-              setProgress(Math.round(((i) / cardsToEnrich.length) * 100))
-              setProgressText(`Generiere KI-Felder (Batch ${currentBatch}/${totalBatches})...`)
-
-              const reqBody = {
-                cards: batch.map(c => ({ id: c.id, front: c.front, back: c.back }))
-              };
-
-              const res = await fetch("/api/enrich-csv", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify(reqBody)
-              });
-
-              if (!res.ok) {
-                const data = await res.json().catch(() => ({}));
-                if (res.status === 429 || data.quotaExhausted || data.backgroundEnrichment) {
-                  // Kontingent aller Schlüssel erschöpft:
-                  // Karten direkt mit enrichmentStatus = 'PENDING' speichern!
-                  const remainingEnriched = new Map(enrichedResults.map((e: any) => [e.id, e]));
-                  const cardsToSave = cards.map(c => {
-                    const enrichment = remainingEnriched.get(c.id);
-                    if (enrichment) {
-                      return {
-                        front: c.front,
-                        back: c.back,
-                        notes: c.notes,
-                        gapText: c.gapText || enrichment.gapText,
-                        mnemonic: c.mnemonic || enrichment.mnemonic,
-                        contextSentence: c.contextSentence || enrichment.contextSentence,
-                        enrichmentStatus: "DONE",
-                      };
-                    }
-                    return {
-                      front: c.front,
-                      back: c.back,
-                      notes: c.notes,
-                      gapText: c.gapText || null,
-                      mnemonic: c.mnemonic || null,
-                      contextSentence: c.contextSentence || null,
-                      enrichmentStatus: "PENDING",
-                    };
-                  });
-
-                  await addCardsBulk(deckId, cardsToSave as any);
-                  const pendingCount = cardsToSave.filter(c => c.enrichmentStatus === "PENDING").length;
-                  setProgress(100);
-                  setProgressText(`Kontingent aller Schlüssel erschöpft. Die restlichen ${pendingCount} Karten werden im Hintergrund vervollständigt.`);
-                  await new Promise(r => setTimeout(r, 2000));
-                  setFile(null);
-                  onClose();
-                  return;
+            const outcome = await runBlockEnrichment(blocks, {
+              signal: controller.signal,
+              onBlockStart: (bIdx) => {
+                setAnalysisBlocks((prev) =>
+                  prev.map((b, idx) => (idx === bIdx ? { ...b, status: "analyzing" } : b))
+                )
+              },
+              onBlockSuccess: (bIdx, enrichedList) => {
+                for (const item of enrichedList) {
+                  enrichedResults.set(item.id, item)
                 }
-                throw new Error(data.error || "Fehler bei der KI-Generierung");
-              }
+                setAnalysisBlocks((prev) =>
+                  prev.map((b, idx) => (idx === bIdx ? { ...b, status: "done" } : b))
+                )
+              },
+              onRemainingToBackground: (startBlockIdx, info) => {
+                hadBackgroundFallback = true
+                hadQuota = info.isQuota
+                setStatusText(info.message)
+                setAnalysisBlocks((prev) =>
+                  prev.map((b, idx) =>
+                    idx >= startBlockIdx && b.status !== "done"
+                      ? { ...b, status: "background" }
+                      : b
+                  )
+                )
+              },
+            })
 
-              const data = await res.json();
-              enrichedResults.push(...data.cards);
+            if (outcome.aborted) {
+              return
             }
-
-            // Merge back
-            setProgress(100)
-            setProgressText("Speichere Karten...")
-
-            cards = cards.map(c => {
-               const enrichment = enrichedResults.find((e: any) => e.id === c.id);
-               if (enrichment) {
-                 return {
-                   ...c,
-                   gapText: c.gapText || enrichment.gapText,
-                   mnemonic: c.mnemonic || enrichment.mnemonic,
-                   contextSentence: c.contextSentence || enrichment.contextSentence
-                 }
-               }
-               return c;
-            });
-          } else {
-             setProgress(100)
-             setProgressText("Speichere Karten...")
           }
 
-          // Remove id before saving as it is not needed by addCardsBulk
-          const finalCards = cards.map(({ id, ...rest }) => rest);
-          await addCardsBulk(deckId, finalCards)
+          if (!hadBackgroundFallback) {
+            setStatusText("Speichere Karten...")
+          }
+
+          const cardsToSave = cards.map((c) => {
+            const enrichment = enrichedResults.get(c.id)
+            const finalGap = c.gapText || enrichment?.gapText || null
+            const finalMnemonic = c.mnemonic || enrichment?.mnemonic || null
+            const finalContext = c.contextSentence || enrichment?.contextSentence || null
+            const needsEnrichment = !finalGap || !finalMnemonic || !finalContext
+
+            return {
+              front: c.front,
+              back: c.back,
+              notes: c.notes,
+              gapText: finalGap,
+              mnemonic: finalMnemonic,
+              contextSentence: finalContext,
+              enrichmentStatus: needsEnrichment ? "PENDING" : "DONE",
+            }
+          })
+
+          await addCardsBulk(deckId, cardsToSave as any, { waitInitial: hadQuota })
+
+          if (hadBackgroundFallback) {
+            await new Promise((r) => setTimeout(r, 2000))
+          }
+
           setFile(null)
           onClose()
         } catch (err: any) {
           setError(err.message || "Fehler beim Speichern der Karten.")
           console.error(err)
         } finally {
+          abortRef.current = null
           setIsSubmitting(false)
-          setProgress(0)
-          setProgressText("")
         }
       },
       error: (err) => {
         setError("Fehler beim Parsen der CSV: " + err.message)
         setIsSubmitting(false)
-        setProgress(0)
-        setProgressText("")
-      }
+        setStatusText("")
+      },
     })
   }
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-      <div className="bg-white dark:bg-zinc-900 rounded-xl p-6 w-full max-w-md shadow-xl">
+      <div className="bg-white dark:bg-zinc-900 rounded-xl p-6 w-full max-w-lg shadow-xl">
         <h2 className="text-xl font-bold mb-4">CSV Import</h2>
         <div className="space-y-4">
           <p className="text-sm text-zinc-500">
@@ -187,33 +188,28 @@ export function CsvImportModal({ deckId, isOpen, onClose }: CsvImportModalProps)
           <input
             type="file"
             accept=".csv"
-            onChange={e => setFile(e.target.files?.[0] || null)}
+            onChange={(e) => setFile(e.target.files?.[0] || null)}
             className="w-full border rounded-lg p-2 dark:bg-zinc-800 dark:border-zinc-700"
             disabled={isSubmitting}
           />
 
-          {isSubmitting && (
-            <div className="space-y-2">
-              <div className="flex justify-between text-xs text-zinc-500">
-                <span>{progressText}</span>
-                <span>{progress}%</span>
-              </div>
-              <div className="h-2 w-full bg-zinc-200 dark:bg-zinc-800 rounded-full overflow-hidden">
-                <div
-                  className="h-full bg-blue-500 transition-all duration-300"
-                  style={{ width: `${progress}%` }}
-                />
-              </div>
-            </div>
+          {isSubmitting && analysisBlocks.length > 0 && (
+            <AnalysisBlocksPanel blocks={analysisBlocks} statusText={statusText || undefined} />
+          )}
+
+          {isSubmitting && analysisBlocks.length === 0 && statusText && (
+            <p className="text-xs text-zinc-500">{statusText}</p>
           )}
 
           {error && <p className="text-red-500 text-sm">{error}</p>}
           <div className="flex justify-end gap-2 mt-6">
             <button
               type="button"
-              onClick={onClose}
-              disabled={isSubmitting}
-              className="px-4 py-2 border rounded-lg hover:bg-zinc-100 dark:hover:bg-zinc-800 disabled:opacity-50"
+              onClick={() => {
+                abortRef.current?.abort()
+                onClose()
+              }}
+              className="px-4 py-2 border rounded-lg hover:bg-zinc-100 dark:hover:bg-zinc-800"
             >
               Abbrechen
             </button>
