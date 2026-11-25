@@ -6,7 +6,9 @@ import {
   DEFAULT_RETRY_DELAYS_MS,
   isOverloadedError,
   isQuotaError,
+  isTimeoutError,
   QuotaExceededError,
+  RequestTimeoutError,
 } from "@/lib/services/gemini-executor";
 
 describe("gemini-executor service", () => {
@@ -223,6 +225,28 @@ describe("gemini-executor service", () => {
 
       const retryEvents = statusEvents.filter((e) => e.type === "retry");
       expect(retryEvents).toHaveLength(2);
+    });
+
+    it("fails fast on timeoutMs and falls back immediately to the next model", async () => {
+      const executeMock = vi
+        .fn()
+        .mockImplementationOnce(
+          () => new Promise((resolve) => setTimeout(() => resolve("too-late"), 200))
+        )
+        .mockResolvedValueOnce("fallback-fast");
+
+      const result = await callGeminiWithRetry({
+        endpoint: "test-endpoint",
+        apiKeys: ["key-1"],
+        models: ["gemini-4-hydrogen", "gemini-flash-lite-latest"],
+        timeoutMs: 25,
+        retryDelayMs: 1,
+        execute: executeMock,
+      });
+
+      expect(result).toBe("fallback-fast");
+      expect(executeMock).toHaveBeenCalledTimes(2);
+      expect(isTimeoutError(new RequestTimeoutError())).toBe(true);
     });
   });
 });

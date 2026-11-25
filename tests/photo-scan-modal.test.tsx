@@ -82,4 +82,99 @@ describe("PhotoScanModal component", () => {
     expect(screen.getByText("Bildanalyse abgebrochen.")).toBeDefined()
     expect(screen.getByText("Bild analysieren")).toBeDefined()
   })
+
+  it("shows extracted cards immediately in preview and enriches blocks live", async () => {
+    vi.useRealTimers()
+
+    global.fetch = vi
+      .fn()
+      // 1. Call: Fast OCR from /api/scan-image
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          cards: [
+            { id: "scan_1", front: "apple", back: "der Apfel", notes: "", phonetic: "" },
+            { id: "scan_2", front: "book", back: "das Buch", notes: "", phonetic: "" },
+          ],
+        }),
+      } as any)
+      // 2. Call: Block 1 enrichment from /api/enrich-csv
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          cards: [
+            {
+              id: "scan_1",
+              gapText: "I eat an ___",
+              mnemonic: "Apfel-Eselsbrücke",
+              contextSentence: "I eat an apple",
+            },
+            {
+              id: "scan_2",
+              gapText: "Read a ___",
+              mnemonic: "Buch-Eselsbrücke",
+              contextSentence: "Read a book",
+            },
+          ],
+        }),
+      } as any)
+
+    render(<PhotoScanModal deckId="deck-123" isOpen={true} onClose={vi.fn()} />)
+
+    const fileInput = document.querySelector('input[type="file"]') as HTMLInputElement
+    const dummyFile = new File(["dummy"], "vokabeln.jpg", { type: "image/jpeg" })
+    fireEvent.change(fileInput, { target: { files: [dummyFile] } })
+    fireEvent.click(screen.getByText("Bild analysieren"))
+
+    // Preview must open immediately showing the block panel and card rows
+    await waitFor(() => {
+      expect(screen.getByText("Erkannte Vokabeln (Vorschau)")).toBeDefined()
+      expect(screen.getByText(/Block 1 \(1–2\):/)).toBeDefined()
+      expect(screen.getByDisplayValue("apple")).toBeDefined()
+    })
+
+    // Enriched mnemonic should populate live once /api/enrich-csv resolves
+    await waitFor(() => {
+      expect(screen.getByDisplayValue("Apfel-Eselsbrücke")).toBeDefined()
+      expect(screen.getByDisplayValue("Read a ___")).toBeDefined()
+    })
+  })
+
+  it("moves remaining blocks to background on 429 quota without showing other AI provider hints", async () => {
+    vi.useRealTimers()
+
+    global.fetch = vi
+      .fn()
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          cards: [{ id: "scan_1", front: "dog", back: "der Hund", notes: "", phonetic: "" }],
+        }),
+      } as any)
+      .mockResolvedValueOnce({
+        ok: false,
+        status: 429,
+        json: async () => ({
+          error:
+            "Kontingent aller Schlüssel erschöpft. Die restlichen Karten werden im Hintergrund vervollständigt.",
+          quotaExhausted: true,
+        }),
+      } as any)
+
+    render(<PhotoScanModal deckId="deck-123" isOpen={true} onClose={vi.fn()} />)
+
+    const fileInput = document.querySelector('input[type="file"]') as HTMLInputElement
+    const dummyFile = new File(["dummy"], "vokabeln.jpg", { type: "image/jpeg" })
+    fireEvent.change(fileInput, { target: { files: [dummyFile] } })
+    fireEvent.click(screen.getByText("Bild analysieren"))
+
+    await waitFor(() => {
+      expect(screen.getAllByText(/Kontingent aller Schlüssel erschöpft/).length).toBeGreaterThan(0)
+      expect(screen.getAllByText("Hintergrund").length).toBeGreaterThan(0)
+    })
+
+    // Ensure no alternative AI provider hint appears
+    const bodyText = document.body.textContent || ""
+    expect(bodyText).not.toMatch(/OpenAI|ChatGPT|OpenRouter/i)
+  })
 })

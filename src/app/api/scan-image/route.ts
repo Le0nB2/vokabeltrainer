@@ -4,9 +4,6 @@ import { requireAppAuth, UnauthorizedError } from "@/lib/auth-guard";
 import { consumeRateLimit, formatRetryDuration, getClientIpFromHeaders } from "@/lib/rate-limit";
 import { callGeminiWithRetry, QuotaExceededError } from "@/lib/services/gemini-executor";
 import { getActiveAiProvider } from "@/lib/ai/ai-router";
-import { enrichCards } from "@/lib/services/ai-enrichment";
-import { triggerBackgroundEnrichment } from "@/lib/services/background-enricher";
-import prisma from "@/lib/prisma";
 
 export async function POST(req: NextRequest) {
   try {
@@ -37,7 +34,6 @@ export async function POST(req: NextRequest) {
 
     const formData = await req.formData();
     const file = formData.get("image") as File;
-    const deckId = (formData.get("deckId") as string) || null;
 
     if (!file) {
       return NextResponse.json({ error: "No image provided" }, { status: 400 });
@@ -82,7 +78,9 @@ export async function POST(req: NextRequest) {
     const base64Image = buffer.toString("base64");
 
     // ==========================================
-    // SOFORT-PHASE: Schnelles Auslesen aus Bild
+    // SOFORT-PHASE: Schnelles Auslesen aus Bild (nur OCR)
+    // Die Anreicherung (Eselsbrücken & Lückentexte) erfolgt anschließend
+    // sichtbar blockweise im Vorschau-Modal oder im Hintergrund.
     // ==========================================
     const scanPrompt = `Du bist ein didaktischer Englischlehrer für Schüler im Alter von 11 bis 13 Jahren (5.–7. Klasse). Extrahiere alle Vokabelpaare aus diesem Foto (Buchseite, Liste, Notizbuch).
 
@@ -114,6 +112,8 @@ WICHTIGE REGELN:
       rawExtractedCards = await callGeminiWithRetry({
         endpoint: "scan-image",
         apiKeys,
+        maxAttemptsPrimaryModel: 2,
+        timeoutMs: 45000,
         execute: async (ai, modelToUse) => {
           const response = await ai.models.generateContent({
             model: modelToUse,
@@ -156,7 +156,7 @@ WICHTIGE REGELN:
             throw new Error("Failed to generate text from Gemini");
           }
 
-          let cards = JSON.parse(textResponse);
+          const cards = JSON.parse(textResponse);
           return Array.isArray(cards) ? cards : [];
         },
       });
@@ -166,131 +166,21 @@ WICHTIGE REGELN:
       return NextResponse.json({ cards: [] });
     }
 
-    // Filter cards with front & back
     const validRawCards = rawExtractedCards.filter((c) => c.front?.trim() && c.back?.trim());
+    const scanTimestamp = Date.now();
 
-    // Falls deckId übergeben wurde, legen wir die Karten direkt im Deck mit PENDING an
-    let createdCardsInDb: Array<{ id: string; front: string; back: string; notes?: string | null }> = [];
-    if (deckId) {
-      await prisma.$transaction(
-        validRawCards.map((c) => {
-          const rawNotes = c.phonetic ? (c.notes ? `${c.phonetic}\n${c.notes}` : c.phonetic) : c.notes;
-          return prisma.card.create({
-            data: {
-              deckId,
-              front: c.front.trim().slice(0, 2000),
-              back: c.back.trim().slice(0, 2000),
-              notes: rawNotes ? rawNotes.slice(0, 2000) : null,
-              enrichmentStatus: "PENDING",
-              box: 1,
-              dueDate: new Date(),
-              language: "en",
-            },
-            select: { id: true, front: true, back: true, notes: true },
-          });
-        })
-      ).then((res) => {
-        createdCardsInDb = res;
-      });
-    }
-
-    // ==========================================
-    // ANREICHERUNGS-PHASE (synchroner Key-Durchlauf)
-    // ==========================================
-    const cardsToEnrich = validRawCards.map((c, index) => ({
-      id: createdCardsInDb[index]?.id || `temp_${index}`,
-      front: c.front,
-      back: c.back,
-    }));
-
-    try {
-      const apiKeys = (aiConfig?.provider as any)?.apiKeys || (envApiKeys.length > 0 ? envApiKeys : undefined);
-      const enrichedResult = await enrichCards(cardsToEnrich, apiKeys);
-
-      // Zusammenführen mit Lautschrift / Notizen
-      const enrichedMap = new Map<string, any>((enrichedResult || []).map((e: any) => [e.id, e]));
-
-      const fullCards = validRawCards.map((c, index) => {
-        const id = createdCardsInDb[index]?.id || `temp_${index}`;
-        const enriched = enrichedMap.get(id);
-        return {
-          id: createdCardsInDb[index]?.id,
-          front: c.front,
-          back: c.back,
-          notes: c.notes || "",
-          phonetic: c.phonetic || "",
-          gapText: enriched?.gapText || null,
-          mnemonic: enriched?.mnemonic || null,
-          contextSentence: enriched?.contextSentence || null,
-        };
-      });
-
-      // Wenn Karten in DB angelegt wurden, updaten wir sie auf DONE
-      if (deckId && createdCardsInDb.length > 0) {
-        await prisma.$transaction(
-          fullCards
-            .filter((c) => c.id)
-            .map((c) =>
-              prisma.card.update({
-                where: { id: c.id! },
-                data: {
-                  gapText: c.gapText,
-                  mnemonic: c.mnemonic,
-                  contextSentence: c.contextSentence,
-                  enrichmentStatus: "DONE",
-                },
-              })
-            )
-        );
-      }
-
-      // Synchroner Key hatte Kontingent -> Reguläre Kontrollmaske im UI anzeigen
-      return NextResponse.json({
-        cards: fullCards,
-        backgroundEnrichment: false,
-      });
-    } catch (enrichError: unknown) {
-      const isQuota =
-        enrichError instanceof QuotaExceededError ||
-        (enrichError instanceof Error && enrichError.message.toLowerCase().includes("quota")) ||
-        (enrichError as any)?.status === 429;
-
-      if (isQuota) {
-        // Erst wenn ALLE verfügbaren Keys ihr Kontingent überschritten haben (429):
-        // Browser nicht blockieren! Hintergrund-Worker übernimmt Wartepause (60s)
-        triggerBackgroundEnrichment({ waitInitial: true });
-
-        const pendingCount = validRawCards.length;
-        return NextResponse.json({
-          backgroundEnrichment: true,
-          pendingCount,
-          cards: validRawCards.map((c, idx) => ({
-            id: createdCardsInDb[idx]?.id,
-            front: c.front,
-            back: c.back,
-            notes: c.notes || "",
-            phonetic: c.phonetic || "",
-            gapText: null,
-            mnemonic: null,
-            contextSentence: null,
-          })),
-          message: `Kontingent aller Schlüssel erschöpft. Die restlichen ${pendingCount} Karten werden im Hintergrund vervollständigt.`,
-        });
-      }
-
-      // Bei anderen Fehlern trotzdem Rohkarten zurückgeben
-      console.error("Enrichment error during scan:", enrichError);
-      return NextResponse.json({
-        cards: validRawCards.map((c, idx) => ({
-          id: createdCardsInDb[idx]?.id,
-          front: c.front,
-          back: c.back,
-          notes: c.notes || "",
-          phonetic: c.phonetic || "",
-        })),
-        backgroundEnrichment: false,
-      });
-    }
+    return NextResponse.json({
+      cards: validRawCards.map((c, idx) => ({
+        id: `scan_${scanTimestamp}_${idx}`,
+        front: c.front.trim(),
+        back: c.back.trim(),
+        notes: c.notes?.trim() || "",
+        phonetic: c.phonetic?.trim() || "",
+        gapText: null,
+        mnemonic: null,
+        contextSentence: null,
+      })),
+    });
   } catch (error: unknown) {
     if (error instanceof QuotaExceededError) {
       return NextResponse.json({ error: error.message }, { status: 429 });
